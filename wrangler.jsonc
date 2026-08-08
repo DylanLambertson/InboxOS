@@ -1,0 +1,31 @@
+{
+  // Cloudflare Worker config. See the README for setup.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "inboxos",
+  "main": "worker/index.ts",
+  "compatibility_date": "2026-08-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/api/*", "/webhooks/*"]
+  },
+  "observability": { "enabled": true },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "MAIL_DB",
+      "database_id": "REPLACE_WITH_D1_DATABASE_ID",
+      "migrations_dir": "migrations"
+    }
+  ],
+  "r2_buckets": [{ "binding": "FILES", "bucket_name": "inboxos-files" }],
+  // Every minute: dispatch scheduled sends. Daily cleanup runs inside the same handler.
+  "triggers": { "crons": ["* * * * *"] },
+  "vars": {
+    // Public URL of the app (used for OAuth redirects and invite links).
+    "APP_URL": "https://mail.example.com"
+  }
+  // Secrets (set with `wrangler secret put <NAME>`):
+  //   RESEND_API_KEY, RESEND_WEBHOOK_SECRET, SESSION_SECRET,
+  //   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (optional, enables Google sign-in)
+}

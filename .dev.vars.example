@@ -1,0 +1,7 @@
+# Copy to .dev.vars for local development (never commit .dev.vars)
+APP_URL=http://localhost:5173
+SESSION_SECRET=change-me-to-a-long-random-string
+RESEND_API_KEY=re_xxxxxxxxx
+RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxx
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
