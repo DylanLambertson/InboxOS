@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+/*
+ * Design tokens. Brand values (--accent, --radius, --font) are injected at runtime
+ * from the white-label settings (see src/lib/brand.tsx); everything else derives from them.
+ */
+:root {
+  --accent: #4f46e5;
+  --radius: 10px;
+  --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  --bg: #ffffff;
+  --bg-subtle: #f7f7f8;
+  --bg-muted: #f0f0f2;
+  --surface: #ffffff;
+  --surface-raised: #ffffff;
+  --border: #e6e6e9;
+  --border-strong: #d4d4d8;
+  --text: #18181b;
+  --text-muted: #6b6b76;
+  --text-faint: #a1a1aa;
+  --accent-fg: #ffffff;
+  --accent-soft: color-mix(in oklab, var(--accent) 10%, transparent);
+  --accent-softer: color-mix(in oklab, var(--accent) 6%, transparent);
+  --danger: #dc2626;
+  --danger-soft: color-mix(in oklab, #dc2626 10%, transparent);
+  --success: #16a34a;
+  --success-soft: color-mix(in oklab, #16a34a 12%, transparent);
+  --warning: #d97706;
+  --warning-soft: color-mix(in oklab, #d97706 12%, transparent);
+  --series-1: #2a78d6;
+  --series-2: #eb6834;
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
+  --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.04);
+  --shadow-lg: 0 16px 48px -12px rgb(0 0 0 / 0.18), 0 2px 6px rgb(0 0 0 / 0.05);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e0e10;
+    --bg-subtle: #141417;
+    --bg-muted: #1c1c20;
+    --surface: #141417;
+    --surface-raised: #1b1b1f;
+    --border: #26262b;
+    --border-strong: #34343a;
+    --text: #ededf0;
+    --text-muted: #9d9da8;
+    --text-faint: #62626c;
+    --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
+    --accent-softer: color-mix(in oklab, var(--accent) 11%, transparent);
+    --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
+    --shadow-lg: 0 16px 48px -12px rgb(0 0 0 / 0.7);
+    --series-1: #3987e5;
+    --series-2: #d95926;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e0e10;
+  --bg-subtle: #141417;
+  --bg-muted: #1c1c20;
+  --surface: #141417;
+  --surface-raised: #1b1b1f;
+  --border: #26262b;
+  --border-strong: #34343a;
+  --text: #ededf0;
+  --text-muted: #9d9da8;
+  --text-faint: #62626c;
+  --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
+  --accent-softer: color-mix(in oklab, var(--accent) 11%, transparent);
+  --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
+  --shadow-lg: 0 16px 48px -12px rgb(0 0 0 / 0.7);
+  --series-1: #3987e5;
+  --series-2: #d95926;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-subtle: var(--bg-subtle);
+  --color-muted: var(--bg-muted);
+  --color-surface: var(--surface);
+  --color-raised: var(--surface-raised);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-fg-muted: var(--text-muted);
+  --color-fg-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-fg: var(--accent-fg);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-softer: var(--accent-softer);
+  --color-series-1: var(--series-1);
+  --color-series-2: var(--series-2);
+  --color-danger: var(--danger);
+  --color-danger-soft: var(--danger-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --radius-ui: var(--radius);
+  --radius-ui-sm: calc(var(--radius) * 0.7);
+  --radius-ui-lg: calc(var(--radius) * 1.4);
+  --shadow-ui-sm: var(--shadow-sm);
+  --shadow-ui-md: var(--shadow-md);
+  --shadow-ui-lg: var(--shadow-lg);
+  --font-sans: var(--font);
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    font-feature-settings: "cv11", "ss01";
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+}
+
+@layer components {
+  /* Rich-text editor content (compose, signatures, templates). */
+  .rte {
+    outline: none;
+    min-height: 100%;
+    line-height: 1.6;
+    word-break: break-word;
+  }
+  .rte p { margin: 0 0 0.5em; }
+  .rte h1 { font-size: 1.5em; font-weight: 600; margin: 0.6em 0 0.3em; }
+  .rte h2 { font-size: 1.25em; font-weight: 600; margin: 0.6em 0 0.3em; }
+  .rte h3 { font-size: 1.1em; font-weight: 600; margin: 0.6em 0 0.3em; }
+  .rte ul { list-style: disc; padding-left: 1.5em; margin: 0 0 0.5em; }
+  .rte ol { list-style: decimal; padding-left: 1.5em; margin: 0 0 0.5em; }
+  .rte blockquote { border-left: 3px solid var(--border-strong); padding-left: 0.9em; color: var(--text-muted); margin: 0 0 0.5em; }
+  .rte a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  .rte code { background: var(--bg-muted); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
+  .rte pre { background: var(--bg-muted); padding: 0.75em 1em; border-radius: 8px; overflow-x: auto; }
+  .rte hr { border: 0; border-top: 1px solid var(--border); margin: 1em 0; }
+  .rte img { max-width: 100%; height: auto; border-radius: 4px; }
+  .rte img.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+  .rte p.is-editor-empty:first-child::before {
+    content: attr(data-placeholder);
+    color: var(--text-faint);
+    float: left;
+    height: 0;
+    pointer-events: none;
+  }
+}
+
+@keyframes io-in {
+  from { opacity: 0; transform: translateY(4px) scale(0.99); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes io-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-in { animation: io-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.animate-fade { animation: io-fade 140ms ease-out; }
+@media (prefers-reduced-motion: reduce) {
+  .animate-in, .animate-fade { animation: none; }
+}
