@@ -1,0 +1,133 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import type { Me, Preferences } from "@shared/types";
+import { api, errorMessage } from "@/lib/api";
+import { useMe } from "@/lib/queries";
+import { RichTextField } from "@/components/compose/Editor";
+import { Avatar, Button, Field, Input, PageHeader, Section, Select, Spinner, Switch } from "@/components/ui/primitives";
+
+function Row({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
+  return (
+    <div className="flex items-center justify-between gap-6 py-3 first:pt-0 last:pb-0">
+      <div>
+        <p className="text-[13px] font-medium">{title}</p>
+        {description && <p className="mt-0.5 text-xs text-fg-muted">{description}</p>}
+      </div>
+      <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+export function ProfileSettings() {
+  const { data: me } = useMe();
+  const qc = useQueryClient();
+  const [name, setName] = useState("");
+  const [signature, setSignature] = useState("");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (me) {
+      setName(me.name);
+      setSignature(me.signatureHtml);
+    }
+  }, [me]);
+
+  if (!me) return <Spinner />;
+
+  const patch = async (body: Record<string, unknown>, msg = "Saved") => {
+    try {
+      const updated = await api.patch<Me>("me", body);
+      qc.setQueryData(["me"], updated);
+      toast.success(msg);
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
+  const setPref = <K extends keyof Preferences>(k: K, v: Preferences[K]) => patch({ preferences: { [k]: v } }, "Preference updated");
+
+  return (
+    <div className="space-y-6">
+      <PageHeader title="Profile & preferences" description="How you appear to others and how the app behaves for you." />
+
+      <Section title="Profile">
+        <div className="flex items-start gap-5">
+          <Avatar name={me.name} email={me.email} color={me.avatarColor} size={56} />
+          <div className="grid flex-1 gap-4 sm:grid-cols-2">
+            <Field label="Name">
+              <Input value={name} onChange={(e) => setName(e.target.value)} />
+            </Field>
+            <Field label="Sign-in email" hint="Contact an admin to change this.">
+              <Input value={me.email} disabled />
+            </Field>
+          </div>
+        </div>
+        <div className="mt-4 flex justify-end">
+          <Button
+            variant="primary"
+            loading={saving}
+            disabled={name.trim() === me.name || !name.trim()}
+            onClick={async () => {
+              setSaving(true);
+              await patch({ name: name.trim() }, "Profile updated");
+              setSaving(false);
+            }}
+          >
+            Save profile
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Personal signature" description="Added to new messages. A mailbox signature (set per mailbox) takes priority when one exists.">
+        <RichTextField value={signature} onChange={setSignature} placeholder="Your name · Title · Phone" minHeight={110} />
+        <div className="mt-4 flex justify-end">
+          <Button variant="primary" onClick={() => patch({ signatureHtml: signature === "<p></p>" ? "" : signature }, "Signature saved")}>
+            Save signature
+          </Button>
+        </div>
+      </Section>
+
+      <Section title="Preferences">
+        <div className="divide-y divide-line">
+          <Row title="Theme">
+            <Select value={me.preferences.theme} onChange={(e) => setPref("theme", e.target.value as Preferences["theme"])} className="w-36">
+              <option value="system">System</option>
+              <option value="light">Light</option>
+              <option value="dark">Dark</option>
+            </Select>
+          </Row>
+          <Row title="Density" description="Compact shows more messages at once.">
+            <Select value={me.preferences.density} onChange={(e) => setPref("density", e.target.value as Preferences["density"])} className="w-36">
+              <option value="comfortable">Comfortable</option>
+              <option value="compact">Compact</option>
+            </Select>
+          </Row>
+          <Row title="Undo send" description="Delay sending so you can change your mind.">
+            <Select value={me.preferences.undoSendSeconds} onChange={(e) => setPref("undoSendSeconds", Number(e.target.value))} className="w-36">
+              {[0, 5, 10, 20, 30].map((s) => (
+                <option key={s} value={s}>
+                  {s ? `${s} seconds` : "Off"}
+                </option>
+              ))}
+            </Select>
+          </Row>
+          <Row title="Compose window" description="Open new messages docked or full screen.">
+            <Select value={me.preferences.composeMode} onChange={(e) => setPref("composeMode", e.target.value as Preferences["composeMode"])} className="w-36">
+              <option value="docked">Docked</option>
+              <option value="fullscreen">Full screen</option>
+            </Select>
+          </Row>
+          <Row title="Conversation view" description="Group replies into a single thread.">
+            <Switch checked={me.preferences.conversationView} onChange={(v) => setPref("conversationView", v)} label="Conversation view" />
+          </Row>
+          <Row title="Mark as read when opened">
+            <Switch checked={me.preferences.markReadOnOpen} onChange={(v) => setPref("markReadOnOpen", v)} label="Mark as read when opened" />
+          </Row>
+          <Row title="Always load remote images" description="Remote images can reveal to senders that you opened their email.">
+            <Switch checked={me.preferences.loadRemoteImages} onChange={(v) => setPref("loadRemoteImages", v)} label="Always load remote images" />
+          </Row>
+        </div>
+      </Section>
+    </div>
+  );
+}
