@@ -78,6 +78,8 @@ adminUserRoutes.post("/", async (c) => {
       role: z.enum(["owner", "admin", "member"]).default("member"),
       mailboxAddress: zEmail.optional(),
       sendEmail: z.boolean().default(true),
+      /** Extra mailboxes (e.g. shared inboxes) to grant access to right away. */
+      access: z.array(z.object({ mailboxId: z.string().min(1).max(64), role: z.enum(["owner", "editor", "viewer"]) })).max(200).default([]),
     }),
   );
   const actor = c.get("user");
@@ -89,9 +91,21 @@ adminUserRoutes.post("/", async (c) => {
   if (body.mailboxAddress) {
     mailboxId = await ensureMailbox(c.env.DB, { address: body.mailboxAddress, displayName: body.name, type: "personal", ownerId: id });
   }
+  if (body.access.length) {
+    const t = now();
+    await c.env.DB.batch(
+      body.access.map((a) =>
+        c.env.DB.prepare(
+          `INSERT INTO mailbox_members (mailbox_id, user_id, role, created_at)
+           SELECT ?1, ?2, ?3, ?4 WHERE EXISTS (SELECT 1 FROM mailboxes WHERE id = ?1)
+           ON CONFLICT(mailbox_id, user_id) DO UPDATE SET role = excluded.role`,
+        ).bind(a.mailboxId, id, a.role, t),
+      ),
+    );
+  }
   const inviteUrl = await issueToken(c.env, id, "invite", actor.id, 24 * 7);
   const emailed = body.sendEmail ? await emailInvite(c.env, body.email, inviteUrl, actor.name || actor.email) : false;
-  await audit(c, { action: "user.invited", targetType: "user", targetId: id, meta: { email: body.email, role: body.role, mailboxId } });
+  await audit(c, { action: "user.invited", targetType: "user", targetId: id, meta: { email: body.email, role: body.role, mailboxId, access: body.access } });
   return c.json({ id, inviteUrl, emailed }, 201);
 });
 

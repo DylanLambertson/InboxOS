@@ -1,14 +1,15 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Copy, KeyRound, Lock, LogOut, MailPlus, MoreHorizontal, Search, ShieldOff, Trash2, UserCheck, UserPlus, UserX } from "lucide-react";
+import { ChevronDown, Copy, Inbox, KeyRound, Lock, LogOut, MailPlus, MoreHorizontal, Search, ShieldOff, Trash2, UserCheck, UserPlus, UserX } from "lucide-react";
 import { toast } from "sonner";
-import type { Role, UserStatus } from "@shared/types";
+import type { MailboxRole, Role, UserStatus } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { relativeTime } from "@/lib/format";
 import { useMe } from "@/lib/queries";
 import { Avatar, Badge, Button, Card, Field, IconButton, Input, PageHeader, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { Menu, Modal, useConfirm } from "@/components/ui/overlay";
+import { AccessPicker, ManageAccessDialog } from "./MailboxAccess";
 
 interface AdminUser {
   id: string;
@@ -58,6 +59,8 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
   const [createMailbox, setCreateMailbox] = useState(true);
   const [mailboxAddress, setMailboxAddress] = useState("");
   const [sendEmail, setSendEmail] = useState(true);
+  const [access, setAccess] = useState<Record<string, MailboxRole>>({});
+  const [showAccess, setShowAccess] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ inviteUrl: string; emailed: boolean } | null>(null);
   const suggested = email.toLowerCase().endsWith(`@${brand.primaryDomain}`) ? email.toLowerCase() : email ? `${email.split("@")[0].toLowerCase()}@${brand.primaryDomain}` : "";
@@ -70,6 +73,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
         name,
         role,
         sendEmail,
+        access: Object.entries(access).map(([mailboxId, role]) => ({ mailboxId, role })),
         ...(createMailbox ? { mailboxAddress: (mailboxAddress || suggested).trim() } : {}),
       });
       setResult(r);
@@ -133,6 +137,22 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
               <Input className="mt-3" value={mailboxAddress} onChange={(e) => setMailboxAddress(e.target.value)} placeholder={suggested || `name@${brand.primaryDomain}`} />
             )}
           </div>
+          <div className="rounded-ui border border-line">
+            <button type="button" onClick={() => setShowAccess((v) => !v)} className="flex w-full items-center justify-between gap-3 p-3 text-left">
+              <span>
+                <span className="block text-[13px] font-medium">Access to other mailboxes</span>
+                <span className="text-xs text-fg-muted">
+                  {Object.keys(access).length ? `${Object.keys(access).length} selected` : "Shared inboxes like support@ or other people's mailboxes"}
+                </span>
+              </span>
+              <ChevronDown className={`size-4 text-fg-muted transition ${showAccess ? "rotate-180" : ""}`} />
+            </button>
+            {showAccess && (
+              <div className="border-t border-line p-3">
+                <AccessPicker value={access} onChange={setAccess} />
+              </div>
+            )}
+          </div>
           <label className="flex items-center justify-between gap-3 text-[13px]">
             Email the invite link
             <Switch checked={sendEmail} onChange={setSendEmail} label="Email the invite link" />
@@ -150,6 +170,7 @@ export function AdminUsers() {
   const confirm = useConfirm();
   const [q, setQ] = useState("");
   const [inviting, setInviting] = useState(false);
+  const [accessFor, setAccessFor] = useState<AdminUser | null>(null);
   const [link, setLink] = useState<{ url: string; emailed: boolean; kind: "invite" | "reset" } | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
 
@@ -235,7 +256,15 @@ export function AdminUsers() {
                         {u.googleLinked && <Badge>Google</Badge>}
                       </div>
                     </td>
-                    <td className="px-3 py-3 tabular-nums">{u.mailboxCount}</td>
+                    <td className="px-3 py-3">
+                      <button
+                        onClick={() => setAccessFor(u)}
+                        className="inline-flex items-center gap-1.5 rounded-ui-sm px-2 py-1 tabular-nums text-fg hover:bg-muted"
+                        title="Manage mailbox access"
+                      >
+                        <Inbox className="size-3.5 text-fg-muted" /> {u.mailboxCount}
+                      </button>
+                    </td>
                     <td className="px-3 py-3 text-fg-muted">{u.lastLoginAt ? relativeTime(u.lastLoginAt) : "Never"}</td>
                     <td className="px-3 py-3">
                       {canManage && (
@@ -243,6 +272,8 @@ export function AdminUsers() {
                           align="end"
                           width={230}
                           items={[
+                            { label: "Manage mailbox access", icon: <Inbox />, onSelect: () => setAccessFor(u) },
+                            { separator: true, label: "" },
                             ...(u.status === "invited"
                               ? [{
                                   label: "Resend invite",
@@ -322,6 +353,7 @@ export function AdminUsers() {
         )}
       </Card>
       {inviting && <InviteDialog onClose={() => setInviting(false)} />}
+      {accessFor && <ManageAccessDialog user={accessFor} onClose={() => setAccessFor(null)} />}
       <Modal open={!!link} onClose={() => setLink(null)} title={link?.kind === "invite" ? "Invite link" : "Password reset link"} footer={<Button variant="primary" onClick={() => setLink(null)}>Done</Button>}>
         {link && <LinkResult url={link.url} emailed={link.emailed} kind={link.kind} />}
       </Modal>
