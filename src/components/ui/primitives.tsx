@@ -82,20 +82,23 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   );
 });
 
+/** Full width unless the caller sets its own width (e.g. `w-32`). */
+const width = (className?: string) => (className && /(^|\s)(max-|min-)?w-/.test(className) ? "" : "w-full");
+
 const fieldBase =
-  "w-full rounded-ui border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-faint transition-colors hover:border-line-strong focus:border-accent focus:outline-none focus:ring-3 focus:ring-accent-soft disabled:opacity-60";
+  "rounded-ui border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-faint transition-colors hover:border-line-strong focus:border-accent focus:outline-none focus:ring-3 focus:ring-accent-soft disabled:opacity-60";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
-  return <input ref={ref} className={cx(fieldBase, "h-9", className)} {...rest} />;
+  return <input ref={ref} className={cx(fieldBase, width(className), "h-9", className)} {...rest} />;
 });
 
 export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(function Textarea({ className, ...rest }, ref) {
-  return <textarea ref={ref} className={cx(fieldBase, "min-h-20 py-2", className)} {...rest} />;
+  return <textarea ref={ref} className={cx(fieldBase, width(className), "min-h-20 py-2", className)} {...rest} />;
 });
 
 export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSelectElement>>(function Select({ className, children, ...rest }, ref) {
   return (
-    <select ref={ref} className={cx(fieldBase, "h-9 appearance-none bg-[length:16px] bg-[right_8px_center] bg-no-repeat pr-8", className)} style={{ backgroundImage: CHEVRON }} {...rest}>
+    <select ref={ref} className={cx(fieldBase, width(className), "h-9 shrink-0 appearance-none bg-[length:16px] bg-[right_8px_center] bg-no-repeat pr-8", className)} style={{ backgroundImage: CHEVRON }} {...rest}>
       {children}
     </select>
   );
