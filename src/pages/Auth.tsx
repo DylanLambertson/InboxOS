@@ -71,6 +71,50 @@ function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: R
   );
 }
 
+/**
+ * Email field with the organization's domain pre-filled: people type only the part before the @.
+ * Typing, pasting or autofilling a full address (any domain) switches to plain email entry.
+ */
+function EmailField({ id, value, onChange, autoComplete, autoFocus }: { id?: string; value: string; onChange: (v: string) => void; autoComplete: string; autoFocus?: boolean }) {
+  const brand = useBrand();
+  const full = value.includes("@");
+  return (
+    <div className="group flex h-10 w-full items-stretch overflow-hidden rounded-ui border border-line bg-surface transition-colors hover:border-line-strong focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft">
+      <input
+        id={id}
+        type="text"
+        inputMode="email"
+        value={value}
+        onChange={(e) => onChange(e.target.value.replace(/\s/g, ""))}
+        autoComplete={autoComplete}
+        autoCapitalize="none"
+        autoCorrect="off"
+        spellCheck={false}
+        autoFocus={autoFocus}
+        required
+        placeholder={full ? "you@example.com" : "yourname"}
+        aria-describedby={full ? undefined : `${id ?? "email"}-domain`}
+        className="min-w-0 flex-1 bg-transparent px-3 text-sm text-fg outline-none placeholder:text-fg-faint"
+      />
+      {!full && (
+        <label
+          htmlFor={id}
+          id={`${id ?? "email"}-domain`}
+          className="flex shrink-0 cursor-text items-center border-l border-line bg-subtle px-3 text-sm text-fg-muted select-none"
+        >
+          @{brand.primaryDomain}
+        </label>
+      )}
+    </div>
+  );
+}
+
+/** Turn the field's value into a full address. */
+const fullEmail = (v: string, domain: string) => {
+  const t = v.trim().toLowerCase();
+  return !t ? "" : t.includes("@") ? t : `${t}@${domain}`;
+};
+
 function ErrorNote({ children }: { children: ReactNode }) {
   return <div className="mb-4 rounded-ui bg-danger-soft px-3 py-2 text-[13px] text-danger">{children}</div>;
 }
@@ -100,6 +144,7 @@ export function LoginPage() {
   const next = params.get("next") || "/";
   const [step, setStep] = useState<"password" | "2fa" | "forgot" | "forgot-sent">(params.get("step") === "2fa" ? "2fa" : "password");
   const [email, setEmail] = useState("");
+  const address = fullEmail(email, brand.primaryDomain);
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -123,14 +168,14 @@ export function LoginPage() {
     setError(null);
     try {
       if (step === "password") {
-        const r = await api.post<{ ok?: boolean; mfaRequired?: boolean }>("/api/auth/login", { email, password });
+        const r = await api.post<{ ok?: boolean; mfaRequired?: boolean }>("/api/auth/login", { email: address, password });
         if (r.mfaRequired) setStep("2fa");
         else await done();
       } else if (step === "2fa") {
         await api.post("/api/auth/2fa", { code });
         await done();
       } else if (step === "forgot") {
-        await api.post("/api/auth/forgot", { email });
+        await api.post("/api/auth/forgot", { email: address });
         setStep("forgot-sent");
       }
     } catch (err) {
@@ -171,13 +216,13 @@ export function LoginPage() {
         {step === "forgot-sent" ? (
           <div className="text-center">
             <CheckCircle2 className="mx-auto mb-3 size-8 text-success" />
-            <p className="text-[13px] text-fg-muted">If an account exists for <span className="font-medium text-fg">{email}</span>, a reset link is on its way.</p>
+            <p className="text-[13px] text-fg-muted">If an account exists for <span className="font-medium text-fg">{address}</span>, a reset link is on its way.</p>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
             {error && <ErrorNote>{error}</ErrorNote>}
             <Field label="Email">
-              <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" autoFocus required />
+              <EmailField value={email} onChange={setEmail} autoComplete="username" autoFocus />
             </Field>
             <Button type="submit" variant="primary" className="w-full" loading={busy}>
               Send reset link
@@ -207,7 +252,7 @@ export function LoginPage() {
       {(options?.password ?? true) && (
         <form onSubmit={submit} className="space-y-4">
           <Field label="Email" htmlFor="email">
-            <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" autoFocus required />
+            <EmailField id="email" value={email} onChange={setEmail} autoComplete="username" autoFocus />
           </Field>
           <Field
             label={
@@ -220,7 +265,7 @@ export function LoginPage() {
             }
             htmlFor="password"
           >
-            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+            <Input id="password" className="h-10" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
           </Field>
           <Button type="submit" variant="primary" className="h-10 w-full" loading={busy}>
             Sign in
