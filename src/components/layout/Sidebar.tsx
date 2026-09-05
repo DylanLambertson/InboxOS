@@ -3,7 +3,8 @@ import { Link, NavLink, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
-  ChevronsUpDown,
+  ChevronDown,
+  Inbox as Inboxes,
   Clock,
   File,
   Inbox,
@@ -46,29 +47,47 @@ export const FOLDER_NAV = [
   { view: "trash", label: "Trash", icon: Trash2 },
 ] as const;
 
-function MailboxSwitcher({ boxes, current }: { boxes: MailboxSummary[]; current: MailboxSummary }) {
-  const navigate = useNavigate();
+/** Every mailbox the user can open, plus a unified "All inboxes" view. Switching keeps the current folder. */
+function MailboxList({ boxes, currentId, onNavigate }: { boxes: MailboxSummary[]; currentId: string; onNavigate?: () => void }) {
+  const { view = "inbox" } = useParams();
+  const [expanded, setExpanded] = useState(false);
+  const folder = view.startsWith("label:") ? "inbox" : view;
+  const totalUnread = boxes.reduce((n, b) => n + (b.unread.inbox ?? 0), 0);
+  const LIMIT = 6;
+  const visible = expanded || boxes.length <= LIMIT ? boxes : boxes.filter((b, i) => i < LIMIT || b.id === currentId);
+  const row = (id: string, label: string, sub: string, color: string | null, unread: number) => {
+    const active = id === currentId;
+    return (
+      <Link
+        key={id}
+        to={`/mail/${id}/${folder}`}
+        onClick={onNavigate}
+        title={sub}
+        className={cx(
+          "flex h-8 items-center gap-2.5 rounded-ui-sm px-2.5 text-[13px] transition-colors",
+          active ? "bg-muted font-medium text-fg" : "text-fg-muted hover:bg-muted hover:text-fg",
+        )}
+      >
+        {color ? <span className="size-2.5 shrink-0 rounded-full" style={{ background: color }} /> : <Inboxes className="size-4 shrink-0" />}
+        <span className="min-w-0 flex-1 truncate">{label}</span>
+        {!!unread && <span className="text-[11px] font-semibold tabular-nums text-accent">{unread > 999 ? "999+" : unread}</span>}
+      </Link>
+    );
+  };
   return (
-    <Menu
-      width={260}
-      items={boxes.map((b) => ({
-        label: b.displayName || b.address,
-        hint: b.address,
-        icon: <span className="size-2.5 rounded-full" style={{ background: b.color }} />,
-        checked: b.id === current.id,
-        onSelect: () => navigate(`/mail/${b.id}/inbox`),
-      }))}
-      trigger={(p) => (
-        <button {...p} className="flex w-full items-center gap-2.5 rounded-ui px-2 py-1.5 text-left hover:bg-muted">
-          <span className="size-2.5 shrink-0 rounded-full" style={{ background: current.color }} />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-[13px] font-medium text-fg">{current.displayName || current.address.split("@")[0]}</span>
-            <span className="block truncate text-[11px] text-fg-muted">{current.address}</span>
-          </span>
-          {boxes.length > 1 && <ChevronsUpDown className="size-3.5 shrink-0 text-fg-faint" />}
-        </button>
-      )}
-    />
+    <div className="mb-4">
+      <div className="mb-1 px-2.5 text-[11px] font-semibold tracking-wide text-fg-faint uppercase">Mailboxes</div>
+      <div className="space-y-0.5">
+        {boxes.length > 1 && row("all", "All inboxes", "Every mailbox you can access", null, totalUnread)}
+        {visible.map((b) => row(b.id, b.displayName || b.address.split("@")[0], b.address, b.color, b.unread.inbox ?? 0))}
+        {boxes.length > LIMIT && (
+          <button onClick={() => setExpanded((e) => !e)} className="flex h-7 w-full items-center gap-2.5 px-2.5 text-xs text-fg-muted hover:text-fg">
+            <ChevronDown className={cx("size-3.5 transition", expanded && "rotate-180")} />
+            {expanded ? "Show less" : `${boxes.length - visible.length} more`}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -95,7 +114,13 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const { mailboxId } = useParams();
   const { data: boxes = [] } = useMailboxes();
   const { data: me } = useMe();
-  const current = boxes.find((b) => b.id === mailboxId) ?? boxes[0];
+  const unified = mailboxId === "all" && boxes.length > 0;
+  const current = unified ? undefined : boxes.find((b) => b.id === mailboxId) ?? boxes[0];
+  const composeBox = current?.role !== "viewer" ? current : undefined;
+  const fallbackCompose = boxes.find((b) => b.role !== "viewer");
+  const sendFrom = composeBox ?? (unified ? fallbackCompose : undefined);
+  const scopeId = unified ? "all" : current?.id;
+  const unreadFor = (key: string) => (unified ? boxes.reduce((n, b) => n + (b.unread[key] ?? 0), 0) : current?.unread[key]);
   const { data: labels = [] } = useLabels(current?.id);
   const compose = useCompose();
   const navigate = useNavigate();
@@ -130,31 +155,36 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           variant="primary"
           className="w-full"
           icon={<PenSquare className="size-4" />}
-          disabled={!current || current.role === "viewer"}
-          onClick={() => (current && compose.open({ mailboxId: current.id }), onNavigate?.())}
+          disabled={!sendFrom}
+          onClick={() => (sendFrom && compose.open({ mailboxId: sendFrom.id }), onNavigate?.())}
         >
           Compose
         </Button>
       </div>
 
       <nav className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-        {current && (
+        {scopeId && (
           <>
-            <div className="mb-2">
-              <MailboxSwitcher boxes={boxes} current={current} />
+            <MailboxList boxes={boxes} currentId={scopeId} onNavigate={onNavigate} />
+            <div className="mb-1 px-2.5 text-[11px] font-semibold tracking-wide text-fg-faint uppercase">
+              {unified ? "All inboxes" : current?.displayName || current?.address.split("@")[0]}
             </div>
             <div className="space-y-0.5">
               {FOLDER_NAV.map((f) => (
                 <NavItem
                   key={f.view}
-                  to={`/mail/${current.id}/${f.view}`}
+                  to={`/mail/${scopeId}/${f.view}`}
                   icon={f.icon}
                   label={f.label}
-                  count={"count" in f ? current.unread[f.count] : undefined}
+                  count={"count" in f ? unreadFor(f.count) : undefined}
                   onNavigate={onNavigate}
                 />
               ))}
             </div>
+          </>
+        )}
+        {current && (
+          <>
 
             <div className="mt-5 mb-1 flex items-center justify-between px-2.5">
               <span className="text-[11px] font-semibold tracking-wide text-fg-faint uppercase">Labels</span>

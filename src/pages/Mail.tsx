@@ -32,8 +32,12 @@ export function MailPage() {
   const navigate = useNavigate();
   const { data: boxes, isLoading: boxesLoading } = useMailboxes();
   const { data: me } = useMe();
-  const mailbox = boxes?.find((b) => b.id === mailboxId);
-  const { data: labels = [] } = useLabels(mailbox?.id);
+  const unified = mailboxId === "all" && !!boxes?.length;
+  const mailbox = unified
+    ? { id: "all", address: "", displayName: "All inboxes", role: boxes!.some((b) => b.role !== "viewer") ? ("editor" as const) : ("viewer" as const) }
+    : boxes?.find((b) => b.id === mailboxId);
+  const boxById = useMemo(() => new Map((boxes ?? []).map((b) => [b.id, b])), [boxes]);
+  const { data: labels = [] } = useLabels(unified ? undefined : mailbox?.id);
   const isLabel = rawView.startsWith("label:");
   const labelId = isLabel ? rawView.slice(6) : null;
   const view = (isLabel ? "all" : rawView) as View;
@@ -132,9 +136,13 @@ export function MailPage() {
 
   const target = () => (messageId ? [messageId] : checked.size ? [...checked] : items[focusIdx] ? [items[focusIdx].id] : []);
   const readOnly = mailbox?.role === "viewer";
+  // In the unified view, act as the mailbox that owns the message.
+  const ownerOf = (id: string | undefined) => (id ? items.find((m) => m.id === id)?.mailboxId : undefined) ?? (unified ? undefined : mailboxId);
+  const canSendIn = (mb: string | undefined) => !!mb && boxById.get(mb)?.role !== "viewer" && boxById.has(mb);
+  const composeBox = unified ? boxes?.find((b) => b.role !== "viewer")?.id : mailboxId;
   useShortcuts(
     {
-      c: () => mailbox && !readOnly && compose.open({ mailboxId: mailbox.id }),
+      c: () => composeBox && canSendIn(composeBox) && compose.open({ mailboxId: composeBox }),
       "/": () => searchRef.current?.focus(),
       j: () => step(1),
       k: () => step(-1),
@@ -151,9 +159,9 @@ export function MailPage() {
       },
       "shift+i": () => runBulk({ action: "read" }, target()),
       "shift+u": () => runBulk({ action: "unread" }, target()),
-      r: () => messageId && !readOnly && compose.open({ mailboxId, sourceId: messageId, mode: "reply" }),
-      a: () => messageId && !readOnly && compose.open({ mailboxId, sourceId: messageId, mode: "replyAll" }),
-      f: () => messageId && !readOnly && compose.open({ mailboxId, sourceId: messageId, mode: "forward" }),
+      r: () => messageId && canSendIn(ownerOf(messageId)) && compose.open({ mailboxId: ownerOf(messageId)!, sourceId: messageId, mode: "reply" }),
+      a: () => messageId && canSendIn(ownerOf(messageId)) && compose.open({ mailboxId: ownerOf(messageId)!, sourceId: messageId, mode: "replyAll" }),
+      f: () => messageId && canSendIn(ownerOf(messageId)) && compose.open({ mailboxId: ownerOf(messageId)!, sourceId: messageId, mode: "forward" }),
       "g i": () => navigate(`/mail/${mailboxId}/inbox`),
       "g s": () => navigate(`/mail/${mailboxId}/starred`),
       "g t": () => navigate(`/mail/${mailboxId}/sent`),
@@ -199,7 +207,7 @@ export function MailPage() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={(e) => e.key === "Escape" && (e.currentTarget.blur(), e.stopPropagation())}
-              placeholder={`Search ${mailbox.displayName || mailbox.address}`}
+              placeholder={unified ? "Search all inboxes" : `Search ${mailbox.displayName || mailbox.address}`}
               aria-label="Search mail"
               className="h-9 w-full rounded-ui border border-transparent bg-muted pr-16 pl-8 text-[13px] outline-none placeholder:text-fg-faint focus:border-accent focus:bg-surface focus:ring-3 focus:ring-accent-soft"
             />
@@ -229,11 +237,14 @@ export function MailPage() {
             </>
           ) : (
             <>
-              <span className="truncate text-[13px] font-semibold">{q ? "Search results" : title}</span>
+              <span className="truncate text-[13px] font-semibold">
+                {q ? "Search results" : title}
+                {unified && !q && <span className="ml-1.5 font-normal text-fg-muted">· all inboxes</span>}
+              </span>
               <IconButton size="sm" label="Refresh" onClick={() => list.refetch()} className="ml-1">
                 <RefreshCw className={cx("size-3.5", list.isRefetching && "animate-spin")} />
               </IconButton>
-              {(view === "trash" || view === "spam") && items.length > 0 && !readOnly && !q && (
+              {(view === "trash" || view === "spam") && items.length > 0 && !readOnly && !q && !unified && (
                 <Button size="xs" variant="ghost" className="ml-auto" icon={<Trash2 className="size-3.5" />} onClick={emptyFolder}>
                   Empty {view}
                 </Button>
@@ -273,6 +284,7 @@ export function MailPage() {
                   focused={i === focusIdx && !messageId}
                   compact={compact}
                   labels={labels}
+                  mailboxTag={unified ? boxById.get(m.mailboxId) : undefined}
                   showRecipients={showRecipients}
                   onOpen={open}
                   onCheck={onCheck}
@@ -295,8 +307,7 @@ export function MailPage() {
           <ThreadView
             key={messageId}
             messageId={messageId}
-            mailbox={mailbox}
-            labels={labels}
+            mailboxes={boxes ?? []}
             onBack={() => navigate(`${base}${q ? `?q=${encodeURIComponent(q)}` : ""}`)}
             onNavigate={step}
             onAfterAction={afterAction}

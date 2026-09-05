@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, ChevronUp, Clock, Forward, PenSquare, Printer, Reply, ReplyAll, X } from "lucide-react";
 import { toast } from "sonner";
-import type { Label, MailboxSummary } from "@shared/types";
+import type { MailboxSummary } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { longDate } from "@/lib/format";
-import { useInvalidateMail, useMe, useMessageAction, useThread, type BulkInput } from "@/lib/queries";
+import { useInvalidateMail, useLabels, useMe, useMessageAction, useThread, type BulkInput } from "@/lib/queries";
 import { useCompose } from "../compose/ComposeProvider";
 import { Button, EmptyState, IconButton, Spinner } from "../ui/primitives";
 import { BulkActions } from "./BulkActions";
@@ -12,15 +12,13 @@ import { MessageCard, printMessage } from "./MessageCard";
 
 export function ThreadView({
   messageId,
-  mailbox,
-  labels,
+  mailboxes,
   onBack,
   onNavigate,
   onAfterAction,
 }: {
   messageId: string;
-  mailbox: MailboxSummary;
-  labels: Label[];
+  mailboxes: MailboxSummary[];
   onBack: () => void;
   onNavigate: (dir: 1 | -1) => void;
   onAfterAction: () => void;
@@ -32,7 +30,9 @@ export function ThreadView({
   const invalidate = useInvalidateMail();
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const markedFor = useRef<string | null>(null);
-  const readOnly = mailbox.role === "viewer";
+  const mailbox = mailboxes.find((b) => b.id === thread?.[0]?.mailboxId);
+  const { data: labels = [] } = useLabels(mailbox?.id);
+  const readOnly = !mailbox || mailbox.role === "viewer";
 
   // Expand unread messages and the latest one; mark the conversation read.
   useEffect(() => {
@@ -53,7 +53,7 @@ export function ThreadView({
       </div>
     );
   }
-  if (error || !thread?.length) {
+  if (error || !thread?.length || !mailbox) {
     return <EmptyState title="Message not found" body="It may have been moved or deleted." action={<Button onClick={onBack}>Back</Button>} />;
   }
 

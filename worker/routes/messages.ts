@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import type { Address, EmailEvent, MessageDetail, View } from "@shared/types";
 import { FOLDERS } from "@shared/types";
 import type { AppEnv } from "../env";
-import { requireMailbox, requireMessage } from "../lib/access";
+import { requireMailbox, requireMessage, userMailboxIds } from "../lib/access";
 import { toAttachmentInfo, toListItem, type AttachmentRow, type MessageRow } from "../lib/messages";
 import { resend } from "../lib/resend";
 import { ftsExpression, likeEscape, parseQuery } from "../lib/search";
@@ -29,15 +29,24 @@ function decodeCursor(s: string | undefined): { date: string; id: string } | nul
 messageRoutes.get("/", async (c) => {
   const u = c.get("user");
   const mailboxId = c.req.query("mailbox") ?? "";
-  await requireMailbox(c.env.DB, u, mailboxId);
+  // "all" = unified view across every mailbox the user can access.
+  let mailboxIds: string[];
+  if (mailboxId === "all") {
+    mailboxIds = await userMailboxIds(c.env.DB, u.id);
+    if (!mailboxIds.length) return c.json({ items: [], nextCursor: null });
+  } else {
+    await requireMailbox(c.env.DB, u, mailboxId);
+    mailboxIds = [mailboxId];
+  }
+  const inMailboxes = `(${mailboxIds.map(() => "?").join(",")})`;
   const view = (c.req.query("view") ?? "inbox") as View;
   const labelId = c.req.query("label") || null;
   const q = (c.req.query("q") ?? "").trim().slice(0, 500);
   const limit = clampInt(c.req.query("limit"), 1, 100, 50);
   const cursor = decodeCursor(c.req.query("cursor"));
 
-  const where: string[] = ["mailbox_id = ?"];
-  const args: unknown[] = [mailboxId];
+  const where: string[] = [`mailbox_id IN ${inMailboxes}`];
+  const args: unknown[] = [...mailboxIds];
 
   if (q) {
     const p = parseQuery(q);
@@ -75,8 +84,8 @@ messageRoutes.get("/", async (c) => {
       args.push(p.after);
     }
     if (p.label) {
-      where.push("id IN (SELECT ml.message_id FROM message_labels ml JOIN labels l ON l.id = ml.label_id WHERE l.mailbox_id = ? AND l.name = ? COLLATE NOCASE)");
-      args.push(mailboxId, p.label);
+      where.push(`id IN (SELECT ml.message_id FROM message_labels ml JOIN labels l ON l.id = ml.label_id WHERE l.mailbox_id IN ${inMailboxes} AND l.name = ? COLLATE NOCASE)`);
+      args.push(...mailboxIds, p.label);
     }
   } else if (labelId) {
     where.push(`folder NOT IN ('trash','spam') AND id IN (SELECT message_id FROM message_labels WHERE label_id = ?)`);
@@ -113,7 +122,7 @@ messageRoutes.get("/", async (c) => {
       WHERE 1 = 1 ${cursorSqlDir}
       ORDER BY f.date ${dir}, f.id ${dir} LIMIT ?`;
   } else {
-    sql = `SELECT f.*, ${labelSub} FROM messages f WHERE ${where.map((w) => w).join(" AND ")} ${cursorSqlDir}
+    sql = `SELECT f.*, ${labelSub} FROM messages f WHERE ${where.join(" AND ")} ${cursorSqlDir}
       ORDER BY f.${orderCol} ${dir}, f.id ${dir} LIMIT ?`;
   }
   const { results } = await c.env.DB.prepare(sql)
