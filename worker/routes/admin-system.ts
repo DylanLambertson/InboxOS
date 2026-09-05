@@ -25,7 +25,8 @@ adminSystemRoutes.get("/overview", async (c) => {
         `SELECT
            (SELECT COUNT(*) FROM users WHERE status = 'active') AS users,
            (SELECT COUNT(*) FROM users WHERE status = 'invited') AS invited,
-           (SELECT COUNT(*) FROM mailboxes WHERE is_active = 1) AS mailboxes,
+           (SELECT COUNT(*) FROM mailboxes WHERE is_active = 1 AND is_system = 0) AS mailboxes,
+           (SELECT COUNT(*) FROM messages WHERE mailbox_id = 'system-unrouted') AS unrouted,
            (SELECT COUNT(*) FROM messages) AS messages,
            (SELECT COALESCE(SUM(size), 0) FROM messages) AS bytes,
            (SELECT COUNT(*) FROM messages WHERE status = 'scheduled') AS scheduled`,

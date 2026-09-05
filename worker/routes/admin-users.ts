@@ -97,7 +97,7 @@ adminUserRoutes.post("/", async (c) => {
       body.access.map((a) =>
         c.env.DB.prepare(
           `INSERT INTO mailbox_members (mailbox_id, user_id, role, created_at)
-           SELECT ?1, ?2, ?3, ?4 WHERE EXISTS (SELECT 1 FROM mailboxes WHERE id = ?1)
+           SELECT ?1, ?2, ?3, ?4 WHERE EXISTS (SELECT 1 FROM mailboxes WHERE id = ?1 AND is_system = 0)
            ON CONFLICT(mailbox_id, user_id) DO UPDATE SET role = excluded.role`,
         ).bind(a.mailboxId, id, a.role, t),
       ),

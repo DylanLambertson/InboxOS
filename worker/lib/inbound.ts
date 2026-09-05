@@ -1,4 +1,4 @@
-import type { Address, MessageStatus } from "@shared/types";
+import { UNROUTED_MAILBOX_ID, type Address, type MessageStatus } from "@shared/types";
 import type { Env } from "../env";
 import { attachmentKey, bodyKey, contactStatements, ftsStatements, resolveThread } from "./messages";
 import { resend, type ReceivedEmail } from "./resend";
@@ -19,9 +19,9 @@ async function routeRecipients(env: Env, recipients: string[]): Promise<string[]
   if (!addrs.length) return [];
   const ph = addrs.map(() => "?").join(",");
   const { results } = await env.DB.prepare(
-    `SELECT id FROM mailboxes WHERE is_active = 1 AND address IN (${ph})
+    `SELECT id FROM mailboxes WHERE is_active = 1 AND is_system = 0 AND address IN (${ph})
      UNION SELECT a.mailbox_id FROM mailbox_aliases a JOIN mailboxes m ON m.id = a.mailbox_id
-       WHERE m.is_active = 1 AND a.address IN (${ph})`,
+       WHERE m.is_active = 1 AND m.is_system = 0 AND a.address IN (${ph})`,
   )
     .bind(...addrs, ...addrs)
     .all<{ id: string }>();
@@ -61,16 +61,11 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
     ...(evt.bcc ?? email.bcc ?? []),
     ...(evt.received_for ?? email.received_for ?? []),
   ];
-  const mailboxIds = await routeRecipients(env, recipients);
+  let mailboxIds = await routeRecipients(env, recipients);
   const t = now();
-  if (!mailboxIds.length) {
-    await env.DB.prepare(
-      "INSERT INTO email_events (id, resend_id, type, recipient, detail, payload, created_at) VALUES (?, ?, 'received.unrouted', ?, ?, '{}', ?)",
-    )
-      .bind(newId(), email.id, recipients.join(", ").slice(0, 500), `No mailbox for ${recipients.join(", ")}`.slice(0, 500), t)
-      .run();
-    return { stored: 0, unrouted: true };
-  }
+  // No mailbox and no catch-all: keep it in the admin-only Unrouted area instead of dropping it.
+  const unrouted = mailboxIds.length === 0;
+  if (unrouted) mailboxIds = [UNROUTED_MAILBOX_ID];
 
   const from: Address = parseAddress(header(h, "from") ?? "") ?? parseAddress(email.from) ?? { email: email.from };
   const headerTo = parseAddressList(header(h, "to"));
@@ -166,14 +161,22 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
       ),
       ...attStmts,
       env.DB.prepare(
-        "INSERT INTO email_events (id, message_id, resend_id, type, recipient, detail, payload, created_at) VALUES (?, ?, ?, 'received', ?, ?, '{}', ?)",
-      ).bind(newId(), id, email.id, to.map((a) => a.email).join(", ").slice(0, 500), `From ${from.email}`, t),
+        "INSERT INTO email_events (id, message_id, resend_id, type, recipient, detail, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, '{}', ?)",
+      ).bind(
+        newId(),
+        id,
+        email.id,
+        unrouted ? "received.unrouted" : "received",
+        (unrouted ? recipients : to.map((a) => a.email)).join(", ").slice(0, 500),
+        unrouted ? `No mailbox for ${recipients.join(", ")} (from ${from.email})`.slice(0, 500) : `From ${from.email}`,
+        t,
+      ),
       ...ftsStatements(env.DB, { id, subject, from, to, cc, text }),
       ...contactStatements(env.DB, [from], false),
     ]);
     stored++;
   }
-  return { stored, unrouted: false };
+  return { stored, unrouted };
 }
 
 /** Higher rank wins, so late or out-of-order webhooks never downgrade a status. */

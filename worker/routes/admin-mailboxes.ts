@@ -15,7 +15,7 @@ export const adminMailboxRoutes = new Hono<AppEnv>();
 adminMailboxRoutes.get("/", async (c) => {
   const db = c.env.DB;
   const [{ results: boxes }, { results: members }, { results: aliases }, { results: stats }] = await Promise.all([
-    db.prepare("SELECT * FROM mailboxes ORDER BY is_active DESC, type, address").all<{
+    db.prepare("SELECT * FROM mailboxes WHERE is_system = 0 ORDER BY is_active DESC, type, address").all<{
       id: string;
       address: string;
       display_name: string;
@@ -109,7 +109,7 @@ adminMailboxRoutes.patch("/:id", async (c) => {
   );
   const res = await c.env.DB.prepare(
     `UPDATE mailboxes SET display_name = COALESCE(?, display_name), type = COALESCE(?, type), color = COALESCE(?, color),
-       signature_html = COALESCE(?, signature_html), is_active = COALESCE(?, is_active), updated_at = ? WHERE id = ?`,
+       signature_html = COALESCE(?, signature_html), is_active = COALESCE(?, is_active), updated_at = ? WHERE id = ? AND is_system = 0`,
   )
     .bind(
       body.displayName ?? null,
@@ -134,7 +134,7 @@ adminMailboxRoutes.patch("/:id", async (c) => {
 adminMailboxRoutes.delete("/:id", async (c) => {
   const id = c.req.param("id");
   const { confirm } = await parseBody(c, z.object({ confirm: z.string() }));
-  const mb = await c.env.DB.prepare("SELECT address FROM mailboxes WHERE id = ?").bind(id).first<{ address: string }>();
+  const mb = await c.env.DB.prepare("SELECT address FROM mailboxes WHERE id = ? AND is_system = 0").bind(id).first<{ address: string }>();
   if (!mb) throw new HTTPException(404, { message: "Mailbox not found" });
   if (confirm.toLowerCase() !== mb.address.toLowerCase()) throw new HTTPException(400, { message: "Type the mailbox address to confirm." });
   // Purge in chunks so large mailboxes don't exceed per-request limits; the client retries until done.
@@ -155,7 +155,7 @@ adminMailboxRoutes.delete("/:id", async (c) => {
 adminMailboxRoutes.put("/:id/members/:userId", async (c) => {
   const { id, userId } = c.req.param();
   const { role } = await parseBody(c, z.object({ role: z.enum(["owner", "editor", "viewer"]) }));
-  const ok = await c.env.DB.prepare("SELECT (SELECT 1 FROM mailboxes WHERE id = ?) AS m, (SELECT 1 FROM users WHERE id = ?) AS u")
+  const ok = await c.env.DB.prepare("SELECT (SELECT 1 FROM mailboxes WHERE id = ? AND is_system = 0) AS m, (SELECT 1 FROM users WHERE id = ?) AS u")
     .bind(id, userId)
     .first<{ m: number | null; u: number | null }>();
   if (!ok?.m || !ok.u) throw new HTTPException(404, { message: "Mailbox or user not found" });
@@ -181,6 +181,8 @@ adminMailboxRoutes.delete("/:id/members/:userId", async (c) => {
 adminMailboxRoutes.post("/:id/aliases", async (c) => {
   const id = c.req.param("id");
   const { address } = await parseBody(c, z.object({ address: zEmail }));
+  const target = await c.env.DB.prepare("SELECT 1 FROM mailboxes WHERE id = ? AND is_system = 0").bind(id).first();
+  if (!target) throw new HTTPException(404, { message: "Mailbox not found" });
   if (await addressTaken(c.env.DB, address)) throw new HTTPException(409, { message: "That address is already in use." });
   await c.env.DB.prepare("INSERT INTO mailbox_aliases (address, mailbox_id, created_at) VALUES (?, ?, ?)").bind(address, id, now()).run();
   await audit(c, { action: "mailbox.alias_added", targetType: "mailbox", targetId: id, meta: { address } });

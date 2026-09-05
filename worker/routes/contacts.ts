@@ -51,7 +51,7 @@ contactRoutes.get("/", async (c) => {
   let internal: Contact[] = [];
   if (q && !savedOnly) {
     const { results: people } = await c.env.DB.prepare(
-      `SELECT address AS email, display_name AS name FROM mailboxes WHERE is_active = 1 AND (address LIKE ? ESCAPE '\\' OR display_name LIKE ? ESCAPE '\\')
+      `SELECT address AS email, display_name AS name FROM mailboxes WHERE is_active = 1 AND is_system = 0 AND (address LIKE ? ESCAPE '\\' OR display_name LIKE ? ESCAPE '\\')
        UNION SELECT email, name FROM users WHERE status = 'active' AND (email LIKE ? ESCAPE '\\' OR name LIKE ? ESCAPE '\\') LIMIT 10`,
     )
       .bind(pat, pat, pat, pat)
