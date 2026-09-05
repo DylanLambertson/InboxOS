@@ -7,6 +7,7 @@ import { requireAdmin, requireAuth, sameOrigin } from "./lib/session";
 import { getBrand } from "./lib/settings";
 import { adminMailboxRoutes } from "./routes/admin-mailboxes";
 import { adminSystemRoutes } from "./routes/admin-system";
+import { adminTrafficRoutes } from "./routes/admin-traffic";
 import { adminUserRoutes } from "./routes/admin-users";
 import { attachmentRoutes } from "./routes/attachments";
 import { authRoutes } from "./routes/auth";
@@ -78,6 +79,7 @@ const admin = new Hono<AppEnv>();
 admin.use("*", requireAdmin);
 admin.route("/users", adminUserRoutes);
 admin.route("/mailboxes", adminMailboxRoutes);
+admin.route("/traffic", adminTrafficRoutes);
 admin.route("/", adminSystemRoutes);
 api.route("/admin", admin);
 

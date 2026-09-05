@@ -32,6 +32,7 @@ export function EmailFrame({
   allowRemote,
   onBlocked,
   maxHeight,
+  attachmentBase,
 }: {
   html?: string | null;
   text?: string;
@@ -39,6 +40,8 @@ export function EmailFrame({
   allowRemote: boolean;
   onBlocked?: (count: number) => void;
   maxHeight?: number;
+  /** Where inline images are served from (admins use the traffic endpoint). */
+  attachmentBase?: string;
 }) {
   const dark = useIsDark();
   const ref = useRef<HTMLIFrameElement>(null);
@@ -46,7 +49,7 @@ export function EmailFrame({
 
   const { doc, blocked } = useMemo(() => {
     const source = html ?? textToHtml(text ?? "");
-    const { html: clean, blockedImages } = sanitizeEmail(source, { attachments, allowRemote });
+    const { html: clean, blockedImages } = sanitizeEmail(source, { attachments, allowRemote, attachmentBase });
     const base = `<base target="_blank"><meta name="color-scheme" content="light"><style>
       html,body{margin:0;padding:0;background:transparent}
       body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#1f2328;word-wrap:break-word;overflow-wrap:anywhere;padding:${dark ? "14px 16px" : "2px"}}
@@ -59,7 +62,7 @@ export function EmailFrame({
     </style>`;
     const withHead = /<head[^>]*>/i.test(clean) ? clean.replace(/<head([^>]*)>/i, `<head$1>${base}`) : `<!doctype html><html><head>${base}</head><body>${clean}</body></html>`;
     return { doc: withHead, blocked: blockedImages };
-  }, [html, text, attachments, allowRemote, dark]);
+  }, [html, text, attachments, allowRemote, dark, attachmentBase]);
 
   useEffect(() => onBlocked?.(blocked), [blocked, onBlocked]);
 

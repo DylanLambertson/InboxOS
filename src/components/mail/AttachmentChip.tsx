@@ -19,12 +19,14 @@ export function AttachmentChip({
   progress,
   error,
   onPreview,
+  base = "/api/attachments",
 }: {
   attachment: AttachmentInfo;
   onRemove?: () => void;
   progress?: number;
   error?: string;
   onPreview?: () => void;
+  base?: string;
 }) {
   const Icon = error ? AlertCircle : iconFor(attachment.contentType, attachment.filename);
   const uploaded = progress === undefined && !error && !attachment.id.startsWith("tmp-");
@@ -43,7 +45,7 @@ export function AttachmentChip({
         disabled={!onPreview}
         className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-ui-sm bg-muted text-fg-muted"
       >
-        {isImage ? <img src={`/api/attachments/${attachment.id}`} alt="" className="size-full object-cover" loading="lazy" /> : <Icon className={cx("size-4", error && "text-danger")} />}
+        {isImage ? <img src={`${base}/${attachment.id}`} alt="" className="size-full object-cover" loading="lazy" /> : <Icon className={cx("size-4", error && "text-danger")} />}
       </button>
       <div className="min-w-0 flex-1">
         <p className="truncate text-[13px] font-medium">{attachment.filename}</p>
@@ -53,7 +55,7 @@ export function AttachmentChip({
       </div>
       {uploaded && !onRemove && (
         <a
-          href={`/api/attachments/${attachment.id}?download=1`}
+          href={`${base}/${attachment.id}?download=1`}
           className="rounded p-1 text-fg-faint opacity-0 transition group-hover:opacity-100 hover:bg-muted hover:text-fg focus:opacity-100"
           aria-label={`Download ${attachment.filename}`}
         >

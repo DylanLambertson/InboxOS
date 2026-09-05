@@ -34,6 +34,7 @@ export const router = createBrowserRouter([
         lazy: lazy(admin, (m) => m.AdminLayout),
         children: [
           { index: true, lazy: lazy(admin, (m) => m.AdminOverview) },
+          { path: "traffic", lazy: lazy(admin, (m) => m.AdminTraffic) },
           { path: "users", lazy: lazy(admin, (m) => m.AdminUsers) },
           { path: "mailboxes", lazy: lazy(admin, (m) => m.AdminMailboxes) },
           { path: "branding", lazy: lazy(admin, (m) => m.AdminBranding) },

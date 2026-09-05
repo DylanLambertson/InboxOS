@@ -65,9 +65,14 @@ attachmentRoutes.post("/", async (c) => {
 
 async function serve(c: Context<AppEnv>, forceDownload: boolean) {
   const a = await loadAttachment(c.env.DB, c.get("user"), c.req.param("id")!, "viewer");
-  const obj = await c.env.FILES.get(a.r2_key);
+  return attachmentResponse(c.env.FILES, a, forceDownload || c.req.query("download") === "1");
+}
+
+/** Stream an attachment from R2 with safe headers (only images/PDF/text/media render inline). */
+export async function attachmentResponse(files: R2Bucket, a: AttachmentRow, forceDownload: boolean): Promise<Response> {
+  const obj = await files.get(a.r2_key);
   if (!obj) throw new HTTPException(404, { message: "File is missing from storage" });
-  const inline = !forceDownload && c.req.query("download") !== "1" && INLINE_SAFE.test(a.content_type);
+  const inline = !forceDownload && INLINE_SAFE.test(a.content_type);
   const encoded = encodeURIComponent(a.filename);
   return new Response(obj.body, {
     headers: {

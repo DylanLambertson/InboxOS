@@ -15,9 +15,10 @@ const REMOTE = /^(https?:)?\/\//i;
  * - optionally blocks remote images (tracking pixels) until the user allows them
  * - forces links to open in a new tab
  */
-export function sanitizeEmail(raw: string, opts: { attachments: AttachmentInfo[]; allowRemote: boolean }): SanitizeResult {
+export function sanitizeEmail(raw: string, opts: { attachments: AttachmentInfo[]; allowRemote: boolean; attachmentBase?: string }): SanitizeResult {
   let blocked = 0;
-  const cidMap = new Map(opts.attachments.filter((a) => a.contentId).map((a) => [a.contentId!.toLowerCase(), `/api/attachments/${a.id}`]));
+  const base = opts.attachmentBase ?? "/api/attachments";
+  const cidMap = new Map(opts.attachments.filter((a) => a.contentId).map((a) => [a.contentId!.toLowerCase(), `${base}/${a.id}`]));
 
   const rewriteUrl = (url: string): string | null => {
     const u = url.trim();

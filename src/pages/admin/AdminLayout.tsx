@@ -1,5 +1,5 @@
 import { Navigate } from "react-router";
-import { Activity, Inbox, LayoutDashboard, Palette, Rocket, ScrollText, SlidersHorizontal, Users } from "lucide-react";
+import { Activity, Inbox, LayoutDashboard, Palette, Radar, Rocket, ScrollText, SlidersHorizontal, Users } from "lucide-react";
 import { useMe } from "@/lib/queries";
 import { SubNavLayout } from "@/components/layout/SubNav";
 
@@ -11,6 +11,7 @@ export function AdminLayout() {
       title="Admin console"
       items={[
         { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
+        { to: "/admin/traffic", label: "All traffic", icon: Radar },
         { to: "/admin/users", label: "Users", icon: Users },
         { to: "/admin/mailboxes", label: "Mailboxes", icon: Inbox },
         { to: "/admin/logs/delivery", label: "Delivery log", icon: Activity },

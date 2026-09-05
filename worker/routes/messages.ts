@@ -137,7 +137,7 @@ messageRoutes.get("/", async (c) => {
   });
 });
 
-async function buildDetail(c: { env: AppEnv["Bindings"] }, m: MessageRow): Promise<MessageDetail> {
+export async function buildDetail(c: { env: AppEnv["Bindings"] }, m: MessageRow): Promise<MessageDetail> {
   const db = c.env.DB;
   const [{ results: atts }, { results: events }, { results: labels }, sender, htmlObj] = await Promise.all([
     db.prepare("SELECT * FROM attachments WHERE message_id = ? ORDER BY created_at").bind(m.id).all<AttachmentRow>(),
