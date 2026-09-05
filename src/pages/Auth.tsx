@@ -5,6 +5,7 @@ import { ArrowLeft, CheckCircle2, KeyRound } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { Logo } from "@/components/layout/Logo";
+import { AuthHero } from "@/components/auth/AuthHero";
 import { Button, Field, Input, Spinner } from "@/components/ui/primitives";
 
 const OAUTH_ERRORS: Record<string, string> = {
@@ -21,25 +22,51 @@ const OAUTH_ERRORS: Record<string, string> = {
 function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
   const brand = useBrand();
   return (
-    <div className="flex min-h-full flex-col bg-subtle">
-      <div className="flex flex-1 items-center justify-center px-4 py-12">
-        <div className="animate-in w-full max-w-[380px]">
-          <div className="mb-8 flex justify-center">
-            <Logo size={40} withName={false} />
-          </div>
-          <div className="mb-6 text-center">
-            <h1 className="text-xl font-semibold tracking-tight">{title}</h1>
-            {subtitle && <p className="mt-1.5 text-[13px] text-fg-muted">{subtitle}</p>}
-          </div>
-          <div className="rounded-ui-lg border border-line bg-surface p-6 shadow-ui-md">{children}</div>
-          {brand.supportEmail && (
-            <p className="mt-6 text-center text-xs text-fg-muted">
-              Need help? <a className="text-fg underline-offset-2 hover:underline" href={`mailto:${brand.supportEmail}`}>{brand.supportEmail}</a>
-            </p>
-          )}
+    <div className="flex min-h-full bg-bg">
+      {/* Animated brand panel (desktop) */}
+      <div className="hidden w-[52%] max-w-[760px] shrink-0 p-3 lg:block">
+        <div className="h-full overflow-hidden rounded-[22px]">
+          <AuthHero />
         </div>
       </div>
-      <p className="pb-6 text-center text-xs text-fg-faint">{brand.footerText}</p>
+
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Compact brand strip (mobile) */}
+        <div className="relative overflow-hidden bg-[#0a0a0b] px-6 py-8 text-white lg:hidden">
+          <div className="io-glow io-glow-a" style={{ background: brand.accentColor }} />
+          <div className="io-dots absolute inset-0" />
+          <div className="relative flex items-center gap-2.5">
+            {brand.logoUrl ? (
+              <img src={brand.logoUrl} alt="" className="size-8 rounded-lg object-contain" />
+            ) : (
+              <span className="flex size-8 items-center justify-center rounded-lg bg-white text-xs font-bold text-black">{brand.monogram}</span>
+            )}
+            <span className="text-[15px] font-semibold tracking-tight">{brand.productName}</span>
+          </div>
+        </div>
+
+        <div className="flex flex-1 items-center justify-center px-6 py-12">
+          <div className="io-form-in w-full max-w-[380px]">
+            <div className="mb-8 hidden lg:block">
+              <Logo size={36} withName={false} />
+            </div>
+            <div className="mb-7">
+              <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+              {subtitle && <p className="mt-1.5 text-sm text-fg-muted">{subtitle}</p>}
+            </div>
+            {children}
+            {brand.supportEmail && (
+              <p className="mt-8 text-xs text-fg-muted">
+                Need help?{" "}
+                <a className="font-medium text-fg underline-offset-2 hover:underline" href={`mailto:${brand.supportEmail}`}>
+                  {brand.supportEmail}
+                </a>
+              </p>
+            )}
+          </div>
+        </div>
+        <p className="pb-6 text-center text-xs text-fg-faint lg:hidden">{brand.footerText}</p>
+      </div>
     </div>
   );
 }
@@ -195,7 +222,7 @@ export function LoginPage() {
           >
             <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
           </Field>
-          <Button type="submit" variant="primary" className="w-full" loading={busy}>
+          <Button type="submit" variant="primary" className="h-10 w-full" loading={busy}>
             Sign in
           </Button>
         </form>

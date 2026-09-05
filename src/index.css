@@ -184,6 +184,54 @@
 }
 .animate-in { animation: io-in 140ms cubic-bezier(0.2, 0.8, 0.2, 1); }
 .animate-fade { animation: io-fade 140ms ease-out; }
+
+/* ---- Sign-in hero ---------------------------------------------------- */
+.io-glow {
+  position: absolute;
+  width: 55%;
+  aspect-ratio: 1;
+  border-radius: 9999px;
+  filter: blur(90px);
+  opacity: 0.35;
+  pointer-events: none;
+}
+.io-glow-a { top: -15%; left: -10%; animation: io-drift-a 18s ease-in-out infinite alternate; }
+.io-glow-b { bottom: -20%; right: -15%; opacity: 0.22; animation: io-drift-b 22s ease-in-out infinite alternate; }
+.io-dots {
+  background-image: radial-gradient(rgb(255 255 255 / 0.09) 1px, transparent 1px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+}
+.io-bob { animation: io-bob 6s ease-in-out infinite; }
+.io-card { opacity: 0; animation: io-card-in 700ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards, io-float 7s ease-in-out 1.2s infinite; }
+.io-word { animation: io-word-in 500ms cubic-bezier(0.2, 0.8, 0.2, 1); }
+.io-rise { opacity: 0; animation: io-card-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) forwards; }
+.io-form-in { animation: io-form-in 600ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes io-drift-a { to { transform: translate(35%, 25%) scale(1.15); } }
+@keyframes io-drift-b { to { transform: translate(-30%, -20%) scale(0.9); } }
+@keyframes io-bob {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-12px) rotate(1.5deg); }
+}
+@keyframes io-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+@keyframes io-card-in {
+  from { opacity: 0; transform: translateY(14px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes io-word-in {
+  from { opacity: 0; transform: translateY(10px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes io-form-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .animate-in, .animate-fade { animation: none; }
+  .animate-in, .animate-fade, .io-glow-a, .io-glow-b, .io-bob, .io-word, .io-form-in { animation: none; }
+  .io-card, .io-rise { animation: none; opacity: 1; }
 }
