@@ -16,7 +16,7 @@
     "db:migrate:remote": "wrangler d1 migrations apply MAIL_DB --remote",
     "bootstrap:local": "node scripts/bootstrap.mjs --local",
     "bootstrap:remote": "node scripts/bootstrap.mjs --remote",
-    "deploy": "npm run build && wrangler deploy",
+    "deploy": "npm run build && wrangler d1 migrations apply MAIL_DB --remote && wrangler deploy",
     "cf-typegen": "wrangler types worker/worker-configuration.d.ts"
   },
   "dependencies": {

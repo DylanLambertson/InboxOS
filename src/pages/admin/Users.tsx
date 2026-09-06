@@ -7,7 +7,7 @@ import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { relativeTime } from "@/lib/format";
 import { useMe } from "@/lib/queries";
-import { Avatar, Badge, Button, Card, Field, IconButton, Input, PageHeader, Select, Spinner, Switch } from "@/components/ui/primitives";
+import { Avatar, Badge, Button, Card, Field, IconButton, Input, LoadError, PageHeader, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { Menu, Modal, useConfirm } from "@/components/ui/overlay";
 import { AccessPicker, ManageAccessDialog } from "./MailboxAccess";
 
@@ -164,7 +164,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
 }
 
 export function AdminUsers() {
-  const { data: users = [], isLoading } = useQuery({ queryKey: ["admin-users"], queryFn: () => api.get<AdminUser[]>("admin/users") });
+  const { data: users = [], isLoading, error, refetch } = useQuery({ queryKey: ["admin-users"], queryFn: () => api.get<AdminUser[]>("admin/users") });
   const { data: me } = useMe();
   const qc = useQueryClient();
   const confirm = useConfirm();
@@ -204,6 +204,8 @@ export function AdminUsers() {
       <Card className="overflow-x-auto">
         {isLoading ? (
           <div className="p-6"><Spinner /></div>
+        ) : error ? (
+          <LoadError error={error} onRetry={() => refetch()} />
         ) : (
           <table className="w-full min-w-[720px] text-[13px]">
             <thead className="border-b border-line text-left text-xs text-fg-muted">

@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, CircleDashed, ArrowRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { fileSize, relativeTime } from "@/lib/format";
-import { Card, PageHeader, Section, Spinner, cx } from "@/components/ui/primitives";
+import { Card, LoadError, PageHeader, Section, Spinner, cx } from "@/components/ui/primitives";
 import { EVENT_LABELS } from "@/components/mail/StatusBadge";
 import { ActivityChart } from "./ActivityChart";
 
@@ -46,7 +46,8 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 export function AdminOverview() {
-  const { data, isLoading } = useQuery({ queryKey: ["admin-overview"], queryFn: () => api.get<OverviewData>("admin/overview"), refetchInterval: 60_000 });
+  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["admin-overview"], queryFn: () => api.get<OverviewData>("admin/overview"), refetchInterval: 60_000 });
+  if (error && !data) return <LoadError error={error} onRetry={() => refetch()} />;
   if (isLoading || !data) return <Spinner />;
   const checks = [
     { ok: data.provider.apiKey, label: "Resend API key", hint: "Needed to send and fetch received mail." },

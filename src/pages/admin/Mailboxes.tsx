@@ -8,7 +8,7 @@ import { useBrand } from "@/lib/brand";
 import { fileSize, relativeTime } from "@/lib/format";
 import { useMe } from "@/lib/queries";
 import { LABEL_COLORS } from "@/components/mail/LabelDialog";
-import { Avatar, Badge, Button, Card, cx, EmptyState, Field, IconButton, Input, PageHeader, Select, Spinner, Switch } from "@/components/ui/primitives";
+import { Avatar, Badge, Button, Card, cx, EmptyState, Field, IconButton, Input, LoadError, PageHeader, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { Modal, useConfirm } from "@/components/ui/overlay";
 
 interface AdminMailbox {
@@ -283,7 +283,7 @@ function MailboxDetail({ box, onClose }: { box: AdminMailbox; onClose: () => voi
 }
 
 export function AdminMailboxes() {
-  const { data: boxes = [], isLoading } = useQuery({ queryKey: ["admin-mailboxes"], queryFn: () => api.get<AdminMailbox[]>("admin/mailboxes") });
+  const { data: boxes = [], isLoading, error, refetch } = useQuery({ queryKey: ["admin-mailboxes"], queryFn: () => api.get<AdminMailbox[]>("admin/mailboxes") });
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
   const open = boxes.find((b) => b.id === openId);
@@ -301,6 +301,10 @@ export function AdminMailboxes() {
       />
       {isLoading ? (
         <Spinner />
+      ) : error ? (
+        <Card>
+          <LoadError error={error} onRetry={() => refetch()} />
+        </Card>
       ) : boxes.length === 0 ? (
         <Card>
           <EmptyState icon={<Inbox className="size-5" />} title="No mailboxes yet" body="Create a shared mailbox, or invite users with a personal mailbox." />

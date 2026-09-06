@@ -197,6 +197,23 @@ export function EmptyState({ icon, title, body, action }: { icon?: ReactNode; ti
   );
 }
 
+/** Shown instead of a spinner when a request fails, so failures never look like endless loading. */
+export function LoadError({ error, onRetry }: { error: unknown; onRetry?: () => void }) {
+  const message = error instanceof Error ? error.message : "Something went wrong.";
+  return (
+    <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+      <div className="mb-4 flex size-12 items-center justify-center rounded-full bg-danger-soft text-lg text-danger">!</div>
+      <h3 className="text-sm font-semibold text-fg">Couldn't load this page</h3>
+      <p className="mt-1 max-w-sm text-[13px] text-fg-muted">{message}</p>
+      {onRetry && (
+        <button onClick={onRetry} className="mt-4 h-8 rounded-ui border border-line bg-surface px-3 text-[13px] font-medium hover:bg-subtle">
+          Try again
+        </button>
+      )}
+    </div>
+  );
+}
+
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
   return <div className={cx("rounded-ui-lg border border-line bg-surface shadow-ui-sm", className)}>{children}</div>;
 }

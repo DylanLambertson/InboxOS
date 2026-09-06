@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import type { Brand, OrgPolicy } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
 import { useMe } from "@/lib/queries";
-import { Button, Field, Input, PageHeader, Section, Spinner, Switch } from "@/components/ui/primitives";
+import { Button, Field, Input, LoadError, PageHeader, Section, Spinner, Switch } from "@/components/ui/primitives";
 
 function Toggle({ title, description, checked, onChange, disabled }: { title: string; description?: ReactNode; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
@@ -30,7 +30,7 @@ function NumberField({ label, hint, value, onChange, min = 0, suffix }: { label:
 }
 
 export function AdminPolicy() {
-  const { data } = useQuery({ queryKey: ["admin-settings"], queryFn: () => api.get<{ brand: Brand; policy: OrgPolicy }>("admin/settings") });
+  const { data, error, refetch } = useQuery({ queryKey: ["admin-settings"], queryFn: () => api.get<{ brand: Brand; policy: OrgPolicy }>("admin/settings") });
   const { data: me } = useMe();
   const qc = useQueryClient();
   const [p, setP] = useState<OrgPolicy | null>(null);
@@ -44,6 +44,7 @@ export function AdminPolicy() {
       setDomains(data.policy.googleAllowedDomains.join(", "));
     }
   }, [data]);
+  if (error && !data) return <LoadError error={error} onRetry={() => refetch()} />;
   if (!p || !data) return <Spinner />;
   const set = <K extends keyof OrgPolicy>(k: K, v: OrgPolicy[K]) => setP((x) => (x ? { ...x, [k]: v } : x));
 

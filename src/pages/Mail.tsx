@@ -11,7 +11,7 @@ import { FOLDER_NAV } from "@/components/layout/Sidebar";
 import { BulkActions } from "@/components/mail/BulkActions";
 import { MessageRow } from "@/components/mail/MessageRow";
 import { ThreadView } from "@/components/mail/ThreadView";
-import { Button, Checkbox, cx, EmptyState, IconButton, Spinner } from "@/components/ui/primitives";
+import { Button, Checkbox, cx, EmptyState, IconButton, LoadError, Spinner } from "@/components/ui/primitives";
 import { useConfirm } from "@/components/ui/overlay";
 
 const EMPTY_COPY: Record<string, { title: string; body: string }> = {
@@ -30,7 +30,7 @@ export function MailPage() {
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
   const navigate = useNavigate();
-  const { data: boxes, isLoading: boxesLoading } = useMailboxes();
+  const { data: boxes, isLoading: boxesLoading, error: boxesError, refetch: refetchBoxes } = useMailboxes();
   const { data: me } = useMe();
   const unified = mailboxId === "all" && !!boxes?.length;
   const mailbox = unified
@@ -178,6 +178,7 @@ export function MailPage() {
       </div>
     );
   }
+  if (boxesError && !boxes) return <LoadError error={boxesError} onRetry={() => refetchBoxes()} />;
   if (!mailbox) {
     if (boxes?.length) return <Navigate to={`/mail/${boxes[0].id}/inbox`} replace />;
     return <EmptyState icon={<Inbox className="size-5" />} title="No mailboxes yet" body="An administrator needs to give you access to a mailbox before you can send or receive mail." />;

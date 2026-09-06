@@ -8,7 +8,7 @@ import { displayName, fileSize, fullAddress, longDate, shortDate } from "@/lib/f
 import { AttachmentChip } from "@/components/mail/AttachmentChip";
 import { EmailFrame } from "@/components/mail/EmailFrame";
 import { EVENT_LABELS, StatusBadge } from "@/components/mail/StatusBadge";
-import { Badge, Button, Card, cx, EmptyState, Input, PageHeader, Select, Spinner } from "@/components/ui/primitives";
+import { Badge, Button, Card, cx, EmptyState, Input, LoadError, PageHeader, Select, Spinner } from "@/components/ui/primitives";
 import { Modal, Tabs, useConfirm } from "@/components/ui/overlay";
 import { useAdminMailboxes } from "./MailboxAccess";
 
@@ -296,6 +296,8 @@ export function AdminTraffic() {
       <Card className="overflow-hidden">
         {list.isLoading ? (
           <div className="p-6"><Spinner /></div>
+        ) : list.error && !rows.length ? (
+          <LoadError error={list.error} onRetry={() => list.refetch()} />
         ) : rows.length === 0 ? (
           <EmptyState icon={<Mailbox className="size-5" />} title="No traffic" body={dq || scope !== "all" || mailbox ? "Nothing matches these filters." : "Mail will appear here as it's sent and received."} />
         ) : (
