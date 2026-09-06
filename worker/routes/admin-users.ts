@@ -7,7 +7,8 @@ import { audit } from "../lib/audit";
 import { getBrand } from "../lib/settings";
 import { templates } from "../lib/email-templates";
 import { sendSystemEmail } from "../lib/system-mail";
-import { ensureMailbox, getUser, getUserByEmail, insertUser, type UserRow } from "../lib/users";
+import { storedRole } from "../lib/roles";
+import { ensureMailbox, getUser, getUserByEmail, insertUser, withRole, type UserRow } from "../lib/users";
 import { newId, now, sha256hex } from "../lib/util";
 import { parseBody, zEmail } from "../lib/validate";
 
@@ -23,7 +24,7 @@ adminUserRoutes.get("/", async (c) => {
      FROM users u ORDER BY u.status = 'disabled', u.name COLLATE NOCASE, u.email`,
   ).all<UserListRow>();
   return c.json(
-    results.map((u) => ({
+    results.map((row) => withRole(row)!).map((u) => ({
       id: u.id,
       email: u.email,
       name: u.name,
@@ -69,7 +70,7 @@ adminUserRoutes.post("/", async (c) => {
     z.object({
       email: zEmail,
       name: z.string().trim().max(120).default(""),
-      role: z.enum(["owner", "admin", "member"]).default("member"),
+      role: z.enum(["owner", "admin", "manager", "member"]).default("member"),
       mailboxAddress: zEmail.optional(),
       sendEmail: z.boolean().default(true),
       /** Extra mailboxes (e.g. shared inboxes) to grant access to right away. */
@@ -120,7 +121,7 @@ adminUserRoutes.patch("/:id", async (c) => {
     c,
     z.object({
       name: z.string().trim().max(120).optional(),
-      role: z.enum(["owner", "admin", "member"]).optional(),
+      role: z.enum(["owner", "admin", "manager", "member"]).optional(),
       status: z.enum(["active", "disabled"]).optional(),
       unlock: z.boolean().optional(),
     }),
@@ -138,12 +139,13 @@ adminUserRoutes.patch("/:id", async (c) => {
   // Invited users stay invited until they accept, unless being disabled.
   const status: UserStatus = body.status === "disabled" ? "disabled" : body.status === "active" && target.status === "disabled" ? (target.password_hash || target.google_sub ? "active" : "invited") : target.status;
   const role: Role = body.role ?? target.role;
+  const stored = storedRole(role);
   const stmts: D1PreparedStatement[] = [
     c.env.DB.prepare(
-      `UPDATE users SET name = ?, role = ?, status = ?, updated_at = ?,
+      `UPDATE users SET name = ?, role = ?, is_manager = ?, status = ?, updated_at = ?,
          failed_logins = CASE WHEN ? THEN 0 ELSE failed_logins END, locked_until = CASE WHEN ? THEN NULL ELSE locked_until END
        WHERE id = ?`,
-    ).bind(body.name ?? target.name, role, status, now(), body.unlock ? 1 : 0, body.unlock ? 1 : 0, target.id),
+    ).bind(body.name ?? target.name, stored.role, stored.isManager, status, now(), body.unlock ? 1 : 0, body.unlock ? 1 : 0, target.id),
   ];
   if (status === "disabled") stmts.push(c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id));
   await c.env.DB.batch(stmts);

@@ -11,6 +11,7 @@ import { EVENT_LABELS, StatusBadge } from "@/components/mail/StatusBadge";
 import { Badge, Button, Card, cx, EmptyState, Input, LoadError, PageHeader, Select, Spinner } from "@/components/ui/primitives";
 import { Modal, Tabs, useConfirm } from "@/components/ui/overlay";
 import { useAdminMailboxes } from "./MailboxAccess";
+import { useCanManage } from "@/lib/queries";
 
 type Scope = "all" | "inbound" | "outbound" | "unrouted" | "problems";
 const ATT_BASE = "/api/admin/traffic/attachments";
@@ -138,6 +139,7 @@ function TrafficViewer({ id, onClose }: { id: string; onClose: () => void }) {
   const [headers, setHeaders] = useState(false);
   const confirm = useConfirm();
   const qc = useQueryClient();
+  const editable = useCanManage();
   const visible = msg?.attachments.filter((a) => !a.inline || !(msg.html ?? "").includes(`cid:${a.contentId}`)) ?? [];
 
   return (
@@ -165,7 +167,7 @@ function TrafficViewer({ id, onClose }: { id: string; onClose: () => void }) {
             {msg.sentBy && (<><dt className="text-fg-muted">By</dt><dd>{msg.sentBy.name}</dd></>)}
           </dl>
 
-          {!msg.mailbox && msg.direction === "inbound" && <DeliverPanel msg={msg} onDone={onClose} />}
+          {!msg.mailbox && msg.direction === "inbound" && editable && <DeliverPanel msg={msg} onDone={onClose} />}
 
           {msg.events.length > 0 && (
             <ol className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
@@ -199,7 +201,7 @@ function TrafficViewer({ id, onClose }: { id: string; onClose: () => void }) {
           <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4">
             <Button size="sm" variant="ghost" onClick={() => setHeaders((h) => !h)}>{headers ? "Hide headers" : "Show headers"}</Button>
             <span className="text-xs text-fg-faint">Viewing this message was recorded in the audit log.</span>
-            {!msg.mailbox && (
+            {!msg.mailbox && editable && (
               <Button
                 size="sm"
                 variant="ghost"

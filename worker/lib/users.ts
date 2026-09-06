@@ -1,5 +1,6 @@
 import { DEFAULT_PREFERENCES, type Me, type Preferences, type Role, type UserStatus } from "@shared/types";
 import type { OrgPolicy } from "@shared/brand";
+import { effectiveRole, storedRole } from "./roles";
 import { newId, now, parseJson, randomColor } from "./util";
 
 export interface UserRow {
@@ -7,7 +8,9 @@ export interface UserRow {
   email: string;
   name: string;
   password_hash: string | null;
+  /** Effective role (normalized by `withRole`); the raw column never holds "manager". */
   role: Role;
+  is_manager: number;
   status: UserStatus;
   avatar_color: string;
   totp_secret: string | null;
@@ -39,9 +42,13 @@ export function toMe(u: UserRow, policy: OrgPolicy): Me {
   };
 }
 
-export const getUser = (db: D1Database, id: string) => db.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>();
-export const getUserByEmail = (db: D1Database, email: string) =>
-  db.prepare("SELECT * FROM users WHERE email = ?").bind(email.trim().toLowerCase()).first<UserRow>();
+/** Normalize a raw users row so `role` is the effective role. */
+export const withRole = <T extends { role: string; is_manager?: number | null }>(r: T | null): (T & { role: Role }) | null =>
+  r ? { ...r, role: effectiveRole(r) } : null;
+
+export const getUser = async (db: D1Database, id: string) => withRole(await db.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>());
+export const getUserByEmail = async (db: D1Database, email: string) =>
+  withRole(await db.prepare("SELECT * FROM users WHERE email = ?").bind(email.trim().toLowerCase()).first<UserRow>());
 
 /** Insert a user row; returns the new id. */
 export async function insertUser(
@@ -50,12 +57,13 @@ export async function insertUser(
 ): Promise<string> {
   const id = newId();
   const t = now();
+  const stored = storedRole(u.role);
   await db
     .prepare(
-      `INSERT INTO users (id, email, name, password_hash, role, status, avatar_color, google_sub, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      `INSERT INTO users (id, email, name, password_hash, role, is_manager, status, avatar_color, google_sub, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
-    .bind(id, u.email.trim().toLowerCase(), u.name.trim(), u.passwordHash ?? null, u.role, u.status, randomColor(), u.googleSub ?? null, t, t)
+    .bind(id, u.email.trim().toLowerCase(), u.name.trim(), u.passwordHash ?? null, stored.role, stored.isManager, u.status, randomColor(), u.googleSub ?? null, t, t)
     .run();
   return id;
 }

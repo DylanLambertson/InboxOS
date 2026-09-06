@@ -6,6 +6,12 @@ export const POLL_MS = 30_000;
 
 export const useMe = () => useQuery({ queryKey: ["me"], queryFn: () => api.get<Me>("me"), staleTime: 60_000, retry: false });
 
+/** Owners and admins can change things in the admin console; managers only view. */
+export function useCanManage(): boolean {
+  const { data: me } = useMe();
+  return me?.role === "owner" || me?.role === "admin";
+}
+
 export const useMailboxes = () =>
   useQuery({ queryKey: ["mailboxes"], queryFn: () => api.get<MailboxSummary[]>("mailboxes"), refetchInterval: POLL_MS });
 

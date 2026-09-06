@@ -5,6 +5,7 @@ import { api } from "@/lib/api";
 import { fileSize, relativeTime } from "@/lib/format";
 import { Card, LoadError, PageHeader, Section, Spinner, cx } from "@/components/ui/primitives";
 import { EVENT_LABELS } from "@/components/mail/StatusBadge";
+import { useCanManage } from "@/lib/queries";
 import { ActivityChart } from "./ActivityChart";
 
 export interface OverviewData {
@@ -46,6 +47,7 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
 }
 
 export function AdminOverview() {
+  const editable = useCanManage();
   const { data, isLoading, error, refetch } = useQuery({ queryKey: ["admin-overview"], queryFn: () => api.get<OverviewData>("admin/overview"), refetchInterval: 60_000 });
   if (error && !data) return <LoadError error={error} onRetry={() => refetch()} />;
   if (isLoading || !data) return <Spinner />;
@@ -60,7 +62,7 @@ export function AdminOverview() {
     <div className="space-y-6">
       <PageHeader title="Overview" description="Sending volume, quotas and system health." />
 
-      {!ready && (
+      {!ready && editable && (
         <Link to="/admin/setup" className="flex items-center gap-3 rounded-ui-lg border border-warning/30 bg-warning-soft px-4 py-3 text-[13px] text-warning">
           <AlertTriangle className="size-4 shrink-0" />
           <span className="flex-1">Setup isn't finished — mail can't be sent or received until the provider is connected.</span>

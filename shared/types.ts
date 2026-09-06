@@ -3,7 +3,8 @@
 /** Hidden system mailbox that holds mail sent to addresses with no mailbox (see Admin → All traffic). */
 export const UNROUTED_MAILBOX_ID = "system-unrouted";
 
-export type Role = "owner" | "admin" | "member";
+/** manager = read-only access to the admin console. */
+export type Role = "owner" | "admin" | "manager" | "member";
 export type UserStatus = "active" | "invited" | "disabled";
 export type MailboxRole = "owner" | "editor" | "viewer";
 export type MailboxType = "personal" | "shared";

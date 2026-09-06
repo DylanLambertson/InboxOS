@@ -93,7 +93,7 @@ export function AccessPicker({ value, onChange }: { value: Record<string, Mailbo
 }
 
 /** Live editor: changes apply immediately for an existing user. */
-export function ManageAccessDialog({ user, onClose }: { user: { id: string; name: string; email: string }; onClose: () => void }) {
+export function ManageAccessDialog({ user, onClose, readOnly }: { user: { id: string; name: string; email: string }; onClose: () => void; readOnly?: boolean }) {
   const { data: boxes = [], isLoading } = useAdminMailboxes();
   const qc = useQueryClient();
   const [busy, setBusy] = useState<string | null>(null);
@@ -118,7 +118,7 @@ export function ManageAccessDialog({ user, onClose }: { user: { id: string; name
       open
       onClose={onClose}
       title="Mailbox access"
-      description={`Choose which inboxes ${user.name || user.email} can open. They can switch between them or see them all in one view.`}
+      description={readOnly ? `Inboxes ${user.name || user.email} can open. Only admins can change this.` : `Choose which inboxes ${user.name || user.email} can open. They can switch between them or see them all in one view.`}
       width={600}
       footer={<Button variant="primary" onClick={onClose}>Done</Button>}
     >
@@ -127,7 +127,9 @@ export function ManageAccessDialog({ user, onClose }: { user: { id: string; name
       ) : boxes.length === 0 ? (
         <EmptyState icon={<Inbox className="size-5" />} title="No mailboxes yet" body="Create one in Admin → Mailboxes." />
       ) : (
-        <AccessList boxes={boxes} busy={busy} value={(id) => boxes.find((b) => b.id === id)?.members.find((m) => m.userId === user.id)?.role ?? ""} onChange={change} />
+        <fieldset disabled={readOnly} className="min-w-0">
+          <AccessList boxes={boxes} busy={busy} value={(id) => boxes.find((b) => b.id === id)?.members.find((m) => m.userId === user.id)?.role ?? ""} onChange={change} />
+        </fieldset>
       )}
     </Modal>
   );

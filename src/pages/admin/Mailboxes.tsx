@@ -6,7 +6,7 @@ import type { MailboxRole } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { fileSize, relativeTime } from "@/lib/format";
-import { useMe } from "@/lib/queries";
+import { useCanManage, useMe } from "@/lib/queries";
 import { LABEL_COLORS } from "@/components/mail/LabelDialog";
 import { Avatar, Badge, Button, Card, cx, EmptyState, Field, IconButton, Input, LoadError, PageHeader, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { Modal, useConfirm } from "@/components/ui/overlay";
@@ -94,7 +94,7 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
   );
 }
 
-function MailboxDetail({ box, onClose }: { box: AdminMailbox; onClose: () => void }) {
+function MailboxDetail({ box, onClose, readOnly }: { box: AdminMailbox; onClose: () => void; readOnly: boolean }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
   const { data: me } = useMe();
@@ -142,8 +142,8 @@ function MailboxDetail({ box, onClose }: { box: AdminMailbox; onClose: () => voi
   };
 
   return (
-    <Modal open onClose={onClose} title={box.address} description={`${box.messageCount.toLocaleString()} messages · ${fileSize(box.storageBytes)}`} width={640}>
-      <div className="space-y-6">
+    <Modal open onClose={onClose} title={box.address} description={`${box.messageCount.toLocaleString()} messages · ${fileSize(box.storageBytes)}${readOnly ? " · view only" : ""}`} width={640}>
+      <fieldset disabled={readOnly} className="min-w-0 space-y-6">
         <section className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <Field label="Sender name">
@@ -214,7 +214,7 @@ function MailboxDetail({ box, onClose }: { box: AdminMailbox; onClose: () => voi
               </div>
             ))}
           </div>
-          {nonMembers.length > 0 && (
+          {!readOnly && nonMembers.length > 0 && (
             <div className="mt-2 flex gap-2">
               <Select value={addUser} onChange={(e) => setAddUser(e.target.value)} className="flex-1">
                 <option value="">Add a person…</option>
@@ -255,29 +255,33 @@ function MailboxDetail({ box, onClose }: { box: AdminMailbox; onClose: () => voi
             ))}
             {!box.aliases.length && <span className="text-xs text-fg-faint">No aliases</span>}
           </div>
+          {!readOnly && (
           <form
-            className="flex gap-2"
-            onSubmit={(e) => {
-              e.preventDefault();
-              run(async () => {
-                await api.post(`admin/mailboxes/${box.id}/aliases`, { address: alias });
-                setAlias("");
-              }, "Alias added");
-            }}
-          >
-            <Input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder={`e.g. sales@${box.address.split("@")[1]}`} type="email" />
-            <Button type="submit" disabled={!alias}>Add alias</Button>
-          </form>
+              className="flex gap-2"
+              onSubmit={(e) => {
+                e.preventDefault();
+                run(async () => {
+                  await api.post(`admin/mailboxes/${box.id}/aliases`, { address: alias });
+                  setAlias("");
+                }, "Alias added");
+              }}
+            >
+              <Input value={alias} onChange={(e) => setAlias(e.target.value)} placeholder={`e.g. sales@${box.address.split("@")[1]}`} type="email" />
+              <Button type="submit" disabled={!alias}>Add alias</Button>
+            </form>
+          )}
         </section>
 
-        <section className="rounded-ui border border-danger/30 p-4">
-          <h3 className="text-[13px] font-semibold text-danger">Delete mailbox</h3>
-          <p className="mt-1 mb-3 text-xs text-fg-muted">Permanently deletes the mailbox and every message in it.</p>
-          <Button variant="danger" size="sm" icon={<Trash2 className="size-3.5" />} onClick={destroy}>
-            Delete mailbox
-          </Button>
-        </section>
-      </div>
+        {!readOnly && (
+          <section className="rounded-ui border border-danger/30 p-4">
+            <h3 className="text-[13px] font-semibold text-danger">Delete mailbox</h3>
+            <p className="mt-1 mb-3 text-xs text-fg-muted">Permanently deletes the mailbox and every message in it.</p>
+            <Button variant="danger" size="sm" icon={<Trash2 className="size-3.5" />} onClick={destroy}>
+              Delete mailbox
+            </Button>
+          </section>
+        )}
+      </fieldset>
     </Modal>
   );
 }
@@ -286,6 +290,7 @@ export function AdminMailboxes() {
   const { data: boxes = [], isLoading, error, refetch } = useQuery({ queryKey: ["admin-mailboxes"], queryFn: () => api.get<AdminMailbox[]>("admin/mailboxes") });
   const [creating, setCreating] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
+  const editable = useCanManage();
   const open = boxes.find((b) => b.id === openId);
 
   return (
@@ -294,9 +299,11 @@ export function AdminMailboxes() {
         title="Mailboxes"
         description="Every address your organization sends and receives from."
         actions={
-          <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
-            New mailbox
-          </Button>
+          editable && (
+            <Button variant="primary" icon={<Plus className="size-4" />} onClick={() => setCreating(true)}>
+              New mailbox
+            </Button>
+          )
         }
       />
       {isLoading ? (
@@ -340,7 +347,7 @@ export function AdminMailboxes() {
         </Card>
       )}
       {creating && <CreateDialog onClose={() => setCreating(false)} />}
-      {open && <MailboxDetail key={open.id} box={open} onClose={() => setOpenId(null)} />}
+      {open && <MailboxDetail key={open.id} box={open} readOnly={!editable} onClose={() => setOpenId(null)} />}
     </div>
   );
 }

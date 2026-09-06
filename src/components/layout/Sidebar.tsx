@@ -126,7 +126,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [labelOpen, setLabelOpen] = useState(false);
-  const isAdmin = me?.role === "owner" || me?.role === "admin";
+  const isAdmin = me?.role === "owner" || me?.role === "admin" || me?.role === "manager";
 
   const setTheme = async (theme: "system" | "light" | "dark") => {
     try {

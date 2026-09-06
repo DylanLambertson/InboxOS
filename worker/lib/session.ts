@@ -4,6 +4,7 @@ import { HTTPException } from "hono/http-exception";
 import type { AppEnv, Env, SessionUser } from "../env";
 import type { Role } from "@shared/types";
 import { clientIp } from "./audit";
+import { canManage, canViewConsole, roleSql } from "./roles";
 import { getPolicy } from "./settings";
 import { newId, now, sha256hex } from "./util";
 
@@ -74,7 +75,7 @@ export async function readSession(c: Context<AppEnv>, allowMfaPending = false): 
   if (!token) return null;
   const sid = await sha256hex(token);
   const row = await c.env.DB.prepare(
-    `SELECT s.id AS sid, s.mfa_pending, s.last_seen_at, s.expires_at, u.id, u.email, u.name, u.role, u.status
+    `SELECT s.id AS sid, s.mfa_pending, s.last_seen_at, s.expires_at, u.id, u.email, u.name, ${roleSql("u")} AS role, u.status
      FROM sessions s JOIN users u ON u.id = s.user_id WHERE s.id = ?`,
   )
     .bind(sid)
@@ -105,13 +106,20 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   await next();
 };
 
-export const requireAdmin: MiddlewareHandler<AppEnv> = async (c, next) => {
+/**
+ * Admin console gate: owners, admins and managers may enter; managers are read-only,
+ * so any request that could change something is refused for them.
+ */
+export const requireConsole: MiddlewareHandler<AppEnv> = async (c, next) => {
   const u = c.get("user");
-  if (u.role !== "owner" && u.role !== "admin") throw new HTTPException(403, { message: "Admins only" });
+  if (!canViewConsole(u.role)) throw new HTTPException(403, { message: "Admins only" });
+  if (!canManage(u.role) && !["GET", "HEAD"].includes(c.req.method)) {
+    throw new HTTPException(403, { message: "Managers have view-only access. Ask an admin to make this change." });
+  }
   await next();
 };
 
-export const isAdmin = (u: SessionUser) => u.role === "owner" || u.role === "admin";
+export const isAdmin = (u: SessionUser) => canManage(u.role);
 
 /**
  * CSRF defence for cookie auth: state-changing requests must come from our own origin.

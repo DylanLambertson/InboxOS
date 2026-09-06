@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import type { AppEnv, Env } from "./env";
 import { runCron } from "./cron";
-import { requireAdmin, requireAuth, sameOrigin } from "./lib/session";
+import { requireAuth, requireConsole, sameOrigin } from "./lib/session";
 import { getBrand } from "./lib/settings";
 import { adminMailboxRoutes } from "./routes/admin-mailboxes";
 import { adminSystemRoutes } from "./routes/admin-system";
@@ -76,7 +76,7 @@ api.route("/contacts", contactRoutes);
 api.route("/templates", templateRoutes);
 
 const admin = new Hono<AppEnv>();
-admin.use("*", requireAdmin);
+admin.use("*", requireConsole);
 admin.route("/users", adminUserRoutes);
 admin.route("/mailboxes", adminMailboxRoutes);
 admin.route("/traffic", adminTrafficRoutes);

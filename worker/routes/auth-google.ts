@@ -4,7 +4,7 @@ import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
 import { createSession, readSession } from "../lib/session";
 import { getBrand, getPolicy } from "../lib/settings";
-import { ensureMailbox, getUserByEmail, insertUser, type UserRow } from "../lib/users";
+import { ensureMailbox, getUserByEmail, insertUser, withRole, type UserRow } from "../lib/users";
 import { b64decode, domainOf, newId, now, parseJson, sha256hex } from "../lib/util";
 
 export const googleRoutes = new Hono<AppEnv>();
@@ -121,7 +121,7 @@ googleRoutes.get("/callback", async (c) => {
   const domainOk = !allowed.length || allowed.includes((claims.hd ?? domainOf(email)).toLowerCase());
 
   let user =
-    (await c.env.DB.prepare("SELECT * FROM users WHERE google_sub = ?").bind(claims.sub).first<UserRow>()) ??
+    withRole(await c.env.DB.prepare("SELECT * FROM users WHERE google_sub = ?").bind(claims.sub).first<UserRow>()) ??
     (await getUserByEmail(c.env.DB, email));
 
   if (!user) {
@@ -132,7 +132,7 @@ googleRoutes.get("/callback", async (c) => {
       await ensureMailbox(c.env.DB, { address: email, displayName: claims.name ?? "", type: "personal", ownerId: id });
     }
     await audit(c, { action: "user.auto_provisioned", targetType: "user", targetId: id, actor: { id, email } });
-    user = (await c.env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>())!;
+    user = withRole(await c.env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>())!;
   }
   if (user.status === "disabled") return fail("account_disabled");
   if (!domainOk && user.role !== "owner") return fail("google_domain");

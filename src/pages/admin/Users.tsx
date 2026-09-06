@@ -6,7 +6,7 @@ import type { MailboxRole, Role, UserStatus } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { relativeTime } from "@/lib/format";
-import { useMe } from "@/lib/queries";
+import { useCanManage, useMe } from "@/lib/queries";
 import { Avatar, Badge, Button, Card, Field, IconButton, Input, LoadError, PageHeader, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { Menu, Modal, useConfirm } from "@/components/ui/overlay";
 import { AccessPicker, ManageAccessDialog } from "./MailboxAccess";
@@ -30,6 +30,7 @@ interface AdminUser {
 const ROLE_HELP: Record<Role, string> = {
   owner: "Full control, including security settings and other owners.",
   admin: "Manage users, mailboxes, branding and logs.",
+  manager: "View-only admin console: overview, all traffic, users, mailboxes and logs. Can't change anything.",
   member: "Use the mailboxes they're given access to.",
 };
 
@@ -121,6 +122,7 @@ function InviteDialog({ onClose }: { onClose: () => void }) {
           <Field label="Role" hint={ROLE_HELP[role]}>
             <Select value={role} onChange={(e) => setRole(e.target.value as Role)}>
               <option value="member">Member</option>
+              <option value="manager">Manager</option>
               <option value="admin">Admin</option>
               {me?.role === "owner" && <option value="owner">Owner</option>}
             </Select>
@@ -171,6 +173,7 @@ export function AdminUsers() {
   const [q, setQ] = useState("");
   const [inviting, setInviting] = useState(false);
   const [accessFor, setAccessFor] = useState<AdminUser | null>(null);
+  const editable = useCanManage();
   const [link, setLink] = useState<{ url: string; emailed: boolean; kind: "invite" | "reset" } | null>(null);
   const refresh = () => qc.invalidateQueries({ queryKey: ["admin-users"] });
 
@@ -192,9 +195,11 @@ export function AdminUsers() {
         title="Users"
         description={`${users.filter((u) => u.status === "active").length} active · ${users.filter((u) => u.status === "invited").length} invited`}
         actions={
-          <Button variant="primary" icon={<UserPlus className="size-4" />} onClick={() => setInviting(true)}>
-            Invite user
-          </Button>
+          editable && (
+            <Button variant="primary" icon={<UserPlus className="size-4" />} onClick={() => setInviting(true)}>
+              Invite user
+            </Button>
+          )
         }
       />
       <div className="relative max-w-sm">
@@ -222,7 +227,7 @@ export function AdminUsers() {
             <tbody className="divide-y divide-line">
               {filtered.map((u) => {
                 const self = u.id === me?.id;
-                const canManage = me?.role === "owner" || u.role !== "owner";
+                const canManage = editable && (me?.role === "owner" || u.role !== "owner");
                 return (
                   <tr key={u.id} className="hover:bg-subtle">
                     <td className="px-5 py-3">
@@ -242,6 +247,7 @@ export function AdminUsers() {
                         className="h-8 w-28 text-[13px]"
                       >
                         <option value="member">Member</option>
+                        <option value="manager">Manager</option>
                         <option value="admin">Admin</option>
                         <option value="owner" disabled={me?.role !== "owner"}>Owner</option>
                       </Select>
@@ -355,7 +361,7 @@ export function AdminUsers() {
         )}
       </Card>
       {inviting && <InviteDialog onClose={() => setInviting(false)} />}
-      {accessFor && <ManageAccessDialog user={accessFor} onClose={() => setAccessFor(null)} />}
+      {accessFor && <ManageAccessDialog user={accessFor} readOnly={!editable} onClose={() => setAccessFor(null)} />}
       <Modal open={!!link} onClose={() => setLink(null)} title={link?.kind === "invite" ? "Invite link" : "Password reset link"} footer={<Button variant="primary" onClick={() => setLink(null)}>Done</Button>}>
         {link && <LinkResult url={link.url} emailed={link.emailed} kind={link.kind} />}
       </Modal>

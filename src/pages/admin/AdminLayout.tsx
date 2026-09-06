@@ -1,15 +1,16 @@
-import { Navigate } from "react-router";
-import { Activity, Inbox, LayoutDashboard, Palette, Radar, Rocket, ScrollText, SlidersHorizontal, Users } from "lucide-react";
+import { Navigate, useLocation } from "react-router";
+import { Activity, Eye, Inbox, LayoutDashboard, Palette, Radar, Rocket, ScrollText, SlidersHorizontal, Users } from "lucide-react";
 import { useMe } from "@/lib/queries";
 import { SubNavLayout } from "@/components/layout/SubNav";
 
 export function AdminLayout() {
   const { data: me } = useMe();
-  if (me && me.role !== "owner" && me.role !== "admin") return <Navigate to="/" replace />;
-  return (
-    <SubNavLayout
-      title="Admin console"
-      items={[
+  const { pathname } = useLocation();
+  if (me && me.role !== "owner" && me.role !== "admin" && me.role !== "manager") return <Navigate to="/" replace />;
+  const manager = me?.role === "manager";
+  // Managers have view-only access and don't see configuration pages.
+  if (manager && /^\/admin\/(branding|settings|setup)/.test(pathname)) return <Navigate to="/admin" replace />;
+  const all = [
         { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
         { to: "/admin/traffic", label: "All traffic", icon: Radar },
         { to: "/admin/users", label: "Users", icon: Users },
@@ -19,7 +20,19 @@ export function AdminLayout() {
         { to: "/admin/branding", label: "Branding", icon: Palette },
         { to: "/admin/settings", label: "Settings & policy", icon: SlidersHorizontal },
         { to: "/admin/setup", label: "Setup guide", icon: Rocket },
-      ]}
+  ];
+  return (
+    <SubNavLayout
+      title="Admin console"
+      items={manager ? all.filter((i) => !/branding|settings|setup/.test(i.to)) : all}
+      footer={
+        manager ? (
+          <div className="mx-3 mb-3 flex items-start gap-2 rounded-ui border border-line bg-subtle p-3 text-xs text-fg-muted max-md:hidden">
+            <Eye className="mt-0.5 size-3.5 shrink-0" />
+            <span>You have <strong className="text-fg">view-only</strong> access as a manager.</span>
+          </div>
+        ) : undefined
+      }
     />
   );
 }
