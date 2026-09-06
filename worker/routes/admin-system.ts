@@ -2,7 +2,9 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { AppEnv } from "../env";
-import { audit } from "../lib/audit";
+import { audit, requestContext } from "../lib/audit";
+import { renderEmail } from "../lib/email-layout";
+import { templates, type TemplateName } from "../lib/email-templates";
 import { resend } from "../lib/resend";
 import { likeEscape } from "../lib/search";
 import { quotaUsage } from "../lib/send";
@@ -150,6 +152,28 @@ adminSystemRoutes.post("/settings/logo", async (c) => {
   await saveSetting(c.env.DB, "brand", next, c.get("user").id);
   await audit(c, { action: "settings.logo_updated", targetType: "settings" });
   return c.json(next);
+});
+
+// ---- System email previews ----------------------------------------------
+
+/** Render a transactional email with sample data so admins can see the branded result. */
+adminSystemRoutes.get("/email-preview/:name", async (c) => {
+  const name = c.req.param("name") as TemplateName;
+  if (!(name in templates)) throw new HTTPException(404, { message: "Unknown template" });
+  const { brand } = await loadSettings(c.env.DB);
+  const me = c.get("user");
+  const app = c.env.APP_URL.replace(/\/$/, "");
+  const ctx = requestContext(c);
+  const sample = `${app}/preview-link`;
+  const content = {
+    invite: () => templates.invite(brand, { name: "Jordan Lee", email: `jordan@${brand.primaryDomain}`, inviter: me.name || me.email, url: sample, days: 7 }),
+    reset: () => templates.reset(brand, { name: me.name, url: sample, expires: "1 hour", ctx }),
+    passwordChanged: () => templates.passwordChanged(brand, { name: me.name, appUrl: app, ctx }),
+    twoFactor: () => templates.twoFactor(brand, { name: me.name, enabled: true, appUrl: app, ctx }),
+    welcome: () => templates.welcome(brand, { name: "Jordan Lee", email: `jordan@${brand.primaryDomain}`, appUrl: app, mailboxes: [`jordan@${brand.primaryDomain}`, `support@${brand.primaryDomain}`] }),
+  }[name]();
+  const { html } = renderEmail(brand, app, content);
+  return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });
 });
 
 // ---- Logs -----------------------------------------------------------------

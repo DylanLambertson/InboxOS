@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { AppEnv } from "../env";
-import { audit, clientIp } from "../lib/audit";
+import { audit, clientIp, requestContext } from "../lib/audit";
 import { hashPassword, passwordProblem, verifyPassword } from "../lib/password";
 import { rateLimit } from "../lib/ratelimit";
 import { createSession, destroySession, readSession } from "../lib/session";
 import { getBrand, getPolicy } from "../lib/settings";
+import { templates } from "../lib/email-templates";
 import { sendSystemEmail } from "../lib/system-mail";
 import { verifyTotp } from "../lib/totp";
 import { getUser, getUserByEmail } from "../lib/users";
@@ -160,6 +161,24 @@ authRoutes.post("/invite/accept", async (c) => {
   ]);
   await createSession(c, user.id);
   await audit(c, { action: "user.invite_accepted", targetType: "user", targetId: user.id, actor: { id: user.id, email: user.email } });
+  c.executionCtx.waitUntil(
+    (async () => {
+      const [brand, { results }] = await Promise.all([
+        getBrand(c.env.DB),
+        c.env.DB.prepare(
+          "SELECT m.address FROM mailbox_members mm JOIN mailboxes m ON m.id = mm.mailbox_id WHERE mm.user_id = ? AND m.is_active = 1 AND m.is_system = 0 ORDER BY m.address",
+        )
+          .bind(user.id)
+          .all<{ address: string }>(),
+      ]);
+      await sendSystemEmail(
+        c.env,
+        user.email,
+        templates.welcome(brand, { name: body.name, email: user.email, appUrl: c.env.APP_URL, mailboxes: results.map((r) => r.address) }),
+        "welcome",
+      );
+    })(),
+  );
   return c.json({ ok: true });
 });
 
@@ -177,14 +196,12 @@ authRoutes.post("/forgot", async (c) => {
       .bind(await sha256hex(raw), user.id, new Date(Date.now() + 60 * 60_000).toISOString(), now())
       .run();
     const brand = await getBrand(c.env.DB);
-    await sendSystemEmail(c.env, {
-      to: user.email,
-      subject: `Reset your ${brand.productName} password`,
-      heading: "Reset your password",
-      body: "Someone (hopefully you) asked to reset your password. This link expires in one hour.",
-      ctaLabel: "Choose a new password",
-      ctaUrl: `${c.env.APP_URL}/reset/${raw}`,
-    });
+    await sendSystemEmail(
+      c.env,
+      user.email,
+      templates.reset(brand, { name: user.name, url: `${c.env.APP_URL.replace(/\/$/, "")}/reset/${raw}`, expires: "1 hour", ctx: requestContext(c) }),
+      "password_reset",
+    );
     await audit(c, { action: "auth.reset_requested", targetType: "user", targetId: user.id, actor: null });
   }
   return c.json({ ok: true });
@@ -208,6 +225,15 @@ authRoutes.post("/reset", async (c) => {
     c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(tok.user_id),
   ]);
   await audit(c, { action: "auth.password_reset", targetType: "user", targetId: tok.user_id, actor: null });
+  const user = await getUser(c.env.DB, tok.user_id);
+  if (user) {
+    const ctx = requestContext(c);
+    c.executionCtx.waitUntil(
+      getBrand(c.env.DB).then((brand) =>
+        sendSystemEmail(c.env, user.email, templates.passwordChanged(brand, { name: user.name, appUrl: c.env.APP_URL, ctx }), "security"),
+      ),
+    );
+  }
   return c.json({ ok: true });
 });
 

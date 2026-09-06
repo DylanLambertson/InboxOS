@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, RotateCcw, Upload } from "lucide-react";
+import { ExternalLink, Inbox, KeyRound, PartyPopper, RotateCcw, ShieldCheck, Upload, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_BRAND, radiusValue, type Brand } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
@@ -225,6 +225,35 @@ export function AdminBranding() {
                   Preview across the app
                 </Button>
               </div>
+            </div>
+          </Section>
+
+          <Section title="System emails" description="Invitations, password resets and security alerts use your logo, colors and footer automatically. Save your changes, then preview.">
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                { name: "invite", label: "Invitation", hint: "Account claim link", icon: UserPlus },
+                { name: "welcome", label: "Welcome", hint: "After someone joins", icon: PartyPopper },
+                { name: "reset", label: "Password reset", hint: "Forgot password / admin reset", icon: KeyRound },
+                { name: "passwordChanged", label: "Password changed", hint: "Security alert", icon: ShieldCheck },
+                { name: "twoFactor", label: "Two-factor changed", hint: "Security alert", icon: ShieldCheck },
+              ].map((t) => (
+                <a
+                  key={t.name}
+                  href={`/api/admin/email-preview/${t.name}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="group flex items-center gap-3 rounded-ui border border-line p-3 transition-colors hover:border-line-strong hover:bg-subtle"
+                >
+                  <span className="flex size-8 items-center justify-center rounded-ui-sm bg-accent-soft text-accent">
+                    <t.icon className="size-4" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] font-medium">{t.label}</span>
+                    <span className="block truncate text-xs text-fg-muted">{t.hint}</span>
+                  </span>
+                  <ExternalLink className="size-3.5 text-fg-faint group-hover:text-fg" />
+                </a>
+              ))}
             </div>
           </Section>
 

@@ -5,6 +5,7 @@ import type { Role, UserStatus } from "@shared/types";
 import type { AppEnv, Env, SessionUser } from "../env";
 import { audit } from "../lib/audit";
 import { getBrand } from "../lib/settings";
+import { templates } from "../lib/email-templates";
 import { sendSystemEmail } from "../lib/system-mail";
 import { ensureMailbox, getUser, getUserByEmail, insertUser, type UserRow } from "../lib/users";
 import { newId, now, sha256hex } from "../lib/util";
@@ -57,16 +58,9 @@ async function issueToken(env: Env, userId: string, type: "invite" | "reset", cr
   return `${env.APP_URL.replace(/\/$/, "")}/${type === "invite" ? "invite" : "reset"}/${raw}`;
 }
 
-async function emailInvite(env: Env, to: string, url: string, inviter: string) {
+async function emailInvite(env: Env, to: string, url: string, inviter: string, name?: string) {
   const brand = await getBrand(env.DB);
-  return sendSystemEmail(env, {
-    to,
-    subject: `You're invited to ${brand.productName}`,
-    heading: `Join ${brand.companyName} on ${brand.productName}`,
-    body: `${inviter} invited you to your team's email workspace. The link below expires in 7 days.`,
-    ctaLabel: "Accept invite",
-    ctaUrl: url,
-  });
+  return sendSystemEmail(env, to, templates.invite(brand, { name, email: to, inviter, url, days: 7 }), "invite");
 }
 
 adminUserRoutes.post("/", async (c) => {
@@ -104,7 +98,7 @@ adminUserRoutes.post("/", async (c) => {
     );
   }
   const inviteUrl = await issueToken(c.env, id, "invite", actor.id, 24 * 7);
-  const emailed = body.sendEmail ? await emailInvite(c.env, body.email, inviteUrl, actor.name || actor.email) : false;
+  const emailed = body.sendEmail ? await emailInvite(c.env, body.email, inviteUrl, actor.name || actor.email, body.name) : false;
   await audit(c, { action: "user.invited", targetType: "user", targetId: id, meta: { email: body.email, role: body.role, mailboxId, access: body.access } });
   return c.json({ id, inviteUrl, emailed }, 201);
 });
@@ -168,7 +162,7 @@ adminUserRoutes.post("/:id/invite", async (c) => {
   if (target.status !== "invited") throw new HTTPException(400, { message: "This user has already joined." });
   const inviteUrl = await issueToken(c.env, target.id, "invite", actor.id, 24 * 7);
   const { sendEmail } = await parseBody(c, z.object({ sendEmail: z.boolean().default(true) }));
-  const emailed = sendEmail ? await emailInvite(c.env, target.email, inviteUrl, actor.name || actor.email) : false;
+  const emailed = sendEmail ? await emailInvite(c.env, target.email, inviteUrl, actor.name || actor.email, target.name) : false;
   await audit(c, { action: "user.invite_reissued", targetType: "user", targetId: target.id });
   return c.json({ inviteUrl, emailed });
 });
@@ -179,14 +173,12 @@ adminUserRoutes.post("/:id/reset-password", async (c) => {
   if (target.status !== "active") throw new HTTPException(400, { message: "User is not active." });
   const resetUrl = await issueToken(c.env, target.id, "reset", actor.id, 24);
   const brand = await getBrand(c.env.DB);
-  const emailed = await sendSystemEmail(c.env, {
-    to: target.email,
-    subject: `Reset your ${brand.productName} password`,
-    heading: "Reset your password",
-    body: `An administrator started a password reset for your account. This link expires in 24 hours.`,
-    ctaLabel: "Choose a new password",
-    ctaUrl: resetUrl,
-  });
+  const emailed = await sendSystemEmail(
+    c.env,
+    target.email,
+    templates.reset(brand, { name: target.name, url: resetUrl, expires: "24 hours", byAdmin: actor.name || actor.email }),
+    "password_reset",
+  );
   await audit(c, { action: "user.password_reset_issued", targetType: "user", targetId: target.id });
   return c.json({ resetUrl, emailed });
 });

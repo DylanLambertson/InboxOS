@@ -14,6 +14,11 @@ export function clientIp(c: Context<AppEnv>): string | null {
   return c.req.header("cf-connecting-ip") ?? c.req.header("x-forwarded-for")?.split(",")[0]?.trim() ?? null;
 }
 
+/** IP and device for security emails. */
+export function requestContext(c: Context<AppEnv>) {
+  return { ip: clientIp(c), userAgent: c.req.header("user-agent") ?? null };
+}
+
 /** Records an audit event. Never throws — audit failures must not break requests. */
 export async function audit(c: Context<AppEnv>, e: AuditEntry): Promise<void> {
   const actor = e.actor === undefined ? c.get("user") ?? null : e.actor;

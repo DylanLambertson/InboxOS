@@ -1,9 +1,13 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
+import type { Brand } from "@shared/brand";
+import type { EmailContent } from "../lib/email-layout";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { DEFAULT_PREFERENCES, type Preferences } from "@shared/types";
 import type { AppEnv } from "../env";
-import { audit } from "../lib/audit";
+import { audit, requestContext } from "../lib/audit";
+import { templates } from "../lib/email-templates";
+import { sendSystemEmail } from "../lib/system-mail";
 import { hashPassword, passwordProblem, verifyPassword } from "../lib/password";
 import { getBrand, getPolicy } from "../lib/settings";
 import { generateTotpSecret, totpUri, verifyTotp } from "../lib/totp";
@@ -12,6 +16,12 @@ import { now, parseJson, sha256hex } from "../lib/util";
 import { parseBody } from "../lib/validate";
 
 export const meRoutes = new Hono<AppEnv>();
+
+/** Fire-and-forget security notification to the signed-in user. */
+function securityEmail(c: Context<AppEnv>, build: (brand: Brand) => EmailContent) {
+  const to = c.get("user").email;
+  c.executionCtx.waitUntil(getBrand(c.env.DB).then((brand) => sendSystemEmail(c.env, to, build(brand), "security")));
+}
 
 meRoutes.get("/", async (c) => {
   const [user, policy] = await Promise.all([getUser(c.env.DB, c.get("user").id), getPolicy(c.env.DB)]);
@@ -63,6 +73,7 @@ meRoutes.post("/password", async (c) => {
     c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND id != ?").bind(u.id, u.sessionId),
   ]);
   await audit(c, { action: "user.password_changed", targetType: "user", targetId: u.id });
+  securityEmail(c, (brand) => templates.passwordChanged(brand, { name: user.name, appUrl: c.env.APP_URL, ctx: requestContext(c) }));
   return c.json({ ok: true });
 });
 
@@ -96,6 +107,7 @@ meRoutes.post("/2fa/enable", async (c) => {
     .bind(JSON.stringify(hashes), now(), u.id)
     .run();
   await audit(c, { action: "user.2fa_enabled", targetType: "user", targetId: u.id });
+  securityEmail(c, (brand) => templates.twoFactor(brand, { name: user.name, enabled: true, appUrl: c.env.APP_URL, ctx: requestContext(c) }));
   return c.json({ recoveryCodes: codes });
 });
 
@@ -110,6 +122,7 @@ meRoutes.post("/2fa/disable", async (c) => {
     .bind(now(), u.id)
     .run();
   await audit(c, { action: "user.2fa_disabled", targetType: "user", targetId: u.id });
+  securityEmail(c, (brand) => templates.twoFactor(brand, { name: user.name, enabled: false, appUrl: c.env.APP_URL, ctx: requestContext(c) }));
   return c.json({ ok: true });
 });
 
