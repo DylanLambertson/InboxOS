@@ -1,4 +1,5 @@
 import type { Role } from "@shared/types";
+import type { ApiKey } from "./lib/apikeys";
 
 export interface Env {
   DB: D1Database;
@@ -22,5 +23,5 @@ export interface SessionUser {
 
 export type AppEnv = {
   Bindings: Env;
-  Variables: { user: SessionUser };
+  Variables: { user: SessionUser; apiKey: ApiKey };
 };

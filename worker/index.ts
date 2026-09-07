@@ -5,19 +5,23 @@ import type { AppEnv, Env } from "./env";
 import { runCron } from "./cron";
 import { requireAuth, requireConsole, sameOrigin } from "./lib/session";
 import { getBrand } from "./lib/settings";
+import { adminApiKeyRoutes, adminSuppressionRoutes } from "./routes/admin-apikeys";
 import { adminMailboxRoutes } from "./routes/admin-mailboxes";
 import { adminSystemRoutes } from "./routes/admin-system";
 import { adminTrafficRoutes } from "./routes/admin-traffic";
 import { adminUserRoutes } from "./routes/admin-users";
+import { apiV1Routes } from "./routes/api-v1";
 import { attachmentRoutes } from "./routes/attachments";
 import { authRoutes } from "./routes/auth";
 import { composeRoutes } from "./routes/compose";
 import { contactRoutes } from "./routes/contacts";
 import { labelRoutes, mailboxRoutes } from "./routes/mailboxes";
+import { mcpRoutes } from "./routes/mcp";
 import { meRoutes } from "./routes/me";
 import { messageActionRoutes } from "./routes/message-actions";
 import { messageRoutes } from "./routes/messages";
 import { templateRoutes } from "./routes/templates";
+import { unsubscribeRoutes } from "./routes/unsubscribe";
 import { webhookRoutes } from "./routes/webhooks";
 
 const app = new Hono<AppEnv>();
@@ -61,6 +65,11 @@ app.get("/api/brand/logo", async (c) => {
 });
 app.route("/api/auth", authRoutes);
 app.route("/webhooks", webhookRoutes);
+app.route("/unsubscribe", unsubscribeRoutes);
+
+// ---- API keys (other services and MCP clients) -------------------------
+app.route("/api/v1", apiV1Routes);
+app.route("/mcp", mcpRoutes);
 
 // ---- Signed-in ------------------------------------------------------------
 const api = new Hono<AppEnv>();
@@ -80,6 +89,8 @@ admin.use("*", requireConsole);
 admin.route("/users", adminUserRoutes);
 admin.route("/mailboxes", adminMailboxRoutes);
 admin.route("/traffic", adminTrafficRoutes);
+admin.route("/api-keys", adminApiKeyRoutes);
+admin.route("/suppressions", adminSuppressionRoutes);
 admin.route("/", adminSystemRoutes);
 api.route("/admin", admin);
 

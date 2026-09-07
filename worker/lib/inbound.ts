@@ -245,5 +245,19 @@ export async function recordDeliveryEvent(env: Env, type: string, data: Delivery
     if (type === "email.opened") stmts.push(env.DB.prepare("UPDATE messages SET open_count = open_count + 1 WHERE id = ?").bind(msg.id));
     if (type === "email.clicked") stmts.push(env.DB.prepare("UPDATE messages SET click_count = click_count + 1 WHERE id = ?").bind(msg.id));
   }
+  // Never mail a hard-bounced or complaining address again; it hurts the domain's reputation.
+  const hardBounce = type === "email.bounced" && (data.bounce?.type ?? "Permanent") === "Permanent";
+  if (hardBounce || type === "email.complained") {
+    for (const email of (data.to ?? []).slice(0, 50)) {
+      stmts.push(
+        env.DB.prepare("INSERT OR IGNORE INTO suppressions (email, reason, detail, created_at) VALUES (?, ?, ?, ?)").bind(
+          email.toLowerCase(),
+          hardBounce ? "bounced" : "complained",
+          describe(type, data)?.slice(0, 500) ?? null,
+          t,
+        ),
+      );
+    }
+  }
   await env.DB.batch(stmts);
 }

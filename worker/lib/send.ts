@@ -125,11 +125,11 @@ export async function deliverMessage(env: Env, messageId: string): Promise<Messa
     });
   }
 
-  const text = htmlToText(html) || msg.text_body;
+  const text = meta.api?.text || htmlToText(html) || msg.text_body;
   const fromAddress = msg.from_addr || mailbox.address;
   const messageIdHeader = msg.message_id_header ?? `<${newId(12)}.${Date.now()}@${domainOf(fromAddress)}>`;
 
-  const headers: Record<string, string> = { "Message-ID": messageIdHeader };
+  const headers: Record<string, string> = { ...meta.api?.headers, "Message-ID": messageIdHeader };
   if (msg.in_reply_to) headers["In-Reply-To"] = msg.in_reply_to;
   if (msg.references_header) headers["References"] = msg.references_header;
   if (msg.priority === "high") Object.assign(headers, { "X-Priority": "1", Importance: "high" });
@@ -141,13 +141,13 @@ export async function deliverMessage(env: Env, messageId: string): Promise<Messa
     const res = await resend.send(
       env.RESEND_API_KEY,
       {
-        from: formatAddress({ email: fromAddress, name: mailbox.display_name || brand.defaultFromName }),
+        from: formatAddress({ email: fromAddress, name: meta.api?.fromName || mailbox.display_name || brand.defaultFromName }),
         to: to.map(formatAddress),
         ...(cc.length ? { cc: cc.map(formatAddress) } : {}),
         ...(bcc.length ? { bcc: bcc.map(formatAddress) } : {}),
         ...(replyTo.length ? { reply_to: replyTo.map(formatAddress) } : {}),
         subject: msg.subject || "(no subject)",
-        html: wrapHtml(html, brand.fontFamily),
+        html: meta.api?.rawHtml ? html : wrapHtml(html, brand.fontFamily),
         text,
         headers,
         ...(attachments.length ? { attachments } : {}),

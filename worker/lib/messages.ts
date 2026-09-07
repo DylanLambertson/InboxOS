@@ -68,6 +68,17 @@ export interface ComposeMeta {
   /** Original message quoted below the editable body; appended at send time so its formatting survives. */
   quoteHtml?: string;
   readReceipt?: boolean;
+  /** Set by the external API. */
+  api?: {
+    /** Sender name for this message instead of the mailbox's. */
+    fromName?: string;
+    /** Body is a complete HTML document; send it as-is instead of wrapping it. */
+    rawHtml?: boolean;
+    /** Explicit plain-text part. */
+    text?: string;
+    headers?: Record<string, string>;
+    keyId?: string;
+  };
 }
 
 export const bodyKey = (mailboxId: string, messageId: string) => `mail/${mailboxId}/${messageId}/body.html`;
