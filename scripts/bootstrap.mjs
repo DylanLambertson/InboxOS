@@ -65,8 +65,8 @@ const sql = [
 ];
 if (withMailbox) {
   sql.push(
-    `INSERT OR IGNORE INTO mailboxes (id, address, display_name, type, color, created_at, updated_at)
-     VALUES (${q(mailboxId)}, ${q(email)}, ${q(name)}, 'personal', '#6366f1', ${q(now)}, ${q(now)});`,
+    `INSERT OR IGNORE INTO mailboxes (id, address, name, display_name, type, color, created_at, updated_at)
+     VALUES (${q(mailboxId)}, ${q(email)}, ${q(name)}, ${q(name)}, 'personal', '#6366f1', ${q(now)}, ${q(now)});`,
     `INSERT OR IGNORE INTO mailbox_members (mailbox_id, user_id, role, created_at)
      SELECT m.id, u.id, 'owner', ${q(now)} FROM mailboxes m, users u WHERE m.address = ${q(email)} AND u.email = ${q(email)};`,
   );

@@ -4,7 +4,7 @@ import { AlertTriangle, ArrowDownLeft, ArrowUpRight, Download, ImageOff, Inbox, 
 import { toast } from "sonner";
 import type { Address, MessageDetail, MessageStatus } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
-import { displayName, fileSize, fullAddress, longDate, shortDate } from "@/lib/format";
+import { displayName, fileSize, fullAddress, longDate, mailboxLabel, shortDate } from "@/lib/format";
 import { AttachmentChip } from "@/components/mail/AttachmentChip";
 import { EmailFrame } from "@/components/mail/EmailFrame";
 import { EVENT_LABELS, StatusBadge } from "@/components/mail/StatusBadge";
@@ -107,7 +107,7 @@ function DeliverPanel({ msg, onDone }: { msg: TrafficDetail; onDone: () => void 
         <Select value={mailboxId} onChange={(e) => setMailboxId(e.target.value)} aria-label="Deliver to mailbox">
           <option value="">Choose a mailbox…</option>
           {boxes.filter((b) => b.isActive).map((b) => (
-            <option key={b.id} value={b.id}>{b.displayName ? `${b.displayName} (${b.address})` : b.address}</option>
+            <option key={b.id} value={b.id}>{`${mailboxLabel(b)} (${b.address})`}</option>
           ))}
         </Select>
         <Button variant="primary" icon={<Inbox className="size-4" />} disabled={!mailboxId} loading={busy} onClick={deliver}>

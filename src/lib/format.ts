@@ -49,6 +49,10 @@ export function fileSize(bytes: number): string {
 }
 
 export const displayName = (a: Address | undefined | null) => (a ? a.name || a.email.split("@")[0] : "");
+/** Label for a mailbox in the sidebar and lists: its name, else the sender name, else the address. */
+export const mailboxLabel = (b: { name?: string; displayName?: string; address: string }) =>
+  b.name?.trim() || b.displayName?.trim() || b.address.split("@")[0];
+
 export const fullAddress = (a: Address) => (a.name ? `${a.name} <${a.email}>` : a.email);
 
 export function initials(nameOrEmail: string): string {

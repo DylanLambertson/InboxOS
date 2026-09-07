@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { AlertCircle, Clock, Paperclip, Star } from "lucide-react";
 import type { Label, MessageListItem } from "@shared/types";
-import { displayName, shortDate } from "@/lib/format";
+import { displayName, mailboxLabel, shortDate } from "@/lib/format";
 import { Avatar, Checkbox, cx } from "../ui/primitives";
 import { StatusBadge } from "./StatusBadge";
 
@@ -14,7 +14,7 @@ interface Props {
   labels: Label[];
   showRecipients: boolean;
   /** Shown in the unified view so you can tell which inbox a message belongs to. */
-  mailboxTag?: { displayName: string; address: string; color: string };
+  mailboxTag?: { name?: string; displayName: string; address: string; color: string };
   onOpen: (m: MessageListItem) => void;
   onCheck: (m: MessageListItem, v: boolean, shift: boolean) => void;
   onStar: (m: MessageListItem) => void;
@@ -63,7 +63,7 @@ export const MessageRow = memo(function MessageRow({ m, selected, checked, focus
           {mailboxTag && (
             <span className="inline-flex max-w-28 shrink-0 items-center gap-1 rounded-full bg-muted px-1.5 py-px text-[11px] text-fg-muted" title={mailboxTag.address}>
               <span className="size-1.5 shrink-0 rounded-full" style={{ background: mailboxTag.color }} />
-              <span className="truncate">{mailboxTag.displayName || mailboxTag.address.split("@")[0]}</span>
+              <span className="truncate">{mailboxLabel(mailboxTag)}</span>
             </span>
           )}
           {m.hasAttachments && <Paperclip className="size-3.5 shrink-0 text-fg-faint" />}

@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import type { MailboxRole } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
-import { fileSize, relativeTime } from "@/lib/format";
+import { fileSize, mailboxLabel, relativeTime } from "@/lib/format";
 import { useCanManage, useMe } from "@/lib/queries";
 import { LABEL_COLORS } from "@/components/mail/LabelDialog";
 import { Avatar, Badge, Button, Card, cx, EmptyState, Field, IconButton, Input, LoadError, PageHeader, Select, Spinner, Switch } from "@/components/ui/primitives";
@@ -14,6 +14,7 @@ import { Modal, useConfirm } from "@/components/ui/overlay";
 interface AdminMailbox {
   id: string;
   address: string;
+  name: string;
   displayName: string;
   type: "personal" | "shared";
   color: string;
@@ -41,13 +42,14 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
   const qc = useQueryClient();
   const [local, setLocal] = useState("");
   const [domain, setDomain] = useState(brand.primaryDomain);
+  const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [type, setType] = useState<"shared" | "personal">("shared");
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     setBusy(true);
     try {
-      await api.post("admin/mailboxes", { address: `${local.trim()}@${domain.trim()}`, displayName, type });
+      await api.post("admin/mailboxes", { address: `${local.trim()}@${domain.trim()}`, name, displayName, type });
       qc.invalidateQueries({ queryKey: ["admin-mailboxes"] });
       toast.success("Mailbox created — add members next");
       onClose();
@@ -80,9 +82,14 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
             <Input value={domain} onChange={(e) => setDomain(e.target.value.trim())} />
           </div>
         </Field>
-        <Field label="Sender name" hint="Recipients see this as the From name.">
-          <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={`${brand.companyName} Support`} />
-        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Mailbox name" hint="Label in everyone's sidebar. Only your team sees it.">
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={local ? local.charAt(0).toUpperCase() + local.slice(1) : "Support"} />
+          </Field>
+          <Field label="Sender name" hint="What recipients see in the From line.">
+            <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} placeholder={`${brand.companyName} Support`} />
+          </Field>
+        </div>
         <Field label="Type">
           <Select value={type} onChange={(e) => setType(e.target.value as "shared" | "personal")}>
             <option value="shared">Shared — a team inbox</option>
@@ -99,6 +106,7 @@ function MailboxDetail({ box, onClose, readOnly }: { box: AdminMailbox; onClose:
   const confirm = useConfirm();
   const { data: me } = useMe();
   const { data: users = [] } = useQuery({ queryKey: ["admin-users"], queryFn: () => api.get<UserLite[]>("admin/users") });
+  const [label, setLabel] = useState(box.name);
   const [displayName, setDisplayName] = useState(box.displayName);
   const [alias, setAlias] = useState("");
   const [addUser, setAddUser] = useState("");
@@ -142,18 +150,25 @@ function MailboxDetail({ box, onClose, readOnly }: { box: AdminMailbox; onClose:
   };
 
   return (
-    <Modal open onClose={onClose} title={box.address} description={`${box.messageCount.toLocaleString()} messages · ${fileSize(box.storageBytes)}${readOnly ? " · view only" : ""}`} width={640}>
+    <Modal open onClose={onClose} title={mailboxLabel(box)} description={`${box.address} · ${box.messageCount.toLocaleString()} messages · ${fileSize(box.storageBytes)}${readOnly ? " · view only" : ""}`} width={640}>
       <fieldset disabled={readOnly} className="min-w-0 space-y-6">
         <section className="space-y-4">
-          <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
-            <Field label="Sender name">
-              <div className="flex gap-2">
-                <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
-                <Button disabled={displayName === box.displayName} onClick={() => run(() => api.patch(`admin/mailboxes/${box.id}`, { displayName }), "Saved")}>
-                  Save
-                </Button>
-              </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Mailbox name" hint="Sidebar label (team only).">
+              <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder={box.address.split("@")[0]} />
             </Field>
+            <Field label="Sender name" hint="Recipients see this in the From line.">
+              <Input value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
+            </Field>
+          </div>
+          {!readOnly && (label !== box.name || displayName !== box.displayName) && (
+            <div className="-mt-1 flex justify-end">
+              <Button size="sm" variant="primary" onClick={() => run(() => api.patch(`admin/mailboxes/${box.id}`, { name: label, displayName }), "Saved")}>
+                Save names
+              </Button>
+            </div>
+          )}
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <Field label="Type">
               <Select value={box.type} onChange={(e) => run(() => api.patch(`admin/mailboxes/${box.id}`, { type: e.target.value }))}>
                 <option value="shared">Shared</option>
@@ -323,13 +338,14 @@ export function AdminMailboxes() {
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: b.color }} />
               <div className="min-w-0 flex-1">
                 <p className="flex flex-wrap items-center gap-2 text-[13px] font-medium">
-                  <span className="truncate">{b.address}</span>
+                  <span className="truncate">{mailboxLabel(b)}</span>
+                  <span className="truncate font-normal text-fg-muted">{b.address}</span>
                   <Badge>{b.type === "shared" ? "Shared" : "Personal"}</Badge>
                   {!b.isActive && <Badge tone="warning">Inactive</Badge>}
                   {b.isCatchAll && <Badge tone="accent">Catch-all</Badge>}
                 </p>
                 <p className="truncate text-xs text-fg-muted">
-                  {b.displayName || "No sender name"} · {b.members.length} member{b.members.length === 1 ? "" : "s"}
+                  {b.displayName ? `Sends as “${b.displayName}”` : "No sender name"} · {b.members.length} member{b.members.length === 1 ? "" : "s"}
                   {b.aliases.length > 0 && ` · ${b.aliases.length} alias${b.aliases.length > 1 ? "es" : ""}`} · {b.messageCount.toLocaleString()} messages · {fileSize(b.storageBytes)}
                   {b.lastActivity && ` · active ${relativeTime(b.lastActivity)}`}
                 </p>

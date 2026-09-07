@@ -13,13 +13,13 @@ export const mailboxRoutes = new Hono<AppEnv>();
 mailboxRoutes.get("/", async (c) => {
   const u = c.get("user");
   const { results: boxes } = await c.env.DB.prepare(
-    `SELECT m.id, m.address, m.display_name, m.type, m.color, m.signature_html, mm.role
+    `SELECT m.id, m.address, m.name, m.display_name, m.type, m.color, m.signature_html, mm.role
      FROM mailbox_members mm JOIN mailboxes m ON m.id = mm.mailbox_id
      WHERE mm.user_id = ? AND m.is_active = 1
      ORDER BY m.type = 'shared', m.address`,
   )
     .bind(u.id)
-    .all<{ id: string; address: string; display_name: string; type: MailboxType; color: string; signature_html: string; role: MailboxRole }>();
+    .all<{ id: string; address: string; name: string; display_name: string; type: MailboxType; color: string; signature_html: string; role: MailboxRole }>();
   if (!boxes.length) return c.json([]);
 
   const ids = boxes.map((b) => b.id);
@@ -45,6 +45,7 @@ mailboxRoutes.get("/", async (c) => {
     return {
       id: b.id,
       address: b.address,
+      name: b.name,
       displayName: b.display_name,
       type: b.type,
       color: b.color,
@@ -64,16 +65,17 @@ mailboxRoutes.patch("/:id", async (c) => {
   const body = await parseBody(
     c,
     z.object({
+      name: z.string().trim().max(80).optional(),
       displayName: z.string().trim().max(120).optional(),
       signatureHtml: z.string().max(20_000).optional(),
       color: zColor.optional(),
     }),
   );
   await c.env.DB.prepare(
-    `UPDATE mailboxes SET display_name = COALESCE(?, display_name), signature_html = COALESCE(?, signature_html),
+    `UPDATE mailboxes SET name = COALESCE(?, name), display_name = COALESCE(?, display_name), signature_html = COALESCE(?, signature_html),
        color = COALESCE(?, color), updated_at = ? WHERE id = ?`,
   )
-    .bind(body.displayName ?? null, body.signatureHtml ?? null, body.color ?? null, now(), id)
+    .bind(body.name ?? null, body.displayName ?? null, body.signatureHtml ?? null, body.color ?? null, now(), id)
     .run();
   await audit(c, { action: "mailbox.updated", targetType: "mailbox", targetId: id, meta: { fields: Object.keys(body) } });
   return c.json({ ok: true });

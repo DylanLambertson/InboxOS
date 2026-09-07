@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import type { MailboxSummary } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
+import { mailboxLabel } from "@/lib/format";
 import { useLabels, useMailboxes, useMe } from "@/lib/queries";
 import { toast } from "sonner";
 import { useCompose } from "../compose/ComposeProvider";
@@ -79,7 +80,7 @@ function MailboxList({ boxes, currentId, onNavigate }: { boxes: MailboxSummary[]
       <div className="mb-1 px-2.5 text-[11px] font-semibold tracking-wide text-fg-faint uppercase">Mailboxes</div>
       <div className="space-y-0.5">
         {boxes.length > 1 && row("all", "All inboxes", "Every mailbox you can access", null, totalUnread)}
-        {visible.map((b) => row(b.id, b.displayName || b.address.split("@")[0], b.address, b.color, b.unread.inbox ?? 0))}
+        {visible.map((b) => row(b.id, mailboxLabel(b), b.address, b.color, b.unread.inbox ?? 0))}
         {boxes.length > LIMIT && (
           <button onClick={() => setExpanded((e) => !e)} className="flex h-7 w-full items-center gap-2.5 px-2.5 text-xs text-fg-muted hover:text-fg">
             <ChevronDown className={cx("size-3.5 transition", expanded && "rotate-180")} />
@@ -167,7 +168,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <>
             <MailboxList boxes={boxes} currentId={scopeId} onNavigate={onNavigate} />
             <div className="mb-1 px-2.5 text-[11px] font-semibold tracking-wide text-fg-faint uppercase">
-              {unified ? "All inboxes" : current?.displayName || current?.address.split("@")[0]}
+              {unified ? "All inboxes" : current && mailboxLabel(current)}
             </div>
             <div className="space-y-0.5">
               {FOLDER_NAV.map((f) => (

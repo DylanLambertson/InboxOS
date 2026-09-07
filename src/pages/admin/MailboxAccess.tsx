@@ -4,12 +4,14 @@ import { Inbox, Search } from "lucide-react";
 import { toast } from "sonner";
 import type { MailboxRole } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
+import { mailboxLabel } from "@/lib/format";
 import { Badge, Button, cx, EmptyState, Input, Select, Spinner } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/overlay";
 
 export interface AccessMailbox {
   id: string;
   address: string;
+  name: string;
   displayName: string;
   type: "personal" | "shared";
   color: string;
@@ -25,7 +27,7 @@ export const useAdminMailboxes = () => useQuery({ queryKey: ["admin-mailboxes"],
 /** Filterable list of mailboxes with an access level per row. */
 function AccessList({ boxes, value, onChange, busy }: { boxes: AccessMailbox[]; value: (id: string) => Access; onChange: (id: string, v: Access) => void; busy?: string | null }) {
   const [q, setQ] = useState("");
-  const shown = boxes.filter((b) => !q || `${b.address} ${b.displayName}`.toLowerCase().includes(q.toLowerCase()));
+  const shown = boxes.filter((b) => !q || `${b.address} ${b.name} ${b.displayName}`.toLowerCase().includes(q.toLowerCase()));
   const granted = boxes.filter((b) => value(b.id)).length;
   return (
     <div className="space-y-2">
@@ -48,7 +50,7 @@ function AccessList({ boxes, value, onChange, busy }: { boxes: AccessMailbox[]; 
               <span className="size-2.5 shrink-0 rounded-full" style={{ background: b.color }} />
               <div className="min-w-0 flex-1">
                 <p className="flex items-center gap-1.5 truncate text-[13px] font-medium">
-                  <span className="truncate">{b.displayName || b.address}</span>
+                  <span className="truncate">{mailboxLabel(b)}</span>
                   {b.type === "shared" && <Badge>Shared</Badge>}
                   {!b.isActive && <Badge tone="warning">Inactive</Badge>}
                 </p>

@@ -75,7 +75,7 @@ adminTrafficRoutes.get("/", async (c) => {
 
   const { results } = await c.env.DB.prepare(
     `SELECT m.id, m.mailbox_id, m.direction, m.folder, m.status, m.from_addr, m.from_name, m.to_json, m.cc_json, m.subject, m.snippet,
-            m.has_attachments, m.size, m.date, mb.address AS mailbox_address, mb.display_name AS mailbox_name, mb.color AS mailbox_color, mb.is_system
+            m.has_attachments, m.size, m.date, mb.address AS mailbox_address, COALESCE(NULLIF(mb.name, ''), mb.display_name) AS mailbox_name, mb.color AS mailbox_color, mb.is_system
      FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
      WHERE ${where.join(" AND ")}
      ORDER BY m.date DESC, m.id DESC LIMIT ?`,
@@ -149,7 +149,7 @@ adminTrafficRoutes.get("/attachments/:id", async (c) => {
 
 adminTrafficRoutes.get("/:id", async (c) => {
   const m = await loadMessage(c.env.DB, c.req.param("id"));
-  const mb = await c.env.DB.prepare("SELECT id, address, display_name, color, is_system FROM mailboxes WHERE id = ?")
+  const mb = await c.env.DB.prepare("SELECT id, address, COALESCE(NULLIF(name, ''), display_name) AS display_name, color, is_system FROM mailboxes WHERE id = ?")
     .bind(m.mailbox_id)
     .first<{ id: string; address: string; display_name: string; color: string; is_system: number }>();
   await audit(c, { action: "admin.message_viewed", targetType: "message", targetId: m.id, meta: { mailbox: mb?.is_system ? "unrouted" : mb?.address, subject: m.subject } });

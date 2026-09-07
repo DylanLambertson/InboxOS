@@ -71,7 +71,8 @@ export async function insertUser(
 /** Create a mailbox (if the address is free) and make the user its owner. */
 export async function ensureMailbox(
   db: D1Database,
-  opts: { address: string; displayName: string; type: "personal" | "shared"; ownerId?: string },
+  /** `name` is the sidebar label; defaults to the sender name. */
+  opts: { address: string; name?: string; displayName: string; type: "personal" | "shared"; ownerId?: string },
 ): Promise<string> {
   const address = opts.address.trim().toLowerCase();
   const existing = await db.prepare("SELECT id FROM mailboxes WHERE address = ?").bind(address).first<{ id: string }>();
@@ -81,8 +82,8 @@ export async function ensureMailbox(
   if (!existing) {
     stmts.push(
       db
-        .prepare("INSERT INTO mailboxes (id, address, display_name, type, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .bind(id, address, opts.displayName, opts.type, randomColor(), t, t),
+        .prepare("INSERT INTO mailboxes (id, address, name, display_name, type, color, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+        .bind(id, address, opts.name || opts.displayName, opts.displayName, opts.type, randomColor(), t, t),
     );
   }
   if (opts.ownerId) {

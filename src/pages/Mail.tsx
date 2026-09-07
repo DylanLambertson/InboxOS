@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { Folder, MessageListItem, View } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useLabels, useMailboxes, useMe, useMessageAction, useMessages, useInvalidateMail, type BulkInput } from "@/lib/queries";
+import { mailboxLabel } from "@/lib/format";
 import { useShortcuts } from "@/lib/shortcuts";
 import { useCompose } from "@/components/compose/ComposeProvider";
 import { FOLDER_NAV } from "@/components/layout/Sidebar";
@@ -34,7 +35,7 @@ export function MailPage() {
   const { data: me } = useMe();
   const unified = mailboxId === "all" && !!boxes?.length;
   const mailbox = unified
-    ? { id: "all", address: "", displayName: "All inboxes", role: boxes!.some((b) => b.role !== "viewer") ? ("editor" as const) : ("viewer" as const) }
+    ? { id: "all", address: "", name: "All inboxes", displayName: "All inboxes", role: boxes!.some((b) => b.role !== "viewer") ? ("editor" as const) : ("viewer" as const) }
     : boxes?.find((b) => b.id === mailboxId);
   const boxById = useMemo(() => new Map((boxes ?? []).map((b) => [b.id, b])), [boxes]);
   const { data: labels = [] } = useLabels(unified ? undefined : mailbox?.id);
@@ -208,7 +209,7 @@ export function MailPage() {
               value={searchText}
               onChange={(e) => setSearchText(e.target.value)}
               onKeyDown={(e) => e.key === "Escape" && (e.currentTarget.blur(), e.stopPropagation())}
-              placeholder={unified ? "Search all inboxes" : `Search ${mailbox.displayName || mailbox.address}`}
+              placeholder={unified ? "Search all inboxes" : `Search ${mailboxLabel(mailbox)}`}
               aria-label="Search mail"
               className="h-9 w-full rounded-ui border border-transparent bg-muted pr-16 pl-8 text-[13px] outline-none placeholder:text-fg-faint focus:border-accent focus:bg-surface focus:ring-3 focus:ring-accent-soft"
             />

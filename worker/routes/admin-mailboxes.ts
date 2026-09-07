@@ -18,6 +18,7 @@ adminMailboxRoutes.get("/", async (c) => {
     db.prepare("SELECT * FROM mailboxes WHERE is_system = 0 ORDER BY is_active DESC, type, address").all<{
       id: string;
       address: string;
+      name: string;
       display_name: string;
       type: string;
       color: string;
@@ -43,6 +44,7 @@ adminMailboxRoutes.get("/", async (c) => {
       return {
         id: b.id,
         address: b.address,
+        name: b.name,
         displayName: b.display_name,
         type: b.type,
         color: b.color,
@@ -75,13 +77,14 @@ adminMailboxRoutes.post("/", async (c) => {
     c,
     z.object({
       address: zEmail,
+      name: z.string().trim().max(80).default(""),
       displayName: z.string().trim().max(120).default(""),
       type: z.enum(["personal", "shared"]).default("shared"),
       members: z.array(z.object({ userId: zId, role: z.enum(["owner", "editor", "viewer"]) })).max(200).default([]),
     }),
   );
   if (await addressTaken(c.env.DB, body.address)) throw new HTTPException(409, { message: "That address is already in use." });
-  const id = await ensureMailbox(c.env.DB, { address: body.address, displayName: body.displayName, type: body.type });
+  const id = await ensureMailbox(c.env.DB, { address: body.address, name: body.name, displayName: body.displayName, type: body.type });
   if (body.members.length) {
     const t = now();
     await c.env.DB.batch(
@@ -99,6 +102,7 @@ adminMailboxRoutes.patch("/:id", async (c) => {
   const body = await parseBody(
     c,
     z.object({
+      name: z.string().trim().max(80).optional(),
       displayName: z.string().trim().max(120).optional(),
       type: z.enum(["personal", "shared"]).optional(),
       color: zColor.optional(),
@@ -108,10 +112,11 @@ adminMailboxRoutes.patch("/:id", async (c) => {
     }),
   );
   const res = await c.env.DB.prepare(
-    `UPDATE mailboxes SET display_name = COALESCE(?, display_name), type = COALESCE(?, type), color = COALESCE(?, color),
+    `UPDATE mailboxes SET name = COALESCE(?, name), display_name = COALESCE(?, display_name), type = COALESCE(?, type), color = COALESCE(?, color),
        signature_html = COALESCE(?, signature_html), is_active = COALESCE(?, is_active), updated_at = ? WHERE id = ? AND is_system = 0`,
   )
     .bind(
+      body.name ?? null,
       body.displayName ?? null,
       body.type ?? null,
       body.color ?? null,

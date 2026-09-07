@@ -75,6 +75,9 @@ export interface Me {
 export interface MailboxSummary {
   id: string;
   address: string;
+  /** Label shown in the sidebar and lists (internal only). */
+  name: string;
+  /** Sender name recipients see in the From line. */
   displayName: string;
   type: MailboxType;
   color: string;

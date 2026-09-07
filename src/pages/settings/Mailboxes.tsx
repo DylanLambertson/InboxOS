@@ -4,6 +4,7 @@ import { Tag, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Label, MailboxSummary } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
+import { mailboxLabel } from "@/lib/format";
 import { useLabels, useMailboxes } from "@/lib/queries";
 import { RichTextField } from "@/components/compose/Editor";
 import { LabelDialog } from "@/components/mail/LabelDialog";
@@ -15,6 +16,7 @@ const ROLE_COPY = { owner: "Owner", editor: "Can send", viewer: "Read only" } as
 function MailboxCard({ box }: { box: MailboxSummary }) {
   const qc = useQueryClient();
   const confirm = useConfirm();
+  const [label, setLabel] = useState(box.name);
   const [name, setName] = useState(box.displayName);
   const [sig, setSig] = useState(box.signatureHtml);
   const [saving, setSaving] = useState(false);
@@ -26,7 +28,7 @@ function MailboxCard({ box }: { box: MailboxSummary }) {
   const save = async () => {
     setSaving(true);
     try {
-      await api.patch(`mailboxes/${box.id}`, { displayName: name, signatureHtml: sig === "<p></p>" ? "" : sig });
+      await api.patch(`mailboxes/${box.id}`, { name: label, displayName: name, signatureHtml: sig === "<p></p>" ? "" : sig });
       qc.invalidateQueries({ queryKey: ["mailboxes"] });
       toast.success("Mailbox updated");
     } catch (e) {
@@ -38,7 +40,7 @@ function MailboxCard({ box }: { box: MailboxSummary }) {
 
   return (
     <Section
-      title={box.displayName || box.address}
+      title={mailboxLabel(box)}
       description={
         <span className="flex flex-wrap items-center gap-2">
           {box.address}
@@ -59,9 +61,14 @@ function MailboxCard({ box }: { box: MailboxSummary }) {
         )}
         {isOwner ? (
           <>
-            <Field label="Sender name" hint="Shown to recipients as the From name.">
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Support" />
-            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Mailbox name" hint="How it's labeled in the sidebar. Only your team sees this.">
+                <Input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="e.g. Support" />
+              </Field>
+              <Field label="Sender name" hint="What recipients see in the From line.">
+                <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Acme Support" />
+              </Field>
+            </div>
             <Field label="Mailbox signature" hint="Used for everyone sending from this mailbox.">
               <RichTextField value={sig} onChange={setSig} minHeight={90} />
             </Field>
@@ -72,7 +79,7 @@ function MailboxCard({ box }: { box: MailboxSummary }) {
             </div>
           </>
         ) : (
-          <p className="text-[13px] text-fg-muted">Only mailbox owners can change the sender name and signature.</p>
+          <p className="text-[13px] text-fg-muted">Only mailbox owners can change the mailbox name, sender name and signature.</p>
         )}
 
         <div className="border-t border-line pt-5">
