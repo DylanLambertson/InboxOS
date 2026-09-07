@@ -9,14 +9,14 @@ import { useCanManage } from "@/lib/queries";
 import { ActivityChart } from "./ActivityChart";
 
 export interface OverviewData {
-  usage: { today: number; month: number; dailyLimit: number; monthlyLimit: number };
+  usage: { today: number; month: number; systemToday: number; systemMonth: number; dailyLimit: number; monthlyLimit: number };
   counts: { users: number; invited: number; mailboxes: number; messages: number; bytes: number; scheduled: number };
   series: { day: string; type: string; n: number }[];
   recentProblems: { id: string; type: string; detail: string | null; recipient: string | null; created_at: string; subject: string | null }[];
   provider: { apiKey: boolean; webhookSecret: boolean; google: boolean; webhookUrl: string };
 }
 
-function Meter({ label, used, limit }: { label: string; used: number; limit: number }) {
+function Meter({ label, used, limit, note }: { label: string; used: number; limit: number; note?: string }) {
   const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
   const tone = pct >= 90 ? "bg-danger" : pct >= 70 ? "bg-warning" : "bg-accent";
   return (
@@ -31,7 +31,11 @@ function Meter({ label, used, limit }: { label: string; used: number; limit: num
           <div className={cx("h-full rounded-full", tone)} style={{ width: `${pct}%` }} />
         </div>
       )}
-      {limit > 0 && pct >= 90 && <p className="mt-2 flex items-center gap-1 text-xs text-danger"><AlertTriangle className="size-3" /> Near the limit</p>}
+      {limit > 0 && pct >= 90 ? (
+        <p className="mt-2 flex items-center gap-1 text-xs text-danger"><AlertTriangle className="size-3" /> Near the limit</p>
+      ) : (
+        note && <p className="mt-2 text-xs text-fg-muted">{note}</p>
+      )}
     </Card>
   );
 }
@@ -71,13 +75,23 @@ export function AdminOverview() {
       )}
 
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Meter label="Sent today (UTC)" used={data.usage.today} limit={data.usage.dailyLimit} />
-        <Meter label="Sent this month" used={data.usage.month} limit={data.usage.monthlyLimit} />
+        <Meter
+          label="Sent today (UTC)"
+          used={data.usage.today}
+          limit={data.usage.dailyLimit}
+          note={`Includes ${data.usage.systemToday} system email${data.usage.systemToday === 1 ? "" : "s"}`}
+        />
+        <Meter
+          label="Sent this month"
+          used={data.usage.month}
+          limit={data.usage.monthlyLimit}
+          note={`Includes ${data.usage.systemMonth} system email${data.usage.systemMonth === 1 ? "" : "s"}`}
+        />
         <Stat label="Active users" value={String(data.counts.users)} hint={data.counts.invited ? `${data.counts.invited} invite${data.counts.invited > 1 ? "s" : ""} pending` : undefined} />
         <Stat label="Storage" value={fileSize(data.counts.bytes)} hint={`${data.counts.messages.toLocaleString()} messages · ${data.counts.mailboxes} mailboxes`} />
       </div>
 
-      <Section title="Activity" description="Messages sent and received over the last 14 days.">
+      <Section title="Activity" description="Everything sent and received over the last 14 days, including system emails like invites, password resets and security alerts.">
         <ActivityChart rows={data.series} />
       </Section>
 

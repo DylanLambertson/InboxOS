@@ -3,15 +3,17 @@ import { useMemo, useState } from "react";
 interface Point {
   day: string;
   sent: number;
+  system: number;
   received: number;
 }
 
 const SERIES = [
-  { key: "sent", label: "Sent", color: "var(--series-1)" },
+  { key: "sent", label: "Sent by team", color: "var(--series-1)" },
+  { key: "system", label: "System emails", color: "var(--series-3)" },
   { key: "received", label: "Received", color: "var(--series-2)" },
 ] as const;
 
-/** 14-day grouped bar chart of outbound vs inbound volume, with hover tooltip and table fallback. */
+/** 14-day grouped bar chart: team mail, system emails (invites, resets, alerts) and received mail. */
 export function ActivityChart({ rows }: { rows: { day: string; type: string; n: number }[] }) {
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
@@ -23,12 +25,12 @@ export function ActivityChart({ rows }: { rows: { day: string; type: string; n: 
       const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
       const key = d.toISOString().slice(0, 10);
       const of = (t: string) => rows.filter((r) => r.day === key && r.type === t).reduce((s, r) => s + r.n, 0);
-      days.push({ day: key, sent: of("accepted"), received: of("received") });
+      days.push({ day: key, sent: of("accepted"), system: of("system"), received: of("received") + of("received.unrouted") });
     }
     return days;
   }, [rows]);
 
-  const max = Math.max(4, ...data.flatMap((d) => [d.sent, d.received]));
+  const max = Math.max(4, ...data.flatMap((d) => [d.sent, d.system, d.received]));
   const niceMax = Math.ceil(max / 4) * 4;
   const W = 640;
   const H = 180;
@@ -36,10 +38,10 @@ export function ActivityChart({ rows }: { rows: { day: string; type: string; n: 
   const iw = W - pad.l - pad.r;
   const ih = H - pad.t - pad.b;
   const slot = iw / data.length;
-  const barW = Math.max(3, Math.min(14, (slot - 8) / 2));
+  const barW = Math.max(3, Math.min(11, (slot - 10) / SERIES.length));
   const y = (v: number) => pad.t + ih - (v / niceMax) * ih;
   const label = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString([], { month: "short", day: "numeric", timeZone: "UTC" });
-  const total = (k: "sent" | "received") => data.reduce((s, d) => s + d[k], 0);
+  const total = (k: (typeof SERIES)[number]["key"]) => data.reduce((s, d) => s + d[k], 0);
 
   return (
     <div>
@@ -60,16 +62,18 @@ export function ActivityChart({ rows }: { rows: { day: string; type: string; n: 
             <thead className="sticky top-0 bg-subtle text-left text-xs text-fg-muted">
               <tr>
                 <th className="px-3 py-1.5 font-medium">Day</th>
-                <th className="px-3 py-1.5 text-right font-medium">Sent</th>
-                <th className="px-3 py-1.5 text-right font-medium">Received</th>
+                {SERIES.map((s) => (
+                  <th key={s.key} className="px-3 py-1.5 text-right font-medium">{s.label}</th>
+                ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-line">
               {data.map((d) => (
                 <tr key={d.day}>
                   <td className="px-3 py-1.5">{label(d.day)}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">{d.sent}</td>
-                  <td className="px-3 py-1.5 text-right tabular-nums">{d.received}</td>
+                  {SERIES.map((s) => (
+                    <td key={s.key} className="px-3 py-1.5 text-right tabular-nums">{d[s.key]}</td>
+                  ))}
                 </tr>
               ))}
             </tbody>
@@ -94,7 +98,7 @@ export function ActivityChart({ rows }: { rows: { day: string; type: string; n: 
                   {SERIES.map((s, si) => {
                     const v = d[s.key];
                     const h = Math.max(v ? 2 : 0, pad.t + ih - y(v));
-                    const x = cx - barW - 1 + si * (barW + 2);
+                    const x = cx - (SERIES.length * barW + (SERIES.length - 1) * 2) / 2 + si * (barW + 2);
                     return h > 0 ? <path key={s.key} d={roundedTop(x, pad.t + ih - h, barW, h, Math.min(4, barW / 2))} fill={s.color} /> : null;
                   })}
                   {(i % 2 === 1 || data.length <= 7) && (
@@ -113,7 +117,7 @@ export function ActivityChart({ rows }: { rows: { day: string; type: string; n: 
             >
               <p className="mb-1 font-medium">{label(data[hover].day)}</p>
               {SERIES.map((s) => (
-                <p key={s.key} className="flex items-center gap-1.5 text-fg-muted">
+                <p key={s.key} className="flex items-center gap-1.5 whitespace-nowrap text-fg-muted">
                   <span className="size-2 rounded-sm" style={{ background: s.color }} />
                   {s.label} <span className="ml-auto pl-3 font-medium text-fg tabular-nums">{data[hover][s.key]}</span>
                 </p>

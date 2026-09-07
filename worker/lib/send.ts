@@ -6,13 +6,17 @@ import { getBrand, getPolicy } from "./settings";
 import { b64encode, domainOf, formatAddress, htmlToText, makeSnippet, newId, now, parseJson } from "./util";
 
 export interface QuotaUsage {
+  /** All emails sent through the provider, including system emails. */
   today: number;
   month: number;
+  /** The system-email share of the totals above (invites, resets, alerts). */
+  systemToday: number;
+  systemMonth: number;
   dailyLimit: number;
   monthlyLimit: number;
 }
 
-/** Count recipients-agnostic outbound sends (Resend counts per email). */
+/** Emails sent through the provider in the current UTC day/month — team mail plus system emails, as Resend counts them. */
 export async function quotaUsage(env: Env): Promise<QuotaUsage> {
   const policy = await getPolicy(env.DB);
   const d = new Date();
@@ -26,9 +30,19 @@ export async function quotaUsage(env: Env): Promise<QuotaUsage> {
   )
     .bind(dayStart, monthStart)
     .first<{ today: number | null; month: number }>();
+  const sys = await env.DB.prepare(
+    `SELECT SUM(CASE WHEN created_at >= ?1 THEN 1 ELSE 0 END) AS today, COUNT(*) AS month
+     FROM email_events WHERE type = 'system' AND created_at >= ?2`,
+  )
+    .bind(dayStart, monthStart)
+    .first<{ today: number | null; month: number }>();
+  const systemToday = sys?.today ?? 0;
+  const systemMonth = sys?.month ?? 0;
   return {
-    today: row?.today ?? 0,
-    month: row?.month ?? 0,
+    today: (row?.today ?? 0) + systemToday,
+    month: (row?.month ?? 0) + systemMonth,
+    systemToday,
+    systemMonth,
     dailyLimit: policy.dailySendLimit,
     monthlyLimit: policy.monthlySendLimit,
   };

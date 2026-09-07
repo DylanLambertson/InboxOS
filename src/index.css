@@ -30,6 +30,7 @@
   --warning-soft: color-mix(in oklab, #d97706 12%, transparent);
   --series-1: #2a78d6;
   --series-2: #eb6834;
+  --series-3: #1baf7a;
   --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.04);
   --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.08), 0 1px 3px rgb(0 0 0 / 0.04);
   --shadow-lg: 0 16px 48px -12px rgb(0 0 0 / 0.18), 0 2px 6px rgb(0 0 0 / 0.05);
@@ -54,6 +55,7 @@
     --shadow-lg: 0 16px 48px -12px rgb(0 0 0 / 0.7);
     --series-1: #3987e5;
     --series-2: #d95926;
+    --series-3: #199e70;
     color-scheme: dark;
   }
 }
@@ -74,6 +76,7 @@
   --shadow-lg: 0 16px 48px -12px rgb(0 0 0 / 0.7);
   --series-1: #3987e5;
   --series-2: #d95926;
+    --series-3: #199e70;
   color-scheme: dark;
 }
 
@@ -94,6 +97,7 @@
   --color-accent-softer: var(--accent-softer);
   --color-series-1: var(--series-1);
   --color-series-2: var(--series-2);
+  --color-series-3: var(--series-3);
   --color-danger: var(--danger);
   --color-danger-soft: var(--danger-soft);
   --color-success: var(--success);

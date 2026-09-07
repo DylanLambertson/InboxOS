@@ -2,13 +2,39 @@ import type { Env } from "../env";
 import { renderEmail, type EmailContent } from "./email-layout";
 import { resend } from "./resend";
 import { getBrand } from "./settings";
+import { newId, now } from "./util";
+
+/**
+ * Record a system email in the delivery log. Sent ones count toward the sending quota
+ * (Resend counts them too) and appear in the Overview; later delivery webhooks attach
+ * to them by provider id.
+ */
+async function logSystemEmail(env: Env, e: { resendId: string | null; to: string; subject: string; category: string; error?: string }) {
+  try {
+    await env.DB.prepare(
+      "INSERT INTO email_events (id, message_id, resend_id, type, recipient, detail, payload, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",
+    )
+      .bind(
+        newId(),
+        e.resendId,
+        e.error ? "failed" : "system",
+        e.to,
+        (e.error ? `System email (${e.category}) failed: ${e.error}` : `System email (${e.category}): ${e.subject}`).slice(0, 1000),
+        JSON.stringify({ category: e.category, subject: e.subject }),
+        now(),
+      )
+      .run();
+  } catch (err) {
+    console.error("could not log system email", err);
+  }
+}
 
 /** Send a branded transactional email from no-reply@<primary domain>. Never throws. */
 export async function sendSystemEmail(env: Env, to: string, content: EmailContent, category = "system"): Promise<boolean> {
   const brand = await getBrand(env.DB);
   const { html, text } = renderEmail(brand, env.APP_URL, content);
   try {
-    await resend.send(env.RESEND_API_KEY, {
+    const res = await resend.send(env.RESEND_API_KEY, {
       from: `${brand.productName} <no-reply@${brand.primaryDomain}>`,
       to: [to],
       subject: content.subject,
@@ -17,9 +43,11 @@ export async function sendSystemEmail(env: Env, to: string, content: EmailConten
       ...(brand.supportEmail ? { reply_to: [brand.supportEmail] } : {}),
       tags: [{ name: "category", value: category }],
     });
+    await logSystemEmail(env, { resendId: res.id, to, subject: content.subject, category });
     return true;
   } catch (err) {
     console.error("system email failed", category, err);
+    await logSystemEmail(env, { resendId: null, to, subject: content.subject, category, error: err instanceof Error ? err.message : "Unknown error" });
     return false;
   }
 }

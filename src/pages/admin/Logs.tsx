@@ -33,7 +33,7 @@ interface AuditRow {
   meta: string;
 }
 
-const EVENT_TYPES = ["accepted", "sent", "delivered", "delivery_delayed", "bounced", "complained", "failed", "suppressed", "opened", "clicked", "received", "received.unrouted"];
+const EVENT_TYPES = ["system", "accepted", "sent", "delivered", "delivery_delayed", "bounced", "complained", "failed", "suppressed", "opened", "clicked", "received", "received.unrouted"];
 const AUDIT_GROUPS = [
   ["", "All actions"],
   ["auth.", "Sign-ins"],

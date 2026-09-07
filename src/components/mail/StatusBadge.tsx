@@ -29,6 +29,7 @@ export function StatusBadge({ status }: { status: MessageStatus }) {
 
 export const EVENT_LABELS: Record<string, string> = {
   accepted: "Accepted by provider",
+  system: "System email sent",
   sent: "Sent",
   delivered: "Delivered",
   delivery_delayed: "Delivery delayed",
