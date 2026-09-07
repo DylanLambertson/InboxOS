@@ -1,5 +1,5 @@
 import { Navigate, useLocation } from "react-router";
-import { Activity, Eye, Inbox, LayoutDashboard, Palette, Radar, Rocket, ScrollText, SlidersHorizontal, Users } from "lucide-react";
+import { Activity, Bot, Eye, Inbox, LayoutDashboard, Palette, Radar, Rocket, ScrollText, SlidersHorizontal, Users } from "lucide-react";
 import { useMe } from "@/lib/queries";
 import { SubNavLayout } from "@/components/layout/SubNav";
 
@@ -19,6 +19,7 @@ export function AdminLayout() {
         { to: "/admin/logs/audit", label: "Audit log", icon: ScrollText },
         { to: "/admin/branding", label: "Branding", icon: Palette },
         { to: "/admin/settings", label: "Settings & policy", icon: SlidersHorizontal },
+        { to: "/admin/api", label: "API & MCP", icon: Bot },
         { to: "/admin/setup", label: "Setup guide", icon: Rocket },
   ];
   return (

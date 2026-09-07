@@ -7,3 +7,4 @@ export { AdminBranding } from "./Branding";
 export { AdminPolicy } from "./Policy";
 export { AdminLogs } from "./Logs";
 export { AdminSetup } from "./Setup";
+export { AdminApiKeys } from "./ApiKeys";
