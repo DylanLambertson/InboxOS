@@ -41,6 +41,19 @@ const PRESETS = [
   { label: "Send-only service", name: "Backend service", scopes: ["send"] },
 ];
 
+/** Checkbox with visible text (the shared Checkbox only carries an aria-label). */
+function CheckRow({ checked, onChange, label, hint }: { checked: boolean; onChange: (v: boolean) => void; label: string; hint?: string }) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5">
+      <Checkbox checked={checked} onChange={onChange} label={label} className="mt-0.5" />
+      <span className="min-w-0">
+        <span className="block text-[13px] text-fg">{label}</span>
+        {hint && <span className="block text-xs text-fg-muted">{hint}</span>}
+      </span>
+    </label>
+  );
+}
+
 function Code({ children }: { children: string }) {
   return (
     <div className="relative mt-1.5">
@@ -129,19 +142,16 @@ function NewKeyDialog({ mailboxes, onClose, onCreated }: { mailboxes: MailboxLit
         <Field label="Permissions">
           <div className="space-y-2.5">
             {SCOPES.map((s) => (
-              <div key={s.value}>
-                <Checkbox checked={scopes.includes(s.value)} onChange={(on) => setScopes((x) => toggle(x, s.value, on))} label={s.label} />
-                <p className="ml-6 text-xs text-fg-muted">{s.hint}</p>
-              </div>
+              <CheckRow key={s.value} checked={scopes.includes(s.value)} onChange={(on) => setScopes((x) => toggle(x, s.value, on))} label={s.label} hint={s.hint} />
             ))}
           </div>
         </Field>
         <Field label="Mailboxes">
-          <Checkbox checked={limit} onChange={setLimit} label="Only specific mailboxes (recommended for MCP clients)" />
+          <CheckRow checked={limit} onChange={setLimit} label="Only specific mailboxes" hint="Recommended for MCP clients. Otherwise the key can use every mailbox." />
           {limit && (
             <div className="mt-2.5 max-h-48 space-y-2 overflow-y-auto rounded-ui border border-line p-3">
               {mailboxes.filter((m) => m.isActive).map((m) => (
-                <Checkbox key={m.id} checked={boxes.includes(m.id)} onChange={(on) => setBoxes((x) => toggle(x, m.id, on))} label={m.address} />
+                <CheckRow key={m.id} checked={boxes.includes(m.id)} onChange={(on) => setBoxes((x) => toggle(x, m.id, on))} label={m.address} />
               ))}
             </div>
           )}
