@@ -76,7 +76,10 @@ export function AdminBranding() {
   const logoInput = useRef<HTMLInputElement>(null);
   const dirty = JSON.stringify(b) !== JSON.stringify(current);
 
-  useEffect(() => setB(current), [current]);
+  // Keep the raw text so typing a comma or space isn't swallowed by the round-trip through the array.
+  const [domainsText, setDomainsText] = useState(current.additionalDomains.join(", "));
+
+  useEffect(() => (setB(current), setDomainsText(current.additionalDomains.join(", "))), [current]);
   // Restore the saved brand if the admin leaves without saving.
   useEffect(() => () => applyBrand(current), [current]);
 
@@ -122,6 +125,7 @@ export function AdminBranding() {
               onClick={async () => {
                 if (await confirm({ title: "Reset branding to defaults?", confirmLabel: "Reset" })) {
                   setB(DEFAULT_BRAND);
+                  setDomainsText(DEFAULT_BRAND.additionalDomains.join(", "));
                   save(DEFAULT_BRAND);
                 }
               }}
@@ -150,6 +154,20 @@ export function AdminBranding() {
               </Field>
               <Field label="Default sender name" hint="Used when a mailbox has no sender name.">
                 <Input value={b.defaultFromName} onChange={(e) => set("defaultFromName", e.target.value)} />
+              </Field>
+              <Field
+                label="Additional domains"
+                hint="Comma-separated. Every mailbox also gets its address on these domains, and people can switch between them when sending. Verify each one in Resend first."
+                className="sm:col-span-2"
+              >
+                <Input
+                  value={domainsText}
+                  onChange={(e) => {
+                    setDomainsText(e.target.value);
+                    set("additionalDomains", e.target.value.split(/[\s,]+/).map((d) => d.trim().toLowerCase()).filter(Boolean));
+                  }}
+                  placeholder="example.co"
+                />
               </Field>
             </div>
           </Section>

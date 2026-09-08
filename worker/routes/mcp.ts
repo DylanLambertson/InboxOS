@@ -28,7 +28,7 @@ Outreach guidelines:
 - To follow up or answer a reply, pass reply_to_message_id so it stays in the same conversation.`;
 
 const zMessageFields = {
-  from: z.string().optional().describe('Mailbox address to send from, optionally with a sender name: "Dylan at Acme <dylan@example.com>". Optional when replying or when the key has one mailbox.'),
+  from: z.string().optional().describe('Mailbox address to send from, optionally with a sender name: "Dylan at Acme <dylan@example.com>". Every mailbox also has its address on each mail domain (e.g. dylan@example.org), so pick the domain here. Optional when replying or when the key has one mailbox.'),
   to: zRecipients.optional().describe('Recipient: "Jo Rivera <jo@acme.com>". Optional when replying (defaults to the other person).'),
   subject: z.string().max(998).optional().describe("Subject. Optional when replying (defaults to Re: original)."),
   body: z.string().max(100_000).optional().describe("Plain-text body. Blank lines separate paragraphs; links become clickable."),

@@ -14,6 +14,12 @@ export interface Brand {
   productName: string;
   /** Primary sending/receiving domain. New mailboxes default to this domain. */
   primaryDomain: string;
+  /**
+   * Other domains every mailbox also sends and receives on. A mailbox at
+   * hello@<primary> automatically gets hello@<each additional domain> as an alias,
+   * and compose shows a switch to pick which domain to send from.
+   */
+  additionalDomains: string[];
   /** Absolute URL or data: URI of a logo (square works best). Empty = monogram. */
   logoUrl: string;
   /** 1–3 letters shown when no logo is set. */
@@ -42,6 +48,7 @@ export const DEFAULT_BRAND: Brand = {
   companyName: "Acme",
   productName: "InboxOS",
   primaryDomain: "example.com",
+  additionalDomains: ["example.org"],
   logoUrl: "",
   monogram: "LM",
   accentColor: "#4f46e5",
@@ -101,6 +108,11 @@ export const DEFAULT_POLICY: OrgPolicy = {
   sessionDays: 14,
   trackingEnabled: false,
 };
+
+/** Every mail domain, primary first, lowercased and without duplicates. */
+export function mailDomains(brand: Pick<Brand, "primaryDomain" | "additionalDomains">): string[] {
+  return [...new Set([brand.primaryDomain, ...(brand.additionalDomains ?? [])].map((d) => d.trim().toLowerCase()).filter(Boolean))];
+}
 
 /** Convert radius keyword to a CSS length. */
 export function radiusValue(r: Brand["radius"]): string {

@@ -19,7 +19,9 @@ import {
   Save,
 } from "lucide-react";
 import { toast } from "sonner";
+import { mailDomains } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
+import { useBrand } from "@/lib/brand";
 import { useMailboxes, useMe, useTemplates } from "@/lib/queries";
 import { useQueryClient } from "@tanstack/react-query";
 import { EmailFrame } from "../mail/EmailFrame";
@@ -104,14 +106,43 @@ function ComposeBody({
     onPasteImage: insertInlineImage,
   });
 
+  const brand = useBrand();
+  const domains = useMemo(() => mailDomains(brand), [brand]);
+  // One identity per address, except that the same name on several mail domains
+  // (hello@a, hello@b) is a single identity whose domain is picked with the switch.
   const identities = useMemo(
     () =>
       boxes
         .filter((b) => b.role !== "viewer")
-        .flatMap((b) => [b.address, ...b.aliases].map((addr) => ({ mailboxId: b.id, address: addr, name: b.displayName }))),
-    [boxes],
+        .flatMap((b) => {
+          const groups = new Map<string, string[]>();
+          for (const addr of [b.address, ...b.aliases].map((a) => a.toLowerCase())) {
+            const [local, domain] = splitAddress(addr);
+            const key = domains.includes(domain) ? local : addr;
+            groups.set(key, [...(groups.get(key) ?? []), addr]);
+          }
+          return [...groups.values()].map((addrs) => ({
+            mailboxId: b.id,
+            name: b.displayName,
+            addresses: addrs.sort((x, y) => domainRank(domains, x) - domainRank(domains, y)),
+          }));
+        }),
+    [boxes, domains],
   );
-  const currentFrom = state.fromAddress || boxes.find((b) => b.id === state.mailboxId)?.address || "";
+  const currentFrom = (state.fromAddress || boxes.find((b) => b.id === state.mailboxId)?.address || "").toLowerCase();
+  const currentIdentity = identities.find((i) => i.mailboxId === state.mailboxId && i.addresses.includes(currentFrom));
+  const domainChoices = currentIdentity && currentIdentity.addresses.length > 1 ? currentIdentity.addresses : [];
+  const pickFrom = (mailboxId: string, address: string) => {
+    draft.update({ mailboxId, fromAddress: address });
+    if (domainChoices.length) rememberSendDomain(splitAddress(address)[1]);
+  };
+
+  // New messages start on the domain the user last sent from.
+  useEffect(() => {
+    if (state.mode !== "new" || state.fromAddress || !currentIdentity) return;
+    const preferred = currentIdentity.addresses.find((a) => splitAddress(a)[1] === lastSendDomain());
+    if (preferred && preferred !== currentFrom) draft.update({ fromAddress: preferred });
+  }, [currentIdentity]);
   const title = state.subject || (state.mode === "forward" ? "Forward" : state.mode === "new" ? "New message" : "Reply");
   const recipients = state.to.length + state.cc.length + state.bcc.length;
 
@@ -231,23 +262,40 @@ function ComposeBody({
           </div>
         )}
 
-        {identities.length > 1 && (
+        {(identities.length > 1 || domainChoices.length > 0) && (
           <div className="flex h-10 items-center gap-2 border-b border-line px-3">
             <span className="w-9 shrink-0 text-[13px] text-fg-muted">From</span>
-            <Menu
-              width={320}
-              items={identities.map((i) => ({
-                label: i.name ? `${i.name} <${i.address}>` : i.address,
-                checked: i.address === currentFrom,
-                onSelect: () => draft.update({ mailboxId: i.mailboxId, fromAddress: i.address }),
-              }))}
-              trigger={(p) => (
-                <button {...p} className="flex min-w-0 items-center gap-1 rounded px-1 text-[13px] hover:bg-muted">
-                  <span className="truncate">{currentFrom}</span>
-                  <ChevronDown className="size-3.5 text-fg-faint" />
-                </button>
-              )}
-            />
+            {identities.length > 1 ? (
+              <Menu
+                width={320}
+                items={identities.map((i) => {
+                  // Keep the chosen domain when switching mailboxes, if the other mailbox has it.
+                  const addr = i.addresses.find((a) => splitAddress(a)[1] === splitAddress(currentFrom)[1]) ?? i.addresses[0];
+                  return {
+                    label: i.name ? `${i.name} <${addr}>` : addr,
+                    hint: i.addresses.length > 1 ? `${i.addresses.length} domains` : undefined,
+                    checked: i === currentIdentity,
+                    onSelect: () => pickFrom(i.mailboxId, addr),
+                  };
+                })}
+                trigger={(p) => (
+                  <button {...p} className="flex min-w-0 items-center gap-1 rounded px-1 text-[13px] hover:bg-muted">
+                    <span className="truncate">{currentFrom}</span>
+                    <ChevronDown className="size-3.5 text-fg-faint" />
+                  </button>
+                )}
+              />
+            ) : (
+              <span className="min-w-0 truncate px-1 text-[13px]">{currentFrom}</span>
+            )}
+            {domainChoices.length > 0 && (
+              <DomainSwitch
+                className="ml-auto"
+                options={domainChoices}
+                value={currentFrom}
+                onChange={(addr) => pickFrom(state.mailboxId, addr)}
+              />
+            )}
           </div>
         )}
 
@@ -469,6 +517,60 @@ function Shell({
     >
       {header}
       {!minimized && children}
+    </div>
+  );
+}
+
+const splitAddress = (addr: string): [string, string] => {
+  const at = addr.lastIndexOf("@");
+  return [addr.slice(0, at), addr.slice(at + 1).toLowerCase()];
+};
+
+/** Order addresses by mail domain (primary first); non-domain addresses go last. */
+const domainRank = (domains: string[], addr: string) => {
+  const i = domains.indexOf(splitAddress(addr)[1]);
+  return i === -1 ? domains.length : i;
+};
+
+const SEND_DOMAIN_KEY = "inboxos.sendDomain";
+function lastSendDomain(): string | null {
+  try {
+    return localStorage.getItem(SEND_DOMAIN_KEY);
+  } catch {
+    return null;
+  }
+}
+function rememberSendDomain(domain: string) {
+  try {
+    localStorage.setItem(SEND_DOMAIN_KEY, domain);
+  } catch {
+    /* storage unavailable; the choice just isn't remembered */
+  }
+}
+
+/** Segmented control for picking which mail domain to send from. */
+function DomainSwitch({ options, value, onChange, className }: { options: string[]; value: string; onChange: (address: string) => void; className?: string }) {
+  return (
+    <div role="radiogroup" aria-label="Send from domain" className={cx("flex shrink-0 rounded-full bg-muted p-0.5", className)}>
+      {options.map((addr) => {
+        const selected = addr === value;
+        return (
+          <button
+            key={addr}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            title={`Send as ${addr}`}
+            onClick={() => onChange(addr)}
+            className={cx(
+              "rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
+              selected ? "bg-accent text-accent-fg shadow-ui-sm" : "text-fg-muted hover:text-fg",
+            )}
+          >
+            @{splitAddress(addr)[1]}
+          </button>
+        );
+      })}
     </div>
   );
 }

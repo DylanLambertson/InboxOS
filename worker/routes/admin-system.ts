@@ -8,6 +8,7 @@ import { templates, type TemplateName } from "../lib/email-templates";
 import { resend } from "../lib/resend";
 import { likeEscape } from "../lib/search";
 import { quotaUsage } from "../lib/send";
+import { syncDomainAliases } from "../lib/domains";
 import { loadSettings, saveSetting } from "../lib/settings";
 import { clampInt, now } from "../lib/util";
 import { parseBody, zColor, zEmail, zId } from "../lib/validate";
@@ -78,10 +79,13 @@ adminSystemRoutes.get("/domains", async (c) => {
 
 adminSystemRoutes.get("/settings", async (c) => c.json(await loadSettings(c.env.DB)));
 
+const zDomain = z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "Enter a domain like example.com");
+
 const zBrand = z.object({
   companyName: z.string().trim().min(1).max(120),
   productName: z.string().trim().min(1).max(120),
-  primaryDomain: z.string().trim().toLowerCase().regex(/^[a-z0-9.-]+\.[a-z]{2,}$/, "Enter a domain like example.com"),
+  primaryDomain: zDomain,
+  additionalDomains: z.array(zDomain).max(10),
   logoUrl: z
     .string()
     .trim()
@@ -120,6 +124,8 @@ adminSystemRoutes.put("/settings/brand", async (c) => {
   const { brand } = await loadSettings(c.env.DB);
   const next = { ...brand, ...body };
   await saveSetting(c.env.DB, "brand", next, c.get("user").id);
+  // A newly added domain gives every existing mailbox its address there.
+  if (body.primaryDomain !== undefined || body.additionalDomains !== undefined) await syncDomainAliases(c.env.DB);
   await audit(c, { action: "settings.brand_updated", targetType: "settings", meta: { fields: Object.keys(body) } });
   return c.json(next);
 });

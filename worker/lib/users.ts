@@ -1,5 +1,6 @@
 import { DEFAULT_PREFERENCES, type Me, type Preferences, type Role, type UserStatus } from "@shared/types";
 import type { OrgPolicy } from "@shared/brand";
+import { syncDomainAliases } from "./domains";
 import { effectiveRole, storedRole } from "./roles";
 import { newId, now, parseJson, randomColor } from "./util";
 
@@ -68,7 +69,7 @@ export async function insertUser(
   return id;
 }
 
-/** Create a mailbox (if the address is free) and make the user its owner. */
+/** Create a mailbox (if the address is free, with its address on every mail domain) and make the user its owner. */
 export async function ensureMailbox(
   db: D1Database,
   /** `name` is the sidebar label; defaults to the sender name. */
@@ -94,5 +95,6 @@ export async function ensureMailbox(
     );
   }
   if (stmts.length) await db.batch(stmts);
+  if (!existing) await syncDomainAliases(db, id);
   return id;
 }

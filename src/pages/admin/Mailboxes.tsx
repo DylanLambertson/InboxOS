@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { AtSign, ChevronRight, Inbox, Plus, Trash2, Users, X } from "lucide-react";
 import { toast } from "sonner";
+import { mailDomains } from "@shared/brand";
 import type { MailboxRole } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
@@ -41,7 +42,8 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
   const brand = useBrand();
   const qc = useQueryClient();
   const [local, setLocal] = useState("");
-  const [domain, setDomain] = useState(brand.primaryDomain);
+  const domains = mailDomains(brand);
+  const [domain, setDomain] = useState(domains[0]);
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [type, setType] = useState<"shared" | "personal">("shared");
@@ -79,8 +81,26 @@ function CreateDialog({ onClose }: { onClose: () => void }) {
           <div className="flex items-center gap-1.5">
             <Input value={local} onChange={(e) => setLocal(e.target.value.replace(/[@\s]/g, ""))} placeholder="support" autoFocus />
             <span className="text-fg-muted">@</span>
-            <Input value={domain} onChange={(e) => setDomain(e.target.value.trim())} />
+            {domains.length > 1 ? (
+              <Select value={domain} onChange={(e) => setDomain(e.target.value)} className="w-auto">
+                {domains.map((d) => (
+                  <option key={d} value={d}>{d}</option>
+                ))}
+              </Select>
+            ) : (
+              <Input value={domain} onChange={(e) => setDomain(e.target.value.trim())} />
+            )}
           </div>
+          {domains.length > 1 && local.trim() && (
+            <p className="mt-1.5 text-xs text-fg-muted">
+              Also sends and receives as{" "}
+              {domains
+                .filter((d) => d !== domain)
+                .map((d) => <span key={d} className="font-medium text-fg">{local.trim()}@{d}</span>)
+                .reduce<ReactNode[]>((acc, el, i) => (i ? [...acc, ", ", el] : [el]), [])}
+              .
+            </p>
+          )}
         </Field>
         <div className="grid gap-4 sm:grid-cols-2">
           <Field label="Mailbox name" hint="Label in everyone's sidebar. Only your team sees it.">
