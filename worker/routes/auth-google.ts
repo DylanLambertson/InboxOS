@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
+import { appOrigin } from "../lib/domains";
 import { createSession, readSession } from "../lib/session";
 import { getBrand, getPolicy } from "../lib/settings";
 import { ensureMailbox, getUserByEmail, insertUser, withRole, type UserRow } from "../lib/users";
@@ -17,7 +18,10 @@ interface StateData {
   next: string;
 }
 
-const redirectUri = (appUrl: string) => `${appUrl.replace(/\/$/, "")}/api/auth/google/callback`;
+// Google sends the user back to the host they started on (mail.example.com or mail.example.org),
+// so the state cookie is there. Every such callback URL must be listed in the Google OAuth client.
+const redirectUri = async (env: AppEnv["Bindings"], requestUrl: string) =>
+  `${await appOrigin(env.DB, env.APP_URL, requestUrl)}/api/auth/google/callback`;
 const safeNext = (n: string | undefined) => (n && n.startsWith("/") && !n.startsWith("//") ? n : "/");
 
 googleRoutes.get("/start", async (c) => {
@@ -45,7 +49,7 @@ googleRoutes.get("/start", async (c) => {
   });
   const params = new URLSearchParams({
     client_id: c.env.GOOGLE_CLIENT_ID,
-    redirect_uri: redirectUri(c.env.APP_URL),
+    redirect_uri: await redirectUri(c.env, c.req.url),
     response_type: "code",
     scope: "openid email profile",
     state: raw,
@@ -89,7 +93,7 @@ googleRoutes.get("/callback", async (c) => {
       code,
       client_id: c.env.GOOGLE_CLIENT_ID ?? "",
       client_secret: c.env.GOOGLE_CLIENT_SECRET ?? "",
-      redirect_uri: redirectUri(c.env.APP_URL),
+      redirect_uri: await redirectUri(c.env, c.req.url),
       grant_type: "authorization_code",
     }),
   });

@@ -44,6 +44,11 @@
 			"bucket_name": "inboxos-files"
 		},
 	],
+	// Same app on both mail domains. Sessions are per host, so people sign in on whichever they use.
+	"routes": [
+		{ "pattern": "mail.example.com", "custom_domain": true },
+		{ "pattern": "mail.example.org", "custom_domain": true }
+	],
 	// Every minute: dispatch scheduled sends. Daily cleanup runs inside the same handler.
 	"triggers": {
 		"crons": [

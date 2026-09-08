@@ -29,3 +29,16 @@ export async function syncDomainAliases(db: D1Database, mailboxId?: string): Pro
     ),
   );
 }
+
+/**
+ * Origin the app is being used on: the request's own origin when it's APP_URL or
+ * mail.<one of the mail domains> (e.g. mail.example.org), otherwise APP_URL.
+ * Used where a URL must point back at the host the user is on, like OAuth callbacks.
+ */
+export async function appOrigin(db: D1Database, appUrl: string, requestUrl: string): Promise<string> {
+  const canonical = new URL(appUrl).origin;
+  const req = new URL(requestUrl);
+  if (req.origin === canonical || req.protocol !== new URL(appUrl).protocol) return canonical;
+  const hosts = mailDomains(await getBrand(db)).map((d) => `mail.${d}`);
+  return hosts.includes(req.hostname) ? req.origin : canonical;
+}
