@@ -1,12 +1,15 @@
 import { Hono } from "hono";
+import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Address } from "@shared/types";
 import { FOLDERS } from "@shared/types";
 import type { AppEnv } from "../env";
-import { allowedMailboxes, deleteContact, getContact, getThread, listMessages, MESSAGE_ACTIONS, messageAction, saveContacts, searchContacts, sendingStatus } from "../lib/api-ops";
+import { allowedMailboxes, deleteContact, getContact, getMessage, getThread, listMessages, MESSAGE_ACTIONS, messageAction, saveContacts, searchContacts, sendingStatus } from "../lib/api-ops";
 import { apiSend } from "../lib/api-send";
-import { requireApiKey } from "../lib/apikeys";
+import { mailboxAllowed, requireApiKey, requireScope } from "../lib/apikeys";
+import type { AttachmentRow } from "../lib/messages";
 import { clampInt, parseAddress } from "../lib/util";
+import { attachmentResponse } from "./attachments";
 import { parseBody, zEmail, zId } from "../lib/validate";
 
 /**
@@ -111,6 +114,15 @@ apiV1Routes.get("/messages", async (c) => {
 });
 
 apiV1Routes.get("/messages/:id/thread", async (c) => c.json(await getThread(c, c.req.param("id"))));
+apiV1Routes.get("/messages/:id", async (c) => c.json(await getMessage(c, c.req.param("id"))));
+
+/** Stream a message attachment from R2, scoped to the key's allowed mailboxes. `?download=1` forces a download. */
+apiV1Routes.get("/attachments/:id", async (c) => {
+  requireScope(c.get("apiKey"), "read");
+  const a = await c.env.DB.prepare("SELECT * FROM attachments WHERE id = ?").bind(c.req.param("id")).first<AttachmentRow>();
+  if (!a || !a.message_id || !mailboxAllowed(c, a.mailbox_id)) throw new HTTPException(404, { message: "Attachment not found" });
+  return attachmentResponse(c.env.FILES, a, c.req.query("download") === "1");
+});
 
 const zMessageAction = z.object({
   ids: z.array(zId).min(1).max(500),

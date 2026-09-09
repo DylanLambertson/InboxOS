@@ -177,9 +177,35 @@ function toSummary(m: MessageRow & { mailbox_address?: string }) {
     snippet: m.snippet,
     date: m.date,
     isRead: !!m.is_read,
+    hasHtml: !!m.html_key,
     opens: m.open_count,
     clicks: m.click_count,
   };
+}
+
+/** Attachment metadata for a set of messages, keyed by message id (inline images excluded). */
+async function attachmentsByMessage(c: Context<AppEnv>, messageIds: string[]) {
+  const out = new Map<string, { id: string; name: string; size: number; type: string; url: string }[]>();
+  if (!messageIds.length) return out;
+  const { results } = await c.env.DB.prepare(
+    `SELECT id, message_id, filename, content_type, size FROM attachments
+     WHERE inline = 0 AND message_id IN (${messageIds.map(() => "?").join(",")}) ORDER BY created_at`,
+  )
+    .bind(...messageIds)
+    .all<{ id: string; message_id: string; filename: string; content_type: string; size: number }>();
+  for (const a of results) {
+    const list = out.get(a.message_id) ?? [];
+    list.push({ id: a.id, name: a.filename, size: a.size, type: a.content_type, url: `/api/v1/attachments/${a.id}` });
+    out.set(a.message_id, list);
+  }
+  return out;
+}
+
+/** The HTML body of a message from R2, or null if it has none. */
+async function htmlBody(c: Context<AppEnv>, htmlKey: string | null): Promise<string | null> {
+  if (!htmlKey) return null;
+  const obj = await c.env.FILES.get(htmlKey);
+  return obj ? await obj.text() : null;
 }
 
 export async function listMessages(
@@ -214,7 +240,7 @@ export async function listMessages(
   return results.map(toSummary);
 }
 
-/** Every message in a conversation, oldest first, with plain-text bodies. */
+/** Every message in a conversation, oldest first, with plain-text and HTML bodies plus attachments. */
 export async function getThread(c: Context<AppEnv>, messageId: string) {
   const key = c.get("apiKey");
   requireScope(key, "read");
@@ -226,11 +252,37 @@ export async function getThread(c: Context<AppEnv>, messageId: string) {
   )
     .bind(m.mailbox_id, m.thread_id)
     .all<MessageRow & { mailbox_address: string }>();
-  return (results.length ? results : [m]).map((r) => ({
+  const rows = results.length ? results : [m];
+  const [attachments, htmls] = await Promise.all([
+    attachmentsByMessage(c, rows.map((r) => r.id)),
+    Promise.all(rows.map((r) => htmlBody(c, r.html_key))),
+  ]);
+  return rows.map((r, i) => ({
     ...toSummary(r),
     cc: parseJson<Address[]>(r.cc_json, []),
     text: r.text_body.slice(0, 8000),
+    html: htmls[i],
+    attachments: attachments.get(r.id) ?? [],
   }));
+}
+
+/** One message in full — summary, recipients, both bodies and its attachments. */
+export async function getMessage(c: Context<AppEnv>, messageId: string) {
+  requireScope(c.get("apiKey"), "read");
+  const m = await c.env.DB.prepare(
+    `SELECT m.*, mb.address AS mailbox_address FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id WHERE m.id = ?`,
+  )
+    .bind(messageId)
+    .first<MessageRow & { mailbox_address: string }>();
+  if (!m || !mailboxAllowed(c, m.mailbox_id)) throw new HTTPException(404, { message: "Message not found" });
+  const [attachments, html] = await Promise.all([attachmentsByMessage(c, [m.id]), htmlBody(c, m.html_key)]);
+  return {
+    ...toSummary(m),
+    cc: parseJson<Address[]>(m.cc_json, []),
+    text: m.text_body.slice(0, 8000),
+    html,
+    attachments: attachments.get(m.id) ?? [],
+  };
 }
 
 // ---- Message actions --------------------------------------------------------
