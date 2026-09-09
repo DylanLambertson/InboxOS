@@ -14,6 +14,7 @@ interface ApiKeyInfo {
   prefix: string;
   scopes: string[];
   mailboxIds: string[];
+  canActAs: boolean;
   lastUsedAt: string | null;
   revokedAt: string | null;
   createdAt: string;
@@ -37,8 +38,9 @@ const SCOPES = [
   { value: "read", label: "Read mail", hint: "Read inboxes and conversations, to follow up on replies" },
 ];
 const PRESETS = [
-  { label: "MCP client (outreach)", name: "MCP client", scopes: ["send", "contacts", "read"] },
-  { label: "Send-only service", name: "Backend service", scopes: ["send"] },
+  { label: "MCP client (outreach)", name: "MCP client", scopes: ["send", "contacts", "read"], actAs: false },
+  { label: "Send-only service", name: "Backend service", scopes: ["send"], actAs: false },
+  { label: "Per-user integration", name: "Per-user integration", scopes: ["send", "read"], actAs: true },
 ];
 
 /** Checkbox with visible text (the shared Checkbox only carries an aria-label). */
@@ -98,6 +100,7 @@ function NewKeyDialog({ mailboxes, onClose, onCreated }: { mailboxes: MailboxLit
   const qc = useQueryClient();
   const [name, setName] = useState(PRESETS[0].name);
   const [scopes, setScopes] = useState<string[]>(PRESETS[0].scopes);
+  const [actAs, setActAs] = useState(PRESETS[0].actAs);
   const [limit, setLimit] = useState(false);
   const [boxes, setBoxes] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
@@ -105,7 +108,7 @@ function NewKeyDialog({ mailboxes, onClose, onCreated }: { mailboxes: MailboxLit
   const create = async () => {
     setBusy(true);
     try {
-      const res = await api.post<{ key: string }>("admin/api-keys", { name, scopes, mailboxIds: limit ? boxes : [] });
+      const res = await api.post<{ key: string }>("admin/api-keys", { name, scopes, mailboxIds: limit ? boxes : [], canActAs: actAs });
       qc.invalidateQueries({ queryKey: ["admin-api-keys"] });
       onCreated({ key: res.key, scopes });
     } catch (e) {
@@ -131,7 +134,7 @@ function NewKeyDialog({ mailboxes, onClose, onCreated }: { mailboxes: MailboxLit
       <div className="space-y-5">
         <div className="flex flex-wrap gap-2">
           {PRESETS.map((p) => (
-            <Button key={p.label} size="sm" variant={name === p.name && scopes.join() === p.scopes.join() ? "subtle" : "secondary"} onClick={() => (setName(p.name), setScopes(p.scopes))}>
+            <Button key={p.label} size="sm" variant={name === p.name && scopes.join() === p.scopes.join() ? "subtle" : "secondary"} onClick={() => (setName(p.name), setScopes(p.scopes), setActAs(p.actAs))}>
               {p.label}
             </Button>
           ))}
@@ -145,6 +148,14 @@ function NewKeyDialog({ mailboxes, onClose, onCreated }: { mailboxes: MailboxLit
               <CheckRow key={s.value} checked={scopes.includes(s.value)} onChange={(on) => setScopes((x) => toggle(x, s.value, on))} label={s.label} hint={s.hint} />
             ))}
           </div>
+        </Field>
+        <Field label="On behalf of a user">
+          <CheckRow
+            checked={actAs}
+            onChange={setActAs}
+            label="Act as a user (X-Act-As)"
+            hint="For an integration that works on behalf of your users. Each request may pass a user's email, and the key is narrowed to the mailboxes that user belongs to."
+          />
         </Field>
         <Field label="Mailboxes">
           <CheckRow checked={limit} onChange={setLimit} label="Only specific mailboxes" hint="Recommended for MCP clients. Otherwise the key can use every mailbox." />
@@ -206,7 +217,7 @@ export function AdminApiKeys() {
             <div className="min-w-0 flex-1">
               <p className="flex items-center gap-2 text-[13px] font-medium">
                 {k.name}
-                {k.revokedAt ? <Badge tone="danger">Revoked</Badge> : k.scopes.map((s) => <Badge key={s}>{s}</Badge>)}
+                {k.revokedAt ? <Badge tone="danger">Revoked</Badge> : <>{k.scopes.map((s) => <Badge key={s}>{s}</Badge>)}{k.canActAs && <Badge tone="accent">act-as</Badge>}</>}
               </p>
               <p className="truncate text-xs text-fg-muted">
                 <span className="font-mono">{k.prefix}…</span> · {k.mailboxIds.length ? k.mailboxIds.map(boxName).join(", ") : "All mailboxes"} ·{" "}

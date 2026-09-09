@@ -12,16 +12,17 @@ export const adminApiKeyRoutes = new Hono<AppEnv>();
 
 adminApiKeyRoutes.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT k.id, k.name, k.prefix, k.scopes, k.mailbox_ids, k.last_used_at, k.revoked_at, k.created_at, u.name AS created_by_name, u.email AS created_by_email
+    `SELECT k.id, k.name, k.prefix, k.scopes, k.mailbox_ids, k.can_act_as, k.last_used_at, k.revoked_at, k.created_at, u.name AS created_by_name, u.email AS created_by_email
      FROM api_keys k LEFT JOIN users u ON u.id = k.created_by ORDER BY k.revoked_at IS NOT NULL, k.created_at DESC`,
-  ).all<Record<string, string | null>>();
+  ).all<Record<string, string | number | null>>();
   return c.json(
     results.map((r) => ({
       id: r.id,
       name: r.name,
       prefix: r.prefix,
-      scopes: parseJson<string[]>(r.scopes, []),
-      mailboxIds: parseJson<string[]>(r.mailbox_ids, []),
+      scopes: parseJson<string[]>(r.scopes as string, []),
+      mailboxIds: parseJson<string[]>(r.mailbox_ids as string, []),
+      canActAs: !!r.can_act_as,
       lastUsedAt: r.last_used_at,
       revokedAt: r.revoked_at,
       createdAt: r.created_at,
@@ -37,6 +38,7 @@ adminApiKeyRoutes.post("/", async (c) => {
       name: z.string().trim().min(1).max(80),
       scopes: z.array(z.enum(API_SCOPES)).min(1),
       mailboxIds: z.array(zId).max(200).default([]),
+      canActAs: z.boolean().default(false),
     }),
   );
   if (body.mailboxIds.length) {
@@ -48,11 +50,11 @@ adminApiKeyRoutes.post("/", async (c) => {
   const { key, hash, prefix } = await generateKey();
   const id = newId();
   await c.env.DB.prepare(
-    "INSERT INTO api_keys (id, name, key_hash, prefix, scopes, mailbox_ids, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO api_keys (id, name, key_hash, prefix, scopes, mailbox_ids, can_act_as, created_by, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   )
-    .bind(id, body.name, hash, prefix, JSON.stringify([...new Set(body.scopes)]), JSON.stringify([...new Set(body.mailboxIds)]), c.get("user").id, now())
+    .bind(id, body.name, hash, prefix, JSON.stringify([...new Set(body.scopes)]), JSON.stringify([...new Set(body.mailboxIds)]), body.canActAs ? 1 : 0, c.get("user").id, now())
     .run();
-  await audit(c, { action: "api_key.created", targetType: "api_key", targetId: id, meta: { name: body.name, scopes: body.scopes, mailboxes: body.mailboxIds.length || "all" } });
+  await audit(c, { action: "api_key.created", targetType: "api_key", targetId: id, meta: { name: body.name, scopes: body.scopes, mailboxes: body.mailboxIds.length || "all", canActAs: body.canActAs } });
   // The key itself is only ever returned here.
   return c.json({ id, key }, 201);
 });

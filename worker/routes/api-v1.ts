@@ -3,7 +3,7 @@ import { z } from "zod";
 import type { Address } from "@shared/types";
 import { FOLDERS } from "@shared/types";
 import type { AppEnv } from "../env";
-import { allowedMailboxes, deleteContact, getContact, getThread, listMessages, saveContacts, searchContacts, sendingStatus } from "../lib/api-ops";
+import { allowedMailboxes, deleteContact, getContact, getThread, listMessages, MESSAGE_ACTIONS, messageAction, saveContacts, searchContacts, sendingStatus } from "../lib/api-ops";
 import { apiSend } from "../lib/api-send";
 import { requireApiKey } from "../lib/apikeys";
 import { clampInt, parseAddress } from "../lib/util";
@@ -111,3 +111,15 @@ apiV1Routes.get("/messages", async (c) => {
 });
 
 apiV1Routes.get("/messages/:id/thread", async (c) => c.json(await getThread(c, c.req.param("id"))));
+
+const zMessageAction = z.object({
+  ids: z.array(zId).min(1).max(500),
+  action: z.enum(MESSAGE_ACTIONS),
+  /** Apply to every message in each one's conversation. */
+  thread: z.boolean().optional(),
+});
+
+apiV1Routes.post("/messages/actions", async (c) => {
+  const b = await parseBody(c, zMessageAction);
+  return c.json(await messageAction(c, b));
+});

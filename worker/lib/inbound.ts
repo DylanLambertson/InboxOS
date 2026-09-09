@@ -1,6 +1,7 @@
 import { UNROUTED_MAILBOX_ID, type Address, type MessageStatus } from "@shared/types";
 import type { Env } from "../env";
 import { attachmentKey, bodyKey, contactStatements, ftsStatements, resolveThread } from "./messages";
+import type { ReceivedNotice } from "./notify";
 import { resend, type ReceivedEmail } from "./resend";
 import { getPolicy } from "./settings";
 import { htmlToText, makeSnippet, newId, normalizeSubject, now, parseAddress, parseAddressList, sanitizeFilename } from "./util";
@@ -52,7 +53,7 @@ async function downloadAttachments(env: Env, email: ReceivedEmail) {
   return out;
 }
 
-export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ stored: number; unrouted: boolean }> {
+export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ stored: number; unrouted: boolean; received: ReceivedNotice[] }> {
   const email = await resend.getReceived(env.RESEND_API_KEY, evt.email_id);
   const h = email.headers ?? {};
   const recipients = [
@@ -85,6 +86,7 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
   const headersJson = JSON.stringify(Object.fromEntries(Object.entries(h).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v)])));
 
   let stored = 0;
+  const received: ReceivedNotice[] = [];
   for (const mailboxId of mailboxIds) {
     const dup = await env.DB.prepare("SELECT id FROM messages WHERE mailbox_id = ? AND resend_id = ?")
       .bind(mailboxId, email.id)
@@ -175,8 +177,10 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
       ...contactStatements(env.DB, [from], false),
     ]);
     stored++;
+    // Routed mail is worth telling the panel about; unrouted lands in the admin-only area.
+    if (!unrouted) received.push({ mailboxId, message: { id, threadId, from, subject, snippet: makeSnippet(text), date: t } });
   }
-  return { stored, unrouted };
+  return { stored, unrouted, received };
 }
 
 /** Higher rank wins, so late or out-of-order webhooks never downgrade a status. */

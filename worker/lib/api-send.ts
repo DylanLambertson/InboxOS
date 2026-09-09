@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import type { Address } from "@shared/types";
 import type { AppEnv } from "../env";
 import { allowedMailboxes } from "./api-ops";
-import { keyActor, keyAllowsMailbox, requireScope } from "./apikeys";
+import { apiActor, mailboxAllowed, requireScope } from "./apikeys";
 import { audit } from "./audit";
 import { bodyKey, ftsStatements, purgeMessages, type ComposeMeta, type MessageRow } from "./messages";
 import { prefixSubject } from "./quote";
@@ -61,7 +61,6 @@ async function mailboxById(db: D1Database, id: string) {
 /** Resolve which mailbox sends, and from which of its addresses. */
 async function resolveSender(c: Context<AppEnv>, input: ApiSendInput, fallbackMailboxId: string | null) {
   const db = c.env.DB;
-  const key = c.get("apiKey");
   const from = input.from ? parseAddress(input.from) : null;
   if (input.from && !from) throw new HTTPException(400, { message: `"${input.from}" isn't a valid from address` });
 
@@ -88,7 +87,7 @@ async function resolveSender(c: Context<AppEnv>, input: ApiSendInput, fallbackMa
     address = mailbox.address;
   }
   if (input.mailboxId && input.mailboxId !== mailbox.id) throw new HTTPException(400, { message: "The from address belongs to a different mailbox" });
-  if (!keyAllowsMailbox(key, mailbox.id)) throw new HTTPException(403, { message: `This API key can't send from ${mailbox.address}` });
+  if (!mailboxAllowed(c, mailbox.id, "write")) throw new HTTPException(403, { message: `Not allowed to send from ${mailbox.address}` });
   return { mailbox, address, fromName: from?.name };
 }
 
@@ -123,7 +122,7 @@ export async function apiSend(c: Context<AppEnv>, input: ApiSendInput): Promise<
   let src: MessageRow | null = null;
   if (input.replyToMessageId) {
     src = await db.prepare("SELECT * FROM messages WHERE id = ?").bind(input.replyToMessageId).first<MessageRow>();
-    if (!src || !keyAllowsMailbox(key, src.mailbox_id)) throw new HTTPException(404, { message: "Message to reply to not found" });
+    if (!src || !mailboxAllowed(c, src.mailbox_id)) throw new HTTPException(404, { message: "Message to reply to not found" });
   }
   const { mailbox, address, fromName } = await resolveSender(c, input, src?.mailbox_id ?? null);
   if (src && src.mailbox_id !== mailbox.id) throw new HTTPException(400, { message: "Reply from the mailbox that holds the conversation" });
@@ -207,7 +206,7 @@ export async function apiSend(c: Context<AppEnv>, input: ApiSendInput): Promise<
         src?.message_id_header ?? null,
         refs || null,
         JSON.stringify(meta),
-        key.createdBy,
+        c.get("scope").userId ?? key.createdBy,
         t,
         t,
         t,
@@ -225,7 +224,7 @@ export async function apiSend(c: Context<AppEnv>, input: ApiSendInput): Promise<
     scheduled_at: m.scheduled_at,
   });
   const auditMeta = { mailboxId: mailbox.id, recipients: everyone.length, outreach: !!input.outreach, apiKey: key.name };
-  const actor = keyActor(key);
+  const actor = apiActor(c);
 
   if (input.mode === "draft") {
     await audit(c, { action: "api.draft_created", targetType: "message", targetId: id, meta: auditMeta, actor });

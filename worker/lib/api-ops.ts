@@ -2,7 +2,7 @@ import type { Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { Address, Folder } from "@shared/types";
 import type { AppEnv } from "../env";
-import { keyActor, keyAllowsMailbox, requireScope } from "./apikeys";
+import { apiActor, type ApiScope, mailboxAllowed, requireScope } from "./apikeys";
 import { audit } from "./audit";
 import type { MessageRow } from "./messages";
 import { likeEscape } from "./search";
@@ -12,14 +12,13 @@ import { newId, now, parseJson } from "./util";
 /** Operations behind the REST API (/api/v1) and the MCP tools, scoped to the calling API key. */
 
 export async function allowedMailboxes(c: Context<AppEnv>) {
-  const key = c.get("apiKey");
   const { results } = await c.env.DB.prepare(
     `SELECT m.id, m.address, m.name, m.display_name, m.type,
        (SELECT group_concat(address) FROM mailbox_aliases a WHERE a.mailbox_id = m.id) AS aliases
      FROM mailboxes m WHERE m.is_active = 1 AND m.is_system = 0 ORDER BY m.address`,
   ).all<{ id: string; address: string; name: string; display_name: string; type: string; aliases: string | null }>();
   return results
-    .filter((m) => keyAllowsMailbox(key, m.id))
+    .filter((m) => mailboxAllowed(c, m.id))
     .map((m) => ({ id: m.id, address: m.address, name: m.name, senderName: m.display_name, type: m.type, aliases: m.aliases ? m.aliases.split(",") : [] }));
 }
 
@@ -110,7 +109,7 @@ export async function saveContacts(c: Context<AppEnv>, contacts: ContactInput[])
   );
   const existing = new Set(before.map((b) => b.email.toLowerCase()));
   const created = contacts.filter((x) => !existing.has(x.email)).length;
-  await audit(c, { action: "api.contacts_saved", targetType: "contact", meta: { created, updated: contacts.length - created, apiKey: key.name }, actor: keyActor(key) });
+  await audit(c, { action: "api.contacts_saved", targetType: "contact", meta: { created, updated: contacts.length - created, apiKey: key.name }, actor: apiActor(c) });
   return { created, updated: contacts.length - created };
 }
 
@@ -119,7 +118,7 @@ export async function deleteContact(c: Context<AppEnv>, email: string) {
   requireScope(key, "contacts");
   const res = await c.env.DB.prepare("DELETE FROM contacts WHERE email = ?").bind(email).run();
   if (!res.meta.changes) throw new HTTPException(404, { message: `No contact ${email}` });
-  await audit(c, { action: "api.contact_deleted", targetType: "contact", targetId: email, meta: { apiKey: key.name }, actor: keyActor(key) });
+  await audit(c, { action: "api.contact_deleted", targetType: "contact", targetId: email, meta: { apiKey: key.name }, actor: apiActor(c) });
   return { deleted: email };
 }
 
@@ -158,7 +157,7 @@ export async function suppress(c: Context<AppEnv>, email: string, reason: "unsub
   )
     .bind(email, reason, detail?.slice(0, 500) ?? null, now())
     .run();
-  await audit(c, { action: "api.contact_suppressed", targetType: "contact", targetId: email, meta: { reason, apiKey: key.name }, actor: keyActor(key) });
+  await audit(c, { action: "api.contact_suppressed", targetType: "contact", targetId: email, meta: { reason, apiKey: key.name }, actor: apiActor(c) });
   return { email, doNotEmail: reason };
 }
 
@@ -220,7 +219,7 @@ export async function getThread(c: Context<AppEnv>, messageId: string) {
   const key = c.get("apiKey");
   requireScope(key, "read");
   const m = await c.env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(messageId).first<MessageRow>();
-  if (!m || !keyAllowsMailbox(key, m.mailbox_id)) throw new HTTPException(404, { message: "Message not found" });
+  if (!m || !mailboxAllowed(c, m.mailbox_id)) throw new HTTPException(404, { message: "Message not found" });
   const { results } = await c.env.DB.prepare(
     `SELECT m.*, mb.address AS mailbox_address FROM messages m JOIN mailboxes mb ON mb.id = m.mailbox_id
      WHERE m.mailbox_id = ? AND m.thread_id = ? AND m.folder NOT IN ('trash','spam') ORDER BY m.date ASC LIMIT 50`,
@@ -232,6 +231,114 @@ export async function getThread(c: Context<AppEnv>, messageId: string) {
     cc: parseJson<Address[]>(r.cc_json, []),
     text: r.text_body.slice(0, 8000),
   }));
+}
+
+// ---- Message actions --------------------------------------------------------
+
+export const MESSAGE_ACTIONS = ["read", "unread", "archive", "trash", "restore", "star", "unstar"] as const;
+export type MessageAction = (typeof MESSAGE_ACTIONS)[number];
+
+/** Read-state needs `read`; anything that moves or flags a message needs `send`. */
+const ACTION_SCOPE: Record<MessageAction, ApiScope> = {
+  read: "read",
+  unread: "read",
+  star: "send",
+  unstar: "send",
+  archive: "send",
+  trash: "send",
+  restore: "send",
+};
+
+interface ActionRow {
+  id: string;
+  mailbox_id: string;
+  thread_id: string;
+  folder: string;
+  direction: string;
+}
+
+/** Mark read/unread, star, archive, trash or restore messages the request may reach. */
+export async function messageAction(c: Context<AppEnv>, opts: { ids: string[]; action: MessageAction; thread?: boolean }) {
+  requireScope(c.get("apiKey"), ACTION_SCOPE[opts.action]);
+  const db = c.env.DB;
+  const readState = opts.action === "read" || opts.action === "unread";
+
+  let rows: ActionRow[] = [];
+  for (let i = 0; i < opts.ids.length; i += 90) {
+    const chunk = opts.ids.slice(i, i + 90);
+    const { results } = await db
+      .prepare(`SELECT id, mailbox_id, thread_id, folder, direction FROM messages WHERE id IN (${chunk.map(() => "?").join(",")})`)
+      .bind(...chunk)
+      .all<ActionRow>();
+    rows.push(...results);
+  }
+  // Read state is personal to reading; moving or starring changes the mailbox, so it needs send rights.
+  rows = rows.filter((r) => mailboxAllowed(c, r.mailbox_id, readState ? "read" : "write"));
+
+  if (opts.thread) {
+    const seen = new Set(rows.map((r) => r.id));
+    const extra: ActionRow[] = [];
+    for (const konv of new Set(rows.map((r) => `${r.mailbox_id}|${r.thread_id}|${r.folder}`))) {
+      const [mb, th, folder] = konv.split("|");
+      // Reading a conversation marks all of it; a move only affects the folder in view.
+      const sql = `SELECT id, mailbox_id, thread_id, folder, direction FROM messages WHERE mailbox_id = ? AND thread_id = ? AND ${readState ? "folder NOT IN ('trash','spam')" : "folder = ?"}`;
+      const stmt = db.prepare(sql);
+      const { results } = await (readState ? stmt.bind(mb, th) : stmt.bind(mb, th, folder)).all<ActionRow>();
+      for (const r of results) if (!seen.has(r.id)) (seen.add(r.id), extra.push(r));
+    }
+    rows = rows.concat(extra);
+  }
+  if (!rows.length) throw new HTTPException(404, { message: "Messages not found" });
+  if (!readState && opts.action !== "star" && opts.action !== "unstar" && rows.some((r) => r.folder === "drafts" || r.folder === "scheduled")) {
+    throw new HTTPException(400, { message: "Drafts and scheduled messages can't be moved over the API." });
+  }
+
+  const t = now();
+  const ids = rows.map((r) => r.id);
+  const stmts: D1PreparedStatement[] = [];
+  const each = (sql: string, ...pre: unknown[]) => {
+    for (let i = 0; i < ids.length; i += 90) {
+      const chunk = ids.slice(i, i + 90);
+      stmts.push(db.prepare(sql.replace("$IDS", chunk.map(() => "?").join(","))).bind(...pre, ...chunk));
+    }
+  };
+  switch (opts.action) {
+    case "read":
+    case "unread":
+      each("UPDATE messages SET is_read = ?, updated_at = ? WHERE id IN ($IDS)", opts.action === "read" ? 1 : 0, t);
+      break;
+    case "star":
+    case "unstar":
+      each("UPDATE messages SET is_starred = ?, updated_at = ? WHERE id IN ($IDS)", opts.action === "star" ? 1 : 0, t);
+      break;
+    case "archive":
+      each("UPDATE messages SET folder = 'archive', trashed_at = NULL, folder_before_trash = NULL, updated_at = ? WHERE id IN ($IDS)", t);
+      break;
+    case "trash":
+      each(
+        `UPDATE messages SET folder_before_trash = CASE WHEN folder = 'trash' THEN folder_before_trash ELSE folder END,
+           folder = 'trash', trashed_at = ?, updated_at = ? WHERE id IN ($IDS)`,
+        t,
+        t,
+      );
+      break;
+    case "restore":
+      each(
+        `UPDATE messages SET folder = COALESCE(folder_before_trash, CASE WHEN direction = 'outbound' THEN 'sent' ELSE 'inbox' END),
+           folder_before_trash = NULL, trashed_at = NULL, updated_at = ? WHERE id IN ($IDS)`,
+        t,
+      );
+      break;
+  }
+  for (let i = 0; i < stmts.length; i += 50) await db.batch(stmts.slice(i, i + 50));
+  await audit(c, {
+    action: `api.message_${opts.action}`,
+    targetType: "message",
+    meta: { count: ids.length, mailboxes: [...new Set(rows.map((r) => r.mailbox_id))], apiKey: c.get("apiKey").name },
+    actor: apiActor(c),
+  });
+  // `updated` and `count` are the same number; both are returned so callers can use either.
+  return { ok: true, updated: ids.length, count: ids.length };
 }
 
 export async function sendingStatus(c: Context<AppEnv>) {

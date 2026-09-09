@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { ingestReceived, recordDeliveryEvent } from "../lib/inbound";
+import { notifyReceived } from "../lib/notify";
 import { verifySvix } from "../lib/svix";
 import { now } from "../lib/util";
 
@@ -33,7 +34,8 @@ webhookRoutes.post("/resend", async (c) => {
   try {
     if (evt.type === "email.received") {
       const r = await ingestReceived(c.env, evt.data);
-      return c.json({ ok: true, ...r });
+      if (r.received.length) c.executionCtx.waitUntil(notifyReceived(c.env, r.received));
+      return c.json({ ok: true, stored: r.stored, unrouted: r.unrouted });
     }
     if (evt.type.startsWith("email.")) {
       await recordDeliveryEvent(c.env, evt.type, evt.data, raw);

@@ -57,9 +57,13 @@
 	},
 	"vars": {
 		// Public URL of the app (used for OAuth redirects and invite links).
-		"APP_URL": "https://mail.example.com"
+		"APP_URL": "https://mail.example.com",
+		// Where to POST a signed notice when mail arrives (another service's receiver).
+		// Leave unset to disable outbound notifications. Pair with NOTIFY_WEBHOOK_SECRET.
+		"NOTIFY_WEBHOOK_URL": "https://team.example.com/api/webhooks/mail"
 	}
 	// Secrets (set with `wrangler secret put <NAME>`):
 	//   RESEND_API_KEY, RESEND_WEBHOOK_SECRET, SESSION_SECRET,
-	//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (optional, enables Google sign-in)
+	//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (optional, enables Google sign-in),
+	//   NOTIFY_WEBHOOK_SECRET (HMAC key shared with the receiving service)
 }

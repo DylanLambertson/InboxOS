@@ -1,6 +1,9 @@
+import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
+import { intersectMailboxes, mailboxAllowed } from "../worker/lib/apikeys";
 import { plainToHtml } from "../worker/lib/api-send";
+import { signPayload } from "../worker/lib/notify";
 import { unsubscribeUrl, verifyUnsubscribe } from "../worker/lib/unsubscribe";
 import { zRecipients } from "../worker/routes/api-v1";
 import { mcpRoutes } from "../worker/routes/mcp";
@@ -43,6 +46,40 @@ describe("plain text bodies", () => {
     expect(html).toContain('<a href="https://acme.com/blog">https://acme.com/blog</a>.');
     expect(html).toContain("&lt;b&gt;");
     expect(html).toContain("<br>");
+  });
+});
+
+describe("act-as mailbox scoping", () => {
+  it("an unrestricted key narrows to exactly the user's mailboxes", () => {
+    expect(intersectMailboxes([], ["mb_a", "mb_b"])).toEqual(["mb_a", "mb_b"]);
+  });
+  it("a restricted key keeps only the overlap with the user's mailboxes", () => {
+    expect(intersectMailboxes(["mb_a", "mb_c"], ["mb_a", "mb_b"])).toEqual(["mb_a"]);
+  });
+  it("no overlap means no access", () => {
+    expect(intersectMailboxes(["mb_x"], ["mb_a", "mb_b"])).toEqual([]);
+    expect(intersectMailboxes(["mb_a"], [])).toEqual([]);
+  });
+  it("a read-only member can read a mailbox but not send from or change it", () => {
+    const scope = { mailboxIds: ["mb_a", "mb_v"], writableMailboxIds: ["mb_a"], actor: { id: "u", email: "u@x" }, userId: "u" };
+    const c = { get: () => scope } as unknown as Parameters<typeof mailboxAllowed>[0];
+    expect(mailboxAllowed(c, "mb_v")).toBe(true);
+    expect(mailboxAllowed(c, "mb_v", "write")).toBe(false);
+    expect(mailboxAllowed(c, "mb_a", "write")).toBe(true);
+    expect(mailboxAllowed(c, "mb_z")).toBe(false);
+  });
+});
+
+describe("outbound webhook signature", () => {
+  it("is HMAC-SHA256 over `${timestamp}.${body}` keyed by the shared secret", async () => {
+    const body = JSON.stringify({ event: "message.received", message: { id: "m1" } });
+    const sig = await signPayload("shh", body, "1700000000");
+    const expected = createHmac("sha256", "shh").update(`1700000000.${body}`).digest("hex");
+    expect(sig).toBe(expected);
+  });
+  it("changes with the timestamp, so a replay is detectable", async () => {
+    const body = "{}";
+    expect(await signPayload("shh", body, "1")).not.toBe(await signPayload("shh", body, "2"));
   });
 });
 

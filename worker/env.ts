@@ -1,5 +1,5 @@
 import type { Role } from "@shared/types";
-import type { ApiKey } from "./lib/apikeys";
+import type { ApiKey, RequestScope } from "./lib/apikeys";
 
 export interface Env {
   DB: D1Database;
@@ -11,6 +11,9 @@ export interface Env {
   RESEND_WEBHOOK_SECRET?: string;
   GOOGLE_CLIENT_ID?: string;
   GOOGLE_CLIENT_SECRET?: string;
+  /** Where to POST a signed notice when mail arrives (e.g. another service's receiver). */
+  NOTIFY_WEBHOOK_URL?: string;
+  NOTIFY_WEBHOOK_SECRET?: string;
 }
 
 export interface SessionUser {
@@ -23,5 +26,5 @@ export interface SessionUser {
 
 export type AppEnv = {
   Bindings: Env;
-  Variables: { user: SessionUser; apiKey: ApiKey };
+  Variables: { user: SessionUser; apiKey: ApiKey; scope: RequestScope };
 };
