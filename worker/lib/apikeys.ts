@@ -94,10 +94,11 @@ async function resolveScope(c: Context<AppEnv>, key: ApiKey): Promise<RequestSco
     return { mailboxIds: ids, writableMailboxIds: ids, actor: keyActor(key), userId: null };
   }
   if (!key.canActAs) throw new HTTPException(403, { message: "This API key isn't allowed to act on behalf of a user." });
-  const user = await c.env.DB.prepare("SELECT id, email FROM users WHERE email = ? AND status != 'disabled'")
+  const user = await c.env.DB.prepare("SELECT id, email FROM users WHERE email = ? AND status = 'active'")
     .bind(actAs)
     .first<{ id: string; email: string }>();
-  // Unknown or disabled user: an empty set, so reads return nothing and writes are refused.
+  // Unknown, invited (not yet onboarded) or disabled user: an empty set, so reads return
+  // nothing and writes are refused — never surface mail an inactive account reaches by membership alone.
   if (!user) return { mailboxIds: [], writableMailboxIds: [], actor: keyActor(key), userId: null };
   const { results } = await c.env.DB.prepare(
     `SELECT mm.mailbox_id, mm.role FROM mailbox_members mm JOIN mailboxes m ON m.id = mm.mailbox_id

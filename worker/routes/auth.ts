@@ -85,7 +85,8 @@ authRoutes.post("/2fa", async (c) => {
   const user = await getUser(c.env.DB, s.id);
   if (!user?.totp_secret) throw new HTTPException(401, { message: "Two-factor is not set up." });
 
-  let ok = await verifyTotp(user.totp_secret, code);
+  // A code is valid for ~90s; refuse a second use so a shoulder-surfed or phished code can't be replayed.
+  let ok = (await verifyTotp(user.totp_secret, code)) && (await rateLimit(c.env.DB, `totp-used:${user.id}:${code.replace(/\s/g, "")}`, 1, 120));
   let usedRecovery = false;
   if (!ok) {
     const hashes = parseJson<string[]>(user.recovery_codes, []);
@@ -189,20 +190,33 @@ authRoutes.post("/forgot", async (c) => {
     throw new HTTPException(429, { message: "Too many requests. Try again later." });
   }
   const user = await getUserByEmail(c.env.DB, email);
-  // Always respond the same way so the endpoint can't be used to discover accounts.
+  // Always respond the same way, and as fast, so the endpoint can't be used to discover accounts:
+  // the token and email are handled after the response.
   if (user && user.status === "active") {
-    const raw = newId(32);
-    await c.env.DB.prepare("INSERT INTO tokens (id, user_id, type, expires_at, created_at) VALUES (?, ?, 'reset', ?, ?)")
-      .bind(await sha256hex(raw), user.id, new Date(Date.now() + 60 * 60_000).toISOString(), now())
-      .run();
-    const brand = await getBrand(c.env.DB);
-    await sendSystemEmail(
-      c.env,
-      user.email,
-      templates.reset(brand, { name: user.name, url: `${c.env.APP_URL.replace(/\/$/, "")}/reset/${raw}`, expires: "1 hour", ctx: requestContext(c) }),
-      "password_reset",
+    const ctx = requestContext(c);
+    c.executionCtx.waitUntil(
+      (async () => {
+        const raw = newId(32);
+        await c.env.DB.batch([
+          // Only the newest reset link stays valid.
+          c.env.DB.prepare("UPDATE tokens SET used_at = ? WHERE user_id = ? AND type = 'reset' AND used_at IS NULL").bind(now(), user.id),
+          c.env.DB.prepare("INSERT INTO tokens (id, user_id, type, expires_at, created_at) VALUES (?, ?, 'reset', ?, ?)").bind(
+            await sha256hex(raw),
+            user.id,
+            new Date(Date.now() + 60 * 60_000).toISOString(),
+            now(),
+          ),
+        ]);
+        const brand = await getBrand(c.env.DB);
+        await sendSystemEmail(
+          c.env,
+          user.email,
+          templates.reset(brand, { name: user.name, url: `${c.env.APP_URL.replace(/\/$/, "")}/reset/${raw}`, expires: "1 hour", ctx }),
+          "password_reset",
+        );
+        await audit(c, { action: "auth.reset_requested", targetType: "user", targetId: user.id, actor: null });
+      })(),
     );
-    await audit(c, { action: "auth.reset_requested", targetType: "user", targetId: user.id, actor: null });
   }
   return c.json({ ok: true });
 });
