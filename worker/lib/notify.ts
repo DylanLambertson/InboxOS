@@ -47,6 +47,8 @@ export async function notifyReceived(env: Env, notices: ReceivedNotice[]): Promi
           "x-inboxos-signature": `sha256=${await signPayload(secret, body, timestamp)}`,
         },
         body,
+        // A slow or hung receiver must never keep the worker alive; the panel falls back to polling.
+        signal: AbortSignal.timeout(10_000),
       });
       if (!res.ok) console.error("notify webhook rejected", res.status, n.message.id);
     } catch (err) {
