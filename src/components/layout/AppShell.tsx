@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
-import { Menu as MenuIcon, ShieldAlert } from "lucide-react";
+import { Menu as MenuIcon, PenSquare, ShieldAlert } from "lucide-react";
 import { applyTheme } from "@/lib/brand";
-import { useMe } from "@/lib/queries";
+import { useInboxNotifications } from "@/lib/notifications";
+import { useMailboxes, useMe } from "@/lib/queries";
 import { SHORTCUT_HELP, useShortcuts } from "@/lib/shortcuts";
-import { ComposeProvider } from "../compose/ComposeProvider";
+import { ComposeProvider, useCompose } from "../compose/ComposeProvider";
 import { IconButton, Kbd, Spinner } from "../ui/primitives";
 import { Modal } from "../ui/overlay";
 import { Logo } from "./Logo";
@@ -13,6 +14,8 @@ import { Sidebar } from "./Sidebar";
 /** Signed-in layout: auth gate, sidebar, compose windows, global shortcuts. */
 export function AppShell() {
   const { data: me, isLoading, error } = useMe();
+  const { data: boxes = [] } = useMailboxes();
+  useInboxNotifications(me, boxes);
   const location = useLocation();
   const navigate = useNavigate();
   const [drawer, setDrawer] = useState(false);
@@ -76,6 +79,7 @@ export function AppShell() {
             <Outlet />
           </div>
         </main>
+        <MobileComposeButton />
       </div>
       <Modal open={help} onClose={() => setHelp(false)} title="Keyboard shortcuts" width={520}>
         <div className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
@@ -88,5 +92,27 @@ export function AppShell() {
         </div>
       </Modal>
     </ComposeProvider>
+  );
+}
+
+/** Floating compose button on phones, where the sidebar's Compose button is tucked into the drawer. */
+function MobileComposeButton() {
+  const { data: boxes = [] } = useMailboxes();
+  const compose = useCompose();
+  const location = useLocation();
+  const routeBox = location.pathname.match(/^\/mail\/([^/]+)/)?.[1];
+  const writable = boxes.filter((b) => b.role !== "viewer");
+  const from = writable.find((b) => b.id === routeBox) ?? writable[0];
+  if (!from || !location.pathname.startsWith("/mail")) return null;
+  return (
+    <button
+      type="button"
+      aria-label="Compose"
+      onClick={() => compose.open({ mailboxId: from.id })}
+      className="fixed right-4 z-40 flex size-14 items-center justify-center rounded-full bg-accent text-accent-fg shadow-ui-lg active:brightness-95 md:hidden"
+      style={{ bottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+    >
+      <PenSquare className="size-5" />
+    </button>
   );
 }

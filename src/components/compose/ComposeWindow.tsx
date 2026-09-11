@@ -132,6 +132,8 @@ function ComposeBody({
   const currentFrom = (state.fromAddress || boxes.find((b) => b.id === state.mailboxId)?.address || "").toLowerCase();
   const currentIdentity = identities.find((i) => i.mailboxId === state.mailboxId && i.addresses.includes(currentFrom));
   const domainChoices = currentIdentity && currentIdentity.addresses.length > 1 ? currentIdentity.addresses : [];
+  // With the domain switch showing, the From text only needs the name part ("hello@").
+  const fromLabel = domainChoices.length ? `${splitAddress(currentFrom)[0]}@` : currentFrom;
   const pickFrom = (mailboxId: string, address: string) => {
     draft.update({ mailboxId, fromAddress: address });
     if (domainChoices.length) rememberSendDomain(splitAddress(address)[1]);
@@ -280,17 +282,17 @@ function ComposeBody({
                 })}
                 trigger={(p) => (
                   <button {...p} className="flex min-w-0 items-center gap-1 rounded px-1 text-[13px] hover:bg-muted">
-                    <span className="truncate">{currentFrom}</span>
+                    <span className="truncate">{fromLabel}</span>
                     <ChevronDown className="size-3.5 text-fg-faint" />
                   </button>
                 )}
               />
             ) : (
-              <span className="min-w-0 truncate px-1 text-[13px]">{currentFrom}</span>
+              <span className="min-w-0 truncate px-1 text-[13px]">{fromLabel}</span>
             )}
             {domainChoices.length > 0 && (
               <DomainSwitch
-                className="ml-auto"
+                className="-ml-1 min-w-0"
                 options={domainChoices}
                 value={currentFrom}
                 onChange={(addr) => pickFrom(state.mailboxId, addr)}
@@ -551,7 +553,7 @@ function rememberSendDomain(domain: string) {
 /** Segmented control for picking which mail domain to send from. */
 function DomainSwitch({ options, value, onChange, className }: { options: string[]; value: string; onChange: (address: string) => void; className?: string }) {
   return (
-    <div role="radiogroup" aria-label="Send from domain" className={cx("flex shrink-0 rounded-full bg-muted p-0.5", className)}>
+    <div role="radiogroup" aria-label="Send from domain" className={cx("flex shrink overflow-x-auto rounded-full bg-muted p-0.5", className)}>
       {options.map((addr) => {
         const selected = addr === value;
         return (
@@ -563,11 +565,11 @@ function DomainSwitch({ options, value, onChange, className }: { options: string
             title={`Send as ${addr}`}
             onClick={() => onChange(addr)}
             className={cx(
-              "rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
+              "shrink-0 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors",
               selected ? "bg-accent text-accent-fg shadow-ui-sm" : "text-fg-muted hover:text-fg",
             )}
           >
-            @{splitAddress(addr)[1]}
+            {splitAddress(addr)[1]}
           </button>
         );
       })}

@@ -38,6 +38,7 @@ const zPrefs = z
     markReadOnOpen: z.boolean(),
     composeMode: z.enum(["docked", "fullscreen"]),
     conversationView: z.boolean(),
+    desktopNotifications: z.boolean(),
   })
   .partial();
 

@@ -46,6 +46,8 @@ export interface Preferences {
   composeMode: "docked" | "fullscreen";
   /** Group messages into conversations. */
   conversationView: boolean;
+  /** Show a desktop notification when new mail arrives while the app is in the background. */
+  desktopNotifications: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -56,6 +58,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   markReadOnOpen: true,
   composeMode: "docked",
   conversationView: true,
+  desktopNotifications: false,
 };
 
 export interface Me {

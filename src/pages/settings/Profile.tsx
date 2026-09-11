@@ -120,6 +120,19 @@ export function ProfileSettings() {
           <Row title="Conversation view" description="Group replies into a single thread.">
             <Switch checked={me.preferences.conversationView} onChange={(v) => setPref("conversationView", v)} label="Conversation view" />
           </Row>
+          <Row title="Desktop notifications" description="Get a notification when new mail arrives while this tab is in the background.">
+            <Switch
+              checked={me.preferences.desktopNotifications}
+              onChange={async (v) => {
+                if (v && "Notification" in window && Notification.permission !== "granted") {
+                  const result = await Notification.requestPermission();
+                  if (result !== "granted") return toast.error("Notifications are blocked for this site. Allow them in your browser's site settings.");
+                }
+                setPref("desktopNotifications", v);
+              }}
+              label="Desktop notifications"
+            />
+          </Row>
           <Row title="Mark as read when opened">
             <Switch checked={me.preferences.markReadOnOpen} onChange={(v) => setPref("markReadOnOpen", v)} label="Mark as read when opened" />
           </Row>
