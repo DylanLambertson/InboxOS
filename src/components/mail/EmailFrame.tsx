@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { AttachmentInfo } from "@shared/types";
 import { sanitizeEmail, textToHtml } from "@/lib/sanitize";
+import { cx } from "../ui/primitives";
 
 /** True when the app is currently rendering dark (explicit choice or system preference). */
 function useIsDark(): boolean {
@@ -47,22 +48,25 @@ export function EmailFrame({
   const ref = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(120);
 
+  // Plain-text mail has no design of its own, so it follows the app theme instead of sitting on a white card.
+  const themed = !html && dark;
+
   const { doc, blocked } = useMemo(() => {
     const source = html ?? textToHtml(text ?? "");
     const { html: clean, blockedImages } = sanitizeEmail(source, { attachments, allowRemote, attachmentBase });
-    const base = `<base target="_blank"><meta name="color-scheme" content="light"><style>
+    const base = `<base target="_blank"><meta name="color-scheme" content="${themed ? "dark" : "light"}"><style>
       html,body{margin:0;padding:0;background:transparent}
-      body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:#1f2328;word-wrap:break-word;overflow-wrap:anywhere;padding:${dark ? "14px 16px" : "2px"}}
+      body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.55;color:${themed ? "#e4e4e7" : "#1f2328"};word-wrap:break-word;overflow-wrap:anywhere;padding:${dark && !themed ? "14px 16px" : "2px"}}
       img{max-width:100%;height:auto}
       table{max-width:100%}
       pre{white-space:pre-wrap}
-      blockquote{margin:0 0 0 .8ex;border-left:2px solid #d0d7de;padding-left:1ex;color:#57606a}
-      a{color:#2563eb}
+      blockquote{margin:0 0 0 .8ex;border-left:2px solid ${themed ? "#3f3f46" : "#d0d7de"};padding-left:1ex;color:${themed ? "#a1a1aa" : "#57606a"}}
+      a{color:${themed ? "#8ab4ff" : "#2563eb"}}
       [data-blocked-src]{display:inline-block;min-width:16px;min-height:16px;background:repeating-linear-gradient(45deg,#f3f4f6,#f3f4f6 6px,#e5e7eb 6px,#e5e7eb 12px);border-radius:3px}
     </style>`;
     const withHead = /<head[^>]*>/i.test(clean) ? clean.replace(/<head([^>]*)>/i, `<head$1>${base}`) : `<!doctype html><html><head>${base}</head><body>${clean}</body></html>`;
     return { doc: withHead, blocked: blockedImages };
-  }, [html, text, attachments, allowRemote, dark, attachmentBase]);
+  }, [html, text, attachments, allowRemote, dark, themed, attachmentBase]);
 
   useEffect(() => onBlocked?.(blocked), [blocked, onBlocked]);
 
@@ -99,7 +103,7 @@ export function EmailFrame({
       title="Email content"
       sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
       srcDoc={doc}
-      className="block w-full rounded-ui-sm border-0 bg-white"
+      className={cx("block w-full rounded-ui-sm border-0", themed ? "bg-transparent" : "bg-white")}
       style={{ height, overflow: maxHeight ? "auto" : "hidden" }}
     />
   );
