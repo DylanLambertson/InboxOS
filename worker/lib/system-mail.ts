@@ -9,7 +9,7 @@ import { newId, now } from "./util";
  * (Resend counts them too) and appear in the Overview; later delivery webhooks attach
  * to them by provider id.
  */
-async function logSystemEmail(env: Env, e: { resendId: string | null; to: string; subject: string; category: string; error?: string }) {
+export async function logSystemEmail(env: Env, e: { resendId: string | null; to: string; subject: string; category: string; error?: string }) {
   try {
     await env.DB.prepare(
       "INSERT INTO email_events (id, message_id, resend_id, type, recipient, detail, payload, created_at) VALUES (?, NULL, ?, ?, ?, ?, ?, ?)",

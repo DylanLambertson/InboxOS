@@ -83,6 +83,20 @@ export async function deliverMessage(env: Env, messageId: string): Promise<Messa
   if (!to.length && !cc.length && !bcc.length) throw new SendError("Add at least one recipient");
   if (total > 50) throw new SendError("A message can have at most 50 recipients");
 
+  // Never deliver to a hard-bounced or complained address: it's proven undeliverable and
+  // keeps hurting the domain's reputation. The API path blocks these up front; this is the
+  // backstop every send (web, scheduled, API) funnels through. System mail uses a separate
+  // path and is deliberately exempt, so invites and password resets still go out.
+  const recipientEmails = [...to, ...cc, ...bcc].map((a) => a.email.toLowerCase());
+  const { results: blocked } = await env.DB.prepare(
+    `SELECT email, reason FROM suppressions WHERE reason IN ('bounced','complained') AND email IN (${recipientEmails.map(() => "?").join(",")})`,
+  )
+    .bind(...recipientEmails)
+    .all<{ email: string; reason: string }>();
+  if (blocked.length) {
+    throw new SendError(`Not sent: ${blocked.map((b) => `${b.email} (${b.reason})`).join(", ")} is on the do-not-email list.`, 422);
+  }
+
   const [brand, policy, usage] = await Promise.all([getBrand(env.DB), getPolicy(env.DB), quotaUsage(env)]);
   if (policy.dailySendLimit > 0 && usage.today >= policy.dailySendLimit) {
     throw new SendError(`Daily sending limit reached (${policy.dailySendLimit}). Try again tomorrow or raise the limit in Admin → Settings.`, 429);
