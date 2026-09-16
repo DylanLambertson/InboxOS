@@ -4,7 +4,7 @@ import { verifySvix } from "../worker/lib/svix";
 import { base32Decode, base32Encode, verifyTotp, _hotpForTests } from "../worker/lib/totp";
 import { hashPassword, passwordProblem, verifyPassword } from "../worker/lib/password";
 import { htmlToText, normalizeSubject, parseAddress, parseAddressList, formatAddress } from "../worker/lib/util";
-import { ftsExpression, parseQuery } from "../worker/lib/search";
+import { ftsExpression, likeEscape, parseQuery } from "../worker/lib/search";
 import { cleanForQuote, prefixSubject } from "../worker/lib/quote";
 import { referencedIds } from "../worker/lib/messages";
 
@@ -110,5 +110,17 @@ describe("search", () => {
   it("builds a safe FTS expression", () => {
     expect(ftsExpression(['bud"get', "q4"])).toBe('"budget"* AND "q4"*');
     expect(ftsExpression([])).toBeNull();
+  });
+  it("maps cc to the to filter and parses dates and read state", () => {
+    const p = parseQuery("cc:boss@x.com is:read before:2026-02-01 label:clients");
+    expect(p.to).toEqual(["boss@x.com"]);
+    expect(p.read).toBe(true);
+    expect(p.before).toBe("2026-02-01T00:00:00.000Z");
+    expect(p.label).toBe("clients");
+  });
+  it("escapes LIKE wildcards so a search can't inject them", () => {
+    // % _ and \ must be neutralised; used everywhere with ESCAPE '\\'.
+    expect(likeEscape("100%_off\\now")).toBe("100\\%\\_off\\\\now");
+    expect(likeEscape("plain")).toBe("plain");
   });
 });

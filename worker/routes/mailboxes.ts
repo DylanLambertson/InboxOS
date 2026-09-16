@@ -5,6 +5,8 @@ import type { Label, MailboxRole, MailboxSummary, MailboxType } from "@shared/ty
 import type { AppEnv } from "../env";
 import { requireMailbox } from "../lib/access";
 import { audit } from "../lib/audit";
+import { autoReplyActive, normalizeBlockPattern, parseAutoReply } from "../lib/mail-rules";
+import { likeEscape } from "../lib/search";
 import { newId, now } from "../lib/util";
 import { parseBody, zColor } from "../lib/validate";
 
@@ -78,6 +80,89 @@ mailboxRoutes.patch("/:id", async (c) => {
     .bind(body.name ?? null, body.displayName ?? null, body.signatureHtml ?? null, body.color ?? null, now(), id)
     .run();
   await audit(c, { action: "mailbox.updated", targetType: "mailbox", targetId: id, meta: { fields: Object.keys(body) } });
+  return c.json({ ok: true });
+});
+
+// ---- Auto-reply & blocked senders -------------------------------------------
+
+mailboxRoutes.get("/:id/autoreply", async (c) => {
+  const id = c.req.param("id");
+  await requireMailbox(c.env.DB, c.get("user"), id);
+  const row = await c.env.DB.prepare("SELECT autoreply_json FROM mailboxes WHERE id = ?").bind(id).first<{ autoreply_json: string | null }>();
+  const rule = parseAutoReply(row?.autoreply_json);
+  return c.json({ ...rule, active: autoReplyActive(rule) });
+});
+
+mailboxRoutes.put("/:id/autoreply", async (c) => {
+  const id = c.req.param("id");
+  await requireMailbox(c.env.DB, c.get("user"), id, "editor");
+  const zDate = z.string().datetime({ offset: true }).nullable();
+  const body = await parseBody(
+    c,
+    z.object({
+      enabled: z.boolean(),
+      subject: z.string().trim().max(200).default(""),
+      message: z.string().max(5000).default(""),
+      startsAt: zDate.default(null),
+      endsAt: zDate.default(null),
+    }),
+  );
+  if (body.enabled && !body.message.trim()) throw new HTTPException(400, { message: "Write the auto-reply message first." });
+  const rule = {
+    ...body,
+    startsAt: body.startsAt ? new Date(body.startsAt).toISOString() : null,
+    endsAt: body.endsAt ? new Date(body.endsAt).toISOString() : null,
+  };
+  if (rule.startsAt && rule.endsAt && rule.endsAt <= rule.startsAt) throw new HTTPException(400, { message: "The end must be after the start." });
+  await c.env.DB.prepare("UPDATE mailboxes SET autoreply_json = ?, updated_at = ? WHERE id = ?").bind(JSON.stringify(rule), now(), id).run();
+  // A fresh vacation starts fresh: everyone gets the new message once.
+  if (rule.enabled) await c.env.DB.prepare("DELETE FROM autoreply_log WHERE mailbox_id = ?").bind(id).run();
+  await audit(c, { action: rule.enabled ? "mailbox.autoreply_on" : "mailbox.autoreply_off", targetType: "mailbox", targetId: id, meta: { endsAt: rule.endsAt } });
+  return c.json({ ...rule, active: autoReplyActive(rule) });
+});
+
+mailboxRoutes.get("/:id/blocked", async (c) => {
+  const id = c.req.param("id");
+  await requireMailbox(c.env.DB, c.get("user"), id);
+  const { results } = await c.env.DB.prepare("SELECT pattern, created_at FROM blocked_senders WHERE mailbox_id = ? ORDER BY pattern")
+    .bind(id)
+    .all<{ pattern: string; created_at: string }>();
+  return c.json(results.map((r) => ({ pattern: r.pattern, createdAt: r.created_at })));
+});
+
+mailboxRoutes.post("/:id/blocked", async (c) => {
+  const id = c.req.param("id");
+  const u = c.get("user");
+  await requireMailbox(c.env.DB, u, id, "editor");
+  const body = await parseBody(c, z.object({ pattern: z.string().max(320), moveExisting: z.boolean().default(false) }));
+  const pattern = normalizeBlockPattern(body.pattern);
+  if (!pattern) throw new HTTPException(400, { message: "Enter an email address or a domain like @example.com." });
+  const t = now();
+  const match = pattern.startsWith("@") ? "lower(from_addr) LIKE ? ESCAPE '\\'" : "lower(from_addr) = ?";
+  const value = pattern.startsWith("@") ? `%${likeEscape(pattern)}` : pattern;
+  const stmts = [
+    c.env.DB.prepare("INSERT OR IGNORE INTO blocked_senders (mailbox_id, pattern, created_by, created_at) VALUES (?, ?, ?, ?)").bind(id, pattern, u.id, t),
+  ];
+  if (body.moveExisting) {
+    stmts.push(
+      c.env.DB.prepare(`UPDATE messages SET folder = 'spam', updated_at = ? WHERE mailbox_id = ? AND direction = 'inbound' AND folder IN ('inbox','archive') AND ${match}`).bind(
+        t,
+        id,
+        value,
+      ),
+    );
+  }
+  const res = await c.env.DB.batch(stmts);
+  await audit(c, { action: "mailbox.sender_blocked", targetType: "mailbox", targetId: id, meta: { pattern } });
+  return c.json({ pattern, moved: body.moveExisting ? (res[1]?.meta.changes ?? 0) : 0 }, 201);
+});
+
+mailboxRoutes.delete("/:id/blocked/:pattern", async (c) => {
+  const id = c.req.param("id");
+  await requireMailbox(c.env.DB, c.get("user"), id, "editor");
+  const pattern = decodeURIComponent(c.req.param("pattern")).toLowerCase();
+  await c.env.DB.prepare("DELETE FROM blocked_senders WHERE mailbox_id = ? AND pattern = ?").bind(id, pattern).run();
+  await audit(c, { action: "mailbox.sender_unblocked", targetType: "mailbox", targetId: id, meta: { pattern } });
   return c.json({ ok: true });
 });
 

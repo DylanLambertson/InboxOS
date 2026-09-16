@@ -1,6 +1,7 @@
 import { UNROUTED_MAILBOX_ID, type Address, type MessageStatus } from "@shared/types";
 import type { Env } from "../env";
 import { attachmentKey, bodyKey, contactStatements, ftsStatements, resolveThread } from "./messages";
+import { isBlocked, type AutoReplyCandidate } from "./mail-rules";
 import type { ReceivedNotice } from "./notify";
 import { resend, type ReceivedEmail } from "./resend";
 import { getPolicy } from "./settings";
@@ -53,7 +54,10 @@ async function downloadAttachments(env: Env, email: ReceivedEmail) {
   return out;
 }
 
-export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ stored: number; unrouted: boolean; received: ReceivedNotice[] }> {
+export async function ingestReceived(
+  env: Env,
+  evt: ReceivedEvent,
+): Promise<{ stored: number; unrouted: boolean; received: ReceivedNotice[]; autoReplies: AutoReplyCandidate[] }> {
   const email = await resend.getReceived(env.RESEND_API_KEY, evt.email_id);
   const h = email.headers ?? {};
   const recipients = [
@@ -85,8 +89,12 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
   const size = text.length + (html?.length ?? 0) + files.reduce((s, f) => s + f.bytes.byteLength, 0);
   const headersJson = JSON.stringify(Object.fromEntries(Object.entries(h).map(([k, v]) => [k, Array.isArray(v) ? v.join(", ") : String(v)])));
 
+  const lowerHeaders = Object.fromEntries(Object.entries(h).map(([k, v]) => [k.toLowerCase(), Array.isArray(v) ? v.join(", ") : String(v)]));
+  const messageIdHeader = email.message_id ?? header(h, "message-id");
+
   let stored = 0;
   const received: ReceivedNotice[] = [];
+  const autoReplies: AutoReplyCandidate[] = [];
   for (const mailboxId of mailboxIds) {
     const dup = await env.DB.prepare("SELECT id FROM messages WHERE mailbox_id = ? AND resend_id = ?")
       .bind(mailboxId, email.id)
@@ -94,6 +102,8 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
     if (dup) continue;
 
     const id = newId();
+    // Blocked senders land in Spam, quietly: no notification, no auto-reply.
+    const folder = !unrouted && (await isBlocked(env.DB, mailboxId, from.email)) ? "spam" : "inbox";
     const threadId = await resolveThread(env.DB, mailboxId, {
       inReplyTo,
       references,
@@ -134,11 +144,12 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
         `INSERT INTO messages (id, mailbox_id, thread_id, direction, folder, status, from_addr, from_name, to_json, cc_json,
            reply_to_json, subject, subject_norm, snippet, text_body, html_key, headers_json, message_id_header, in_reply_to,
            references_header, has_attachments, size, priority, resend_id, date, created_at, updated_at)
-         VALUES (?, ?, ?, 'inbound', 'inbox', 'received', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, 'inbound', ?, 'received', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       ).bind(
         id,
         mailboxId,
         threadId,
+        folder,
         from.email,
         from.name ?? "",
         JSON.stringify(to),
@@ -150,7 +161,7 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
         text,
         htmlKey,
         headersJson.slice(0, 60_000),
-        email.message_id ?? header(h, "message-id"),
+        messageIdHeader,
         inReplyTo,
         references,
         visibleAttachments > 0 ? 1 : 0,
@@ -178,9 +189,14 @@ export async function ingestReceived(env: Env, evt: ReceivedEvent): Promise<{ st
     ]);
     stored++;
     // Routed mail is worth telling the panel about; unrouted lands in the admin-only area.
-    if (!unrouted) received.push({ mailboxId, message: { id, threadId, from, subject, snippet: makeSnippet(text), date: t } });
+    if (!unrouted && folder === "inbox") {
+      received.push({ mailboxId, message: { id, threadId, from, subject, snippet: makeSnippet(text), date: t } });
+      const ours = await mailboxAddressSet(env.DB, mailboxId);
+      const toAddress = recipients.map((r) => (parseAddress(r)?.email ?? r).toLowerCase()).find((r) => ours.has(r)) ?? "";
+      autoReplies.push({ mailboxId, toAddress, from, subject, messageIdHeader, references, headers: lowerHeaders });
+    }
   }
-  return { stored, unrouted, received };
+  return { stored, unrouted, received, autoReplies };
 }
 
 /** Higher rank wins, so late or out-of-order webhooks never downgrade a status. */
@@ -264,4 +280,13 @@ export async function recordDeliveryEvent(env: Env, type: string, data: Delivery
     }
   }
   await env.DB.batch(stmts);
+}
+
+/** A mailbox's own address and aliases, lowercased. */
+async function mailboxAddressSet(db: D1Database, mailboxId: string): Promise<Set<string>> {
+  const { results } = await db
+    .prepare("SELECT address FROM mailboxes WHERE id = ?1 UNION SELECT address FROM mailbox_aliases WHERE mailbox_id = ?1")
+    .bind(mailboxId)
+    .all<{ address: string }>();
+  return new Set(results.map((r) => r.address.toLowerCase()));
 }
