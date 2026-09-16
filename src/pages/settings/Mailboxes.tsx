@@ -8,6 +8,7 @@ import { mailboxLabel } from "@/lib/format";
 import { useLabels, useMailboxes } from "@/lib/queries";
 import { RichTextField } from "@/components/compose/Editor";
 import { LabelDialog } from "@/components/mail/LabelDialog";
+import { AutoReplySettings, BlockedSenders } from "./MailboxRules";
 import { Badge, Button, EmptyState, Field, IconButton, Input, PageHeader, Section } from "@/components/ui/primitives";
 import { useConfirm } from "@/components/ui/overlay";
 
@@ -119,6 +120,9 @@ function MailboxCard({ box }: { box: MailboxSummary }) {
             ))}
           </div>
         </div>
+
+        <AutoReplySettings box={box} />
+        <BlockedSenders box={box} />
       </div>
       <LabelDialog open={labelOpen} onClose={() => setLabelOpen(false)} mailboxId={box.id} label={editLabel} />
     </Section>

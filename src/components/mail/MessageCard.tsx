@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { AlertTriangle, ChevronDown, Code2, Download, Forward, ImageOff, MoreHorizontal, Printer, Reply, ReplyAll, Star, Eye, MousePointerClick } from "lucide-react";
+import { AlertTriangle, Ban, ChevronDown, Code2, Download, Forward, ImageOff, MoreHorizontal, Printer, Reply, ReplyAll, Star, Eye, MousePointerClick } from "lucide-react";
 import type { MessageDetail } from "@shared/types";
 import { displayName, fullAddress, longDate, relativeTime } from "@/lib/format";
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
+import { api, errorMessage } from "@/lib/api";
 import { useMe } from "@/lib/queries";
 import { Avatar, Button, cx, IconButton } from "../ui/primitives";
-import { Menu, Modal } from "../ui/overlay";
+import { Menu, Modal, useConfirm } from "../ui/overlay";
 import { AttachmentChip } from "./AttachmentChip";
 import { EmailFrame } from "./EmailFrame";
 import { EVENT_LABELS, StatusBadge } from "./StatusBadge";
@@ -42,6 +45,26 @@ export function MessageCard({
   const [blocked, setBlocked] = useState(0);
   const [showDetails, setShowDetails] = useState(false);
   const [showHeaders, setShowHeaders] = useState(false);
+  const qc = useQueryClient();
+  const confirm = useConfirm();
+  const blockSender = async () => {
+    const ok = await confirm({
+      title: `Block ${m.from.email}?`,
+      body: "Their messages here move to Spam, and future mail goes straight to Spam. You can unblock them in Settings → Mailboxes.",
+      confirmLabel: "Block",
+      danger: true,
+    });
+    if (!ok) return;
+    try {
+      const r = await api.post<{ moved: number }>(`mailboxes/${m.mailboxId}/blocked`, { pattern: m.from.email, moveExisting: true });
+      qc.invalidateQueries({ queryKey: ["messages"] });
+      qc.invalidateQueries({ queryKey: ["mailboxes"] });
+      qc.invalidateQueries({ queryKey: ["blocked", m.mailboxId] });
+      toast.success(r.moved ? `Blocked. ${r.moved} message${r.moved === 1 ? "" : "s"} moved to Spam.` : "Blocked. Future mail goes to Spam.");
+    } catch (e) {
+      toast.error(errorMessage(e));
+    }
+  };
   const visibleAttachments = m.attachments.filter((a) => !a.inline || !(m.html ?? "").includes(`cid:${a.contentId}`));
   const isOut = m.direction === "outbound";
 
@@ -135,6 +158,12 @@ export function MessageCard({
               { label: "Show headers", icon: <Code2 />, onSelect: () => setShowHeaders(true) },
               ...(m.direction === "inbound"
                 ? [{ label: "Download original (.eml)", icon: <Download />, onSelect: () => window.open(`/api/messages/${m.id}/original`, "_blank") }]
+                : []),
+              ...(m.direction === "inbound" && !readOnly
+                ? [
+                    { separator: true, label: "" },
+                    { label: `Block ${m.from.email}`, icon: <Ban />, danger: true, onSelect: () => blockSender() },
+                  ]
                 : []),
             ]}
             trigger={(p) => (
