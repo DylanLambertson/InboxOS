@@ -3,7 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { FOLDERS } from "@shared/types";
 import type { AppEnv } from "../env";
-import { allowedMailboxes, deleteContact, getContact, getThread, listMessages, saveContacts, searchContacts, sendingStatus, suppress } from "../lib/api-ops";
+import { allowedMailboxes, deleteContact, getContact, getThread, listMessages, messageAction, saveContacts, searchContacts, sendingStatus, suppress } from "../lib/api-ops";
 import { apiSend } from "../lib/api-send";
 import { requireApiKey } from "../lib/apikeys";
 import { zContactInput, zRecipients } from "./api-v1";
@@ -140,6 +140,17 @@ const TOOLS: Record<string, Tool> = {
     input: z.object({ message_id: z.string() }),
     annotations: { readOnlyHint: true },
     run: (c, a) => getThread(c, a.message_id),
+  },
+  triage_messages: {
+    description:
+      "Tidy the inbox after handling replies: mark messages read or unread, or archive them out of the inbox. Use message ids from list_messages or get_thread. Archiving needs the send permission; it doesn't delete anything.",
+    input: z.object({
+      message_ids: z.array(z.string()).min(1).max(100).describe("Message ids to act on."),
+      action: z.enum(["read", "unread", "archive"]),
+      thread: z.boolean().default(false).describe("Apply to every message in each one's conversation."),
+    }),
+    annotations: { destructiveHint: false },
+    run: (c, a) => messageAction(c, { ids: a.message_ids, action: a.action, thread: a.thread }),
   },
 };
 
