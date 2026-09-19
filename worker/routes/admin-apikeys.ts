@@ -7,7 +7,7 @@ import { audit } from "../lib/audit";
 import { newId, now, parseJson } from "../lib/util";
 import { parseBody, zId } from "../lib/validate";
 
-/** Admin → API & MCP: issue and revoke API keys, and manage the do-not-email list. */
+/** Admin → API & MCP: issue and revoke API keys. (The do-not-email list lives in admin-suppressions.ts.) */
 export const adminApiKeyRoutes = new Hono<AppEnv>();
 
 adminApiKeyRoutes.get("/", async (c) => {
@@ -63,22 +63,5 @@ adminApiKeyRoutes.delete("/:id", async (c) => {
   const res = await c.env.DB.prepare("UPDATE api_keys SET revoked_at = ? WHERE id = ? AND revoked_at IS NULL").bind(now(), c.req.param("id")).run();
   if (!res.meta.changes) throw new HTTPException(404, { message: "Key not found or already revoked" });
   await audit(c, { action: "api_key.revoked", targetType: "api_key", targetId: c.req.param("id") });
-  return c.json({ ok: true });
-});
-
-// ---- Do-not-email list ------------------------------------------------------
-
-export const adminSuppressionRoutes = new Hono<AppEnv>();
-
-adminSuppressionRoutes.get("/", async (c) => {
-  const { results } = await c.env.DB.prepare("SELECT email, reason, detail, created_at AS createdAt FROM suppressions ORDER BY created_at DESC LIMIT 500").all();
-  return c.json(results);
-});
-
-adminSuppressionRoutes.delete("/:email", async (c) => {
-  const email = c.req.param("email").toLowerCase();
-  const res = await c.env.DB.prepare("DELETE FROM suppressions WHERE email = ?").bind(email).run();
-  if (!res.meta.changes) throw new HTTPException(404, { message: "Not on the list" });
-  await audit(c, { action: "suppression.removed", targetType: "contact", targetId: email });
   return c.json({ ok: true });
 });

@@ -41,12 +41,3 @@ export function unsubscribeFooter(url: string): { html: string; text: string } {
     text: `\n\n--\nNot interested? Unsubscribe: ${url}`,
   };
 }
-
-export function unsubscribePage(title: string, body: string, form?: { action: string }): string {
-  const button = form
-    ? `<form method="post" action="${escapeHtml(form.action)}"><button type="submit" style="margin-top:16px;padding:10px 18px;border:0;border-radius:6px;background:#111827;color:#fff;font-size:14px;cursor:pointer">Unsubscribe</button></form>`
-    : "";
-  return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="robots" content="noindex"><title>${escapeHtml(title)}</title></head>
-<body style="margin:0;background:#f7f5ef;font-family:system-ui,-apple-system,sans-serif;color:#111827"><main style="max-width:440px;margin:15vh auto;padding:0 16px">
-<h1 style="font-size:20px;margin:0 0 8px">${escapeHtml(title)}</h1><p style="font-size:14px;line-height:1.5;color:#4b5563;margin:0">${escapeHtml(body)}</p>${button}</main></body></html>`;
-}

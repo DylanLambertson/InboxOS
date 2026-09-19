@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { Link } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { Ban, Copy, KeyRound, Plus, Trash2 } from "lucide-react";
+import { Ban, Copy, KeyRound, Plus } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { relativeTime } from "@/lib/format";
@@ -25,13 +26,6 @@ interface MailboxLite {
   address: string;
   isActive: boolean;
 }
-interface Suppression {
-  email: string;
-  reason: string;
-  detail: string | null;
-  createdAt: string;
-}
-
 const SCOPES = [
   { value: "send", label: "Send email", hint: "Send, schedule and draft from the chosen mailboxes" },
   { value: "contacts", label: "Contacts", hint: "Read and edit the address book and do-not-email list" },
@@ -180,7 +174,6 @@ export function AdminApiKeys() {
   const [created, setCreated] = useState<{ key: string; scopes: string[] } | null>(null);
   const keys = useQuery({ queryKey: ["admin-api-keys"], queryFn: () => api.get<ApiKeyInfo[]>("admin/api-keys") });
   const { data: mailboxes = [] } = useQuery({ queryKey: ["admin-mailboxes"], queryFn: () => api.get<MailboxLite[]>("admin/mailboxes") });
-  const { data: suppressions = [] } = useQuery({ queryKey: ["admin-suppressions"], queryFn: () => api.get<Suppression[]>("admin/suppressions") });
   const boxName = (id: string) => mailboxes.find((m) => m.id === id)?.address ?? "removed mailbox";
 
   if (keys.error && !keys.data) return <LoadError error={keys.error} onRetry={() => keys.refetch()} />;
@@ -195,11 +188,6 @@ export function AdminApiKeys() {
     } catch (e) {
       toast.error(errorMessage(e));
     }
-  };
-  const unblock = async (s: Suppression) => {
-    if (!(await confirm({ title: `Allow emails to ${s.email} again?`, body: s.reason === "unsubscribed" ? "They unsubscribed. Only do this if they asked to hear from you again." : undefined, confirmLabel: "Remove" }))) return;
-    await api.del(`admin/suppressions/${encodeURIComponent(s.email)}`);
-    qc.invalidateQueries({ queryKey: ["admin-suppressions"] });
   };
 
   return (
@@ -234,27 +222,10 @@ export function AdminApiKeys() {
         ))}
       </Card>
 
-      <Section title="Do-not-email list" description="People who unsubscribed, hard-bounced or marked you as spam. Outreach to them is always refused; bounces and complaints also block every other email.">
-        {!suppressions.length && <p className="text-[13px] text-fg-muted">Nobody yet.</p>}
-        <div className="divide-y divide-line">
-          {suppressions.map((s) => (
-            <div key={s.email} className="flex items-center gap-3 py-2 first:pt-0 last:pb-0">
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[13px]">{s.email}</p>
-                <p className="truncate text-xs text-fg-muted">
-                  {s.detail ? `${s.detail} · ` : ""}
-                  {relativeTime(s.createdAt)}
-                </p>
-              </div>
-              <Badge tone={s.reason === "unsubscribed" || s.reason === "manual" ? "neutral" : "danger"}>{s.reason}</Badge>
-              {editable && (
-                <IconButton label="Remove from list" onClick={() => unblock(s)}>
-                  <Trash2 className="size-4" />
-                </IconButton>
-              )}
-            </div>
-          ))}
-        </div>
+      <Section title="Do-not-email list" description="People who unsubscribed, hard-bounced or marked you as spam. API sends to them are refused.">
+        <Link to="/admin/unsubscribes" className="text-[13px] font-medium text-accent hover:underline">
+          See everyone on the list →
+        </Link>
       </Section>
 
       {creating && <NewKeyDialog mailboxes={mailboxes} onClose={() => setCreating(false)} onCreated={(c) => (setCreating(false), setCreated(c))} />}
