@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { MailboxSummary, Me } from "@shared/types";
 import { useBrand } from "./brand";
+import { showAppNotification } from "./pwa";
 
 /**
  * Keeps the tab title showing the unread inbox count ("(3) InboxOS") and, when the
@@ -25,15 +26,13 @@ export function useInboxNotifications(me: Me | undefined, boxes: MailboxSummary[
     if (!me?.preferences.desktopNotifications || !document.hidden) return;
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     const fresh = unread - before;
-    try {
-      const n = new Notification(fresh === 1 ? "New message" : `${fresh} new messages`, {
-        body: `You have ${unread} unread in your inbox${boxes.length > 1 ? "es" : ""}.`,
-        icon: brand.logoUrl || "/favicon.ico",
-        tag: "inboxos-new-mail",
-      });
-      n.onclick = () => (window.focus(), n.close());
-    } catch {
-      /* some browsers only allow notifications from a service worker */
-    }
+    // Through the service worker when there is one: phones don't allow page-level notifications.
+    showAppNotification(fresh === 1 ? "New message" : `${fresh} new messages`, {
+      body: `You have ${unread} unread in your inbox${boxes.length > 1 ? "es" : ""}.`,
+      icon: "/api/brand/icons/icon-192.png",
+      badge: "/api/brand/icons/icon-192.png",
+      tag: "inboxos-new-mail",
+      data: { url: "/" },
+    }).catch(() => undefined);
   }, [unread, me?.preferences.desktopNotifications, boxes.length, brand.logoUrl]);
 }

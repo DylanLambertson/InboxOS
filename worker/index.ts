@@ -64,6 +64,40 @@ app.get("/api/brand/logo", async (c) => {
     },
   });
 });
+// ---- Installable app (PWA) -------------------------------------------------
+/** Home-screen icons generated from the brand (Admin → Branding), or the built-in defaults. */
+const APP_ICONS = new Set(["icon-192", "icon-512", "maskable-512", "apple-touch-icon"]);
+app.get("/api/brand/icons/:name{[a-z0-9-]+\\.png}", async (c) => {
+  const name = c.req.param("name").replace(/\.png$/, "");
+  if (!APP_ICONS.has(name)) return c.notFound();
+  const obj = await c.env.FILES.get(`brand/icons/${name}.png`);
+  if (!obj) return c.redirect(`/icons/${name}.png`, 302);
+  return new Response(obj.body, {
+    headers: { "Content-Type": "image/png", "Cache-Control": "public, max-age=3600", "X-Content-Type-Options": "nosniff" },
+  });
+});
+app.get("/manifest.webmanifest", async (c) => {
+  const brand = await getBrand(c.env.DB);
+  const icon = (name: string, size: number, purpose = "any") => ({ src: `/api/brand/icons/${name}.png`, sizes: `${size}x${size}`, type: "image/png", purpose });
+  return c.json(
+    {
+      id: "/",
+      name: brand.productName,
+      short_name: brand.productName.length > 12 ? brand.monogram : brand.productName,
+      description: `${brand.companyName} team email`,
+      start_url: "/?source=pwa",
+      scope: "/",
+      display: "standalone",
+      orientation: "any",
+      background_color: "#0e0e10",
+      theme_color: brand.accentColor,
+      icons: [icon("icon-192", 192), icon("icon-512", 512), icon("maskable-512", 512, "maskable")],
+    },
+    200,
+    { "Content-Type": "application/manifest+json", "Cache-Control": "public, max-age=300" },
+  );
+});
+
 app.route("/api/auth", authRoutes);
 app.route("/webhooks", webhookRoutes);
 app.route("/unsubscribe", unsubscribeRoutes);

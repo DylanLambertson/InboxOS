@@ -160,6 +160,28 @@ adminSystemRoutes.post("/settings/logo", async (c) => {
   return c.json(next);
 });
 
+/**
+ * Home-screen icons, rendered in the admin's browser from the logo or monogram
+ * (Workers can't rasterize images without a heavy dependency) and stored in R2.
+ */
+adminSystemRoutes.post("/settings/icons", async (c) => {
+  const form = await c.req.formData();
+  const names = ["icon-192", "icon-512", "maskable-512", "apple-touch-icon"] as const;
+  const files: [string, File][] = [];
+  for (const name of names) {
+    const file = form.get(name);
+    if (!(file instanceof File)) throw new HTTPException(400, { message: `Missing ${name}` });
+    if (file.type !== "image/png" || file.size > 512 * 1024) throw new HTTPException(400, { message: `${name} must be a PNG under 512 KB` });
+    // Check the PNG signature rather than trusting the declared type.
+    const head = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+    if (head[0] !== 0x89 || head[1] !== 0x50 || head[2] !== 0x4e || head[3] !== 0x47) throw new HTTPException(400, { message: `${name} isn't a PNG` });
+    files.push([name, file]);
+  }
+  await Promise.all(files.map(([name, file]) => c.env.FILES.put(`brand/icons/${name}.png`, file.stream(), { httpMetadata: { contentType: "image/png" } })));
+  await audit(c, { action: "settings.app_icons_updated", targetType: "settings" });
+  return c.json({ ok: true });
+});
+
 // ---- System email previews ----------------------------------------------
 
 /** Render a transactional email with sample data so admins can see the branded result. */

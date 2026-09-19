@@ -8,6 +8,7 @@ import { SHORTCUT_HELP, useShortcuts } from "@/lib/shortcuts";
 import { ComposeProvider, useCompose } from "../compose/ComposeProvider";
 import { IconButton, Kbd, Spinner } from "../ui/primitives";
 import { Modal } from "../ui/overlay";
+import { InstallPrompt } from "./InstallPrompt";
 import { Logo } from "./Logo";
 import { Sidebar } from "./Sidebar";
 
@@ -56,7 +57,7 @@ export function AppShell() {
           <Sidebar />
         </div>
         {drawer && (
-          <div className="fixed inset-0 z-50 md:hidden">
+          <div className="fixed inset-0 z-50 md:hidden" style={{ paddingTop: "env(safe-area-inset-top, 0px)", paddingBottom: "env(safe-area-inset-bottom, 0px)" }}>
             <div className="animate-fade absolute inset-0 bg-black/40" onClick={() => setDrawer(false)} />
             <div className="animate-in absolute inset-y-0 left-0 w-72 border-r border-line shadow-ui-lg">
               <Sidebar onNavigate={() => setDrawer(false)} />
@@ -64,12 +65,17 @@ export function AppShell() {
           </div>
         )}
         <main className="flex min-w-0 flex-1 flex-col">
-          <div className="flex h-12 shrink-0 items-center gap-2 border-b border-line px-2 md:hidden">
+          <div
+            className="flex shrink-0 items-center gap-2 border-b border-line px-2 md:hidden"
+            // Installed on a phone, the app runs full-screen: keep the bar clear of the notch / status bar.
+            style={{ paddingTop: "env(safe-area-inset-top, 0px)", minHeight: "calc(3rem + env(safe-area-inset-top, 0px))" }}
+          >
             <IconButton label="Menu" onClick={() => setDrawer(true)}>
               <MenuIcon className="size-5" />
             </IconButton>
             <Logo size={24} />
           </div>
+          <InstallPrompt />
           {me.mustEnroll2fa && (
             <div className="flex items-center gap-2 border-b border-warning/30 bg-warning-soft px-4 py-2 text-[13px] text-warning">
               <ShieldAlert className="size-4" /> Your organization requires two-factor authentication. Set it up below to continue.

@@ -4,6 +4,7 @@ import { ExternalLink, Inbox, KeyRound, PartyPopper, RotateCcw, ShieldCheck, Upl
 import { toast } from "sonner";
 import { DEFAULT_BRAND, radiusValue, type Brand } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
+import { regenerateAppIcons } from "@/lib/app-icons";
 import { applyBrand, readableOn, useBrand } from "@/lib/brand";
 import { Button, Field, Input, PageHeader, Section, Select, Textarea } from "@/components/ui/primitives";
 import { useConfirm } from "@/components/ui/overlay";
@@ -91,6 +92,8 @@ export function AdminBranding() {
       const saved = await api.put<Brand>("admin/settings/brand", next as unknown as Record<string, unknown>);
       qc.setQueryData(["brand"], saved);
       toast.success("Branding saved");
+      // Keep the home-screen app icon in step with the logo, colors and monogram.
+      regenerateAppIcons(saved).catch(() => toast.error("Couldn't update the app icon. Save again to retry."));
     } catch (e) {
       toast.error(errorMessage(e));
     } finally {
@@ -105,6 +108,7 @@ export function AdminBranding() {
       const saved = await api.post<Brand>("admin/settings/logo", form);
       qc.setQueryData(["brand"], saved);
       toast.success("Logo updated");
+      regenerateAppIcons(saved).catch(() => toast.error("Couldn't update the app icon. Save again to retry."));
     } catch (e) {
       toast.error(errorMessage(e));
     }

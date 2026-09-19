@@ -514,7 +514,7 @@ function Shell({
       ref={rootRef}
       className={cx(
         "animate-in pointer-events-auto flex flex-col overflow-hidden rounded-t-ui-lg border border-b-0 border-line bg-raised shadow-ui-lg",
-        minimized ? "w-72" : "h-[min(620px,calc(100vh-5rem))] w-[560px] max-sm:fixed max-sm:inset-0 max-sm:h-full max-sm:w-full max-sm:rounded-none",
+        minimized ? "w-72" : "h-[min(620px,calc(100vh-5rem))] w-[560px] max-sm:fixed max-sm:inset-0 max-sm:h-full max-sm:w-full max-sm:rounded-none max-sm:pt-[env(safe-area-inset-top)] max-sm:pb-[env(safe-area-inset-bottom)]",
       )}
     >
       {header}

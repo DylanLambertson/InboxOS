@@ -67,7 +67,8 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
       aria-label={label}
       className={cx(
         "group/tt relative inline-flex shrink-0 items-center justify-center rounded-ui-sm text-fg-muted transition-colors hover:bg-muted hover:text-fg disabled:opacity-40 disabled:hover:bg-transparent",
-        size === "sm" ? "size-7" : "size-8",
+        // Bigger on phones, where a finger needs ~40px to hit reliably.
+        size === "sm" ? "size-7 max-md:size-9" : "size-8 max-md:size-10",
         active && "bg-muted text-fg",
         className,
       )}

@@ -119,6 +119,30 @@
   #root {
     height: 100%;
   }
+  /* Phones: the dynamic viewport, so the browser's toolbars and keyboard don't clip the app. */
+  @supports (height: 100dvh) {
+    #root {
+      height: 100dvh;
+    }
+  }
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  button,
+  a,
+  [role="button"],
+  [role="option"] {
+    touch-action: manipulation;
+  }
+  /* iOS zooms into any field under 16px when it's focused; 16px on phones keeps the page still. */
+  @media (max-width: 767px) {
+    input:not([type="checkbox"]):not([type="radio"]),
+    textarea,
+    select,
+    [contenteditable="true"] {
+      font-size: 16px !important;
+    }
+  }
   body {
     background: var(--bg);
     color: var(--text);

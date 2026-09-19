@@ -14,7 +14,8 @@
 			"/webhooks/*",
 			"/mcp",
 			"/mcp/*",
-			"/unsubscribe"
+			"/unsubscribe",
+			"/manifest.webmanifest"
 		]
 	},
   "observability": {

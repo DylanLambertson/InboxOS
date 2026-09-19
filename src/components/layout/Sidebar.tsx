@@ -31,6 +31,7 @@ import { api, errorMessage } from "@/lib/api";
 import { mailboxLabel } from "@/lib/format";
 import { useLabels, useMailboxes, useMe } from "@/lib/queries";
 import { toast } from "sonner";
+import { clearAppCache } from "@/lib/pwa";
 import { useCompose } from "../compose/ComposeProvider";
 import { Avatar, Button, cx } from "../ui/primitives";
 import { Menu } from "../ui/overlay";
@@ -141,6 +142,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   };
   const logout = async () => {
     await api.post("/api/auth/logout");
+    clearAppCache();
     qc.clear();
     navigate("/login");
   };
