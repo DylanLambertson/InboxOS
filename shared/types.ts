@@ -9,7 +9,7 @@ export type UserStatus = "active" | "invited" | "disabled";
 export type MailboxRole = "owner" | "editor" | "viewer";
 export type MailboxType = "personal" | "shared";
 
-export const FOLDERS = ["inbox", "sent", "drafts", "scheduled", "archive", "spam", "trash"] as const;
+export const FOLDERS = ["inbox", "sent", "drafts", "scheduled", "snoozed", "archive", "spam", "trash"] as const;
 export type Folder = (typeof FOLDERS)[number];
 /** Virtual views that aren't stored folders. */
 export type View = Folder | "starred" | "all" | "unread";
@@ -108,6 +108,8 @@ export interface MessageListItem {
   date: string;
   threadCount: number;
   scheduledAt: string | null;
+  /** When a snoozed message comes back to the inbox. */
+  snoozedUntil: string | null;
 }
 
 export interface AttachmentInfo {

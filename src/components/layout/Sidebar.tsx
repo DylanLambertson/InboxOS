@@ -2,16 +2,19 @@ import { useState } from "react";
 import { Link, NavLink, useNavigate, useParams } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
 import {
+  AlarmClock,
   Archive,
   ChevronDown,
-  Inbox as Inboxes,
   Clock,
   File,
   Inbox,
+  Inbox as Inboxes,
   LogOut,
   Mail,
   MailOpen,
+  Monitor,
   Moon,
+  PenSquare,
   Plus,
   Send,
   Settings,
@@ -22,8 +25,6 @@ import {
   Tag,
   Trash2,
   Users,
-  Monitor,
-  PenSquare,
 } from "lucide-react";
 import type { MailboxSummary } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
@@ -42,6 +43,7 @@ export const FOLDER_NAV = [
   { view: "sent", label: "Sent", icon: Send },
   { view: "drafts", label: "Drafts", icon: File, count: "drafts" },
   { view: "scheduled", label: "Scheduled", icon: Clock, count: "scheduled" },
+  { view: "snoozed", label: "Snoozed", icon: AlarmClock, count: "snoozed" },
   { view: "all", label: "All mail", icon: Mail },
   { view: "archive", label: "Archive", icon: Archive },
   { view: "spam", label: "Spam", icon: ShieldAlert, count: "spam" },

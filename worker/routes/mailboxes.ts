@@ -29,7 +29,7 @@ mailboxRoutes.get("/", async (c) => {
   const [{ results: counts }, { results: aliases }] = await Promise.all([
     c.env.DB.prepare(
       `SELECT mailbox_id, folder, SUM(CASE WHEN is_read = 0 THEN 1 ELSE 0 END) AS unread, COUNT(*) AS total
-       FROM messages WHERE mailbox_id IN (${ph}) AND folder IN ('inbox','spam','drafts','scheduled')
+       FROM messages WHERE mailbox_id IN (${ph}) AND folder IN ('inbox','spam','drafts','scheduled','snoozed')
        GROUP BY mailbox_id, folder`,
     )
       .bind(...ids)
@@ -42,7 +42,7 @@ mailboxRoutes.get("/", async (c) => {
   const out: MailboxSummary[] = boxes.map((b) => {
     const unread: Record<string, number> = {};
     for (const r of counts.filter((x) => x.mailbox_id === b.id)) {
-      unread[r.folder] = r.folder === "drafts" || r.folder === "scheduled" ? r.total : r.unread;
+      unread[r.folder] = r.folder === "drafts" || r.folder === "scheduled" || r.folder === "snoozed" ? r.total : r.unread;
     }
     return {
       id: b.id,

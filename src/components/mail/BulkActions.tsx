@@ -1,7 +1,9 @@
-import { Archive, ArchiveRestore, Inbox, MailOpen, Mail, ShieldAlert, ShieldCheck, Tag, Trash2, Undo2, XCircle } from "lucide-react";
+import { useState } from "react";
+import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, CalendarClock, Inbox, MailOpen, Mail, ShieldAlert, ShieldCheck, Tag, Trash2, Undo2, XCircle } from "lucide-react";
 import type { Folder, Label } from "@shared/types";
 import { IconButton } from "../ui/primitives";
 import { Menu, useConfirm } from "../ui/overlay";
+import { ScheduleDialog, snoozePresets } from "../compose/ScheduleDialog";
 import type { BulkInput } from "@/lib/queries";
 
 /** Folder-aware action buttons shared by the list toolbar and the reader toolbar. */
@@ -21,7 +23,10 @@ export function BulkActions({
   size?: "sm" | "md";
 }) {
   const confirm = useConfirm();
+  const [pickSnooze, setPickSnooze] = useState(false);
   const icon = "size-4";
+  const canSnooze = !readOnly && ["inbox", "archive", "all", "starred", "label", "unread", "snoozed"].includes(folder);
+  const fmt = (d: Date) => d.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
   const inTrash = folder === "trash";
   const inSpam = folder === "spam";
   const isDraftish = folder === "drafts" || folder === "scheduled";
@@ -34,9 +39,13 @@ export function BulkActions({
             <IconButton size={size} label="Restore" onClick={() => run({ action: "restore" })}>
               <Undo2 className={icon} />
             </IconButton>
-          ) : folder === "archive" || inSpam ? (
-            <IconButton size={size} label={inSpam ? "Not spam" : "Move to inbox"} onClick={() => run({ action: "move", folder: "inbox" })}>
-              {inSpam ? <ShieldCheck className={icon} /> : <Inbox className={icon} />}
+          ) : folder === "archive" || inSpam || folder === "snoozed" ? (
+            <IconButton
+              size={size}
+              label={inSpam ? "Not spam" : folder === "snoozed" ? "Unsnooze" : "Move to inbox"}
+              onClick={() => run({ action: "move", folder: "inbox" })}
+            >
+              {inSpam ? <ShieldCheck className={icon} /> : folder === "snoozed" ? <AlarmClockOff className={icon} /> : <Inbox className={icon} />}
             </IconButton>
           ) : (
             <IconButton size={size} label="Archive" shortcut="E" onClick={() => run({ action: "move", folder: "archive" })}>
@@ -76,6 +85,34 @@ export function BulkActions({
         >
           <Trash2 className={icon} />
         </IconButton>
+      )}
+      {canSnooze && (
+        <>
+          <Menu
+            width={250}
+            items={[
+              ...snoozePresets().map((p) => ({
+                label: p.label,
+                hint: fmt(p.date),
+                icon: <AlarmClock />,
+                onSelect: () => run({ action: "snooze", until: p.date.toISOString() }),
+              })),
+              { separator: true, label: "" },
+              { label: "Pick date & time…", icon: <CalendarClock />, onSelect: () => setPickSnooze(true) },
+            ]}
+            trigger={(p) => (
+              <IconButton size={size} label="Snooze" shortcut="B" {...p}>
+                <AlarmClock className={icon} />
+              </IconButton>
+            )}
+          />
+          <ScheduleDialog
+            mode="snooze"
+            open={pickSnooze}
+            onClose={() => setPickSnooze(false)}
+            onSchedule={(iso) => (setPickSnooze(false), run({ action: "snooze", until: iso }))}
+          />
+        </>
       )}
       <IconButton
         size={size}

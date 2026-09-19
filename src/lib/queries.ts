@@ -57,13 +57,15 @@ export const useThread = (messageId: string | null) =>
     enabled: !!messageId,
   });
 
-export type BulkAction = "read" | "unread" | "star" | "unstar" | "move" | "restore" | "labelAdd" | "labelRemove" | "delete";
+export type BulkAction = "read" | "unread" | "star" | "unstar" | "move" | "restore" | "labelAdd" | "labelRemove" | "delete" | "snooze";
 export interface BulkInput {
   ids: string[];
   action: BulkAction;
   thread?: boolean;
   folder?: "inbox" | "archive" | "spam" | "trash";
   labelId?: string;
+  /** ISO time a snooze ends. */
+  until?: string;
 }
 
 /** Bulk message action with optimistic updates for read/star so the UI feels instant. */

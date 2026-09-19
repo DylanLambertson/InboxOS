@@ -30,6 +30,7 @@ export interface MessageRow {
   priority: string;
   resend_id: string | null;
   scheduled_at: string | null;
+  snoozed_until?: string | null;
   sent_at: string | null;
   error: string | null;
   open_count: number;
@@ -103,6 +104,7 @@ export function toListItem(r: MessageRow): MessageListItem {
     date: r.date,
     threadCount: r.thread_count ?? 1,
     scheduledAt: r.scheduled_at,
+    snoozedUntil: r.snoozed_until ?? null,
   };
 }
 

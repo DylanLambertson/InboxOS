@@ -8,7 +8,20 @@ import { now } from "./lib/util";
 export async function runCron(env: Env, scheduledTime: number): Promise<void> {
   const sent = await dispatchScheduled(env);
   if (sent) console.log(`cron: sent ${sent} scheduled message(s)`);
+  const woke = await wakeSnoozed(env);
+  if (woke) console.log(`cron: ${woke} snoozed message(s) back in the inbox`);
   if (new Date(scheduledTime).getUTCMinutes() === 0) await housekeeping(env);
+}
+
+/** Snoozed mail whose time has come returns to the inbox as unread, so it's noticed again. */
+export async function wakeSnoozed(env: Env): Promise<number> {
+  const t = now();
+  const res = await env.DB.prepare(
+    "UPDATE messages SET folder = 'inbox', snoozed_until = NULL, is_read = 0, updated_at = ?1 WHERE folder = 'snoozed' AND snoozed_until <= ?1",
+  )
+    .bind(t)
+    .run();
+  return res.meta.changes ?? 0;
 }
 
 export async function housekeeping(env: Env): Promise<void> {

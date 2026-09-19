@@ -15,7 +15,9 @@ const zAction = z.object({
   ids: z.array(zId).min(1).max(500),
   /** Apply to every message in each message's conversation (same folder). */
   thread: z.boolean().optional(),
-  action: z.enum(["read", "unread", "star", "unstar", "move", "restore", "labelAdd", "labelRemove", "delete"]),
+  action: z.enum(["read", "unread", "star", "unstar", "move", "restore", "labelAdd", "labelRemove", "delete", "snooze"]),
+  /** For snooze: when the conversation comes back to the inbox. */
+  until: z.string().datetime({ offset: true }).optional(),
   folder: z.enum(["inbox", "archive", "spam", "trash"]).optional(),
   labelId: zId.optional(),
 });
@@ -105,13 +107,24 @@ messageActionRoutes.post("/bulk", async (c) => {
       } else {
         // Sent mail keeps living in Sent unless explicitly moved; inbound spam report marks as read.
         each(
-          `UPDATE messages SET folder = ?, trashed_at = NULL, folder_before_trash = NULL,
+          `UPDATE messages SET folder = ?, trashed_at = NULL, folder_before_trash = NULL, snoozed_until = NULL,
              is_read = CASE WHEN ? = 'spam' THEN 1 ELSE is_read END, updated_at = ? WHERE id IN ($IDS)`,
           body.folder,
           body.folder,
           t,
         );
       }
+      break;
+    }
+    case "snooze": {
+      const until = body.until ? new Date(body.until) : null;
+      if (!until || until.getTime() < Date.now() + 60_000 || until.getTime() > Date.now() + 366 * 86_400_000) {
+        throw new HTTPException(400, { message: "Pick a time between a minute and a year from now." });
+      }
+      if (rows.some((r) => !["inbox", "archive", "snoozed"].includes(r.folder))) {
+        throw new HTTPException(400, { message: "Only inbox and archived mail can be snoozed." });
+      }
+      each("UPDATE messages SET folder = 'snoozed', snoozed_until = ?, updated_at = ? WHERE id IN ($IDS)", until.toISOString(), t);
       break;
     }
     case "restore":

@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { AlertCircle, Clock, Paperclip, Star } from "lucide-react";
+import { AlarmClock, AlertCircle, Clock, Paperclip, Star } from "lucide-react";
 import type { Label, MessageListItem } from "@shared/types";
 import { displayName, mailboxLabel, shortDate } from "@/lib/format";
 import { Avatar, Checkbox, cx } from "../ui/primitives";
@@ -28,7 +28,7 @@ export const MessageRow = memo(function MessageRow({ m, selected, checked, focus
     : displayName(m.from) || m.from.email;
   const unread = !m.isRead;
   const rowLabels = labels.filter((l) => m.labels.includes(l.id));
-  const date = m.folder === "scheduled" && m.scheduledAt ? m.scheduledAt : m.date;
+  const date = m.folder === "scheduled" && m.scheduledAt ? m.scheduledAt : m.folder === "snoozed" && m.snoozedUntil ? m.snoozedUntil : m.date;
 
   return (
     <div
@@ -68,6 +68,7 @@ export const MessageRow = memo(function MessageRow({ m, selected, checked, focus
           )}
           {m.hasAttachments && <Paperclip className="size-3.5 shrink-0 text-fg-faint" />}
           {m.folder === "scheduled" && <Clock className="size-3.5 shrink-0 text-accent" />}
+          {m.folder === "snoozed" && <AlarmClock className="size-3.5 shrink-0 text-accent" aria-label="Snoozed until" />}
           <span className={cx("shrink-0 text-xs tabular-nums", unread ? "font-semibold text-fg" : "text-fg-muted")}>{shortDate(date)}</span>
         </div>
         <div className="mt-0.5 flex items-center gap-2">

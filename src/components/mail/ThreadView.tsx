@@ -74,9 +74,10 @@ export function ThreadView({
             labelAdd: "Label added",
             labelRemove: "Label removed",
             unread: "Marked as unread",
+            snooze: `Snoozed until ${a.until ? longDate(a.until) : "later"}`,
           };
           if (msg[a.action]) toast.success(msg[a.action]);
-          if (["move", "restore", "delete", "unread"].includes(a.action)) onAfterAction();
+          if (["move", "restore", "delete", "unread", "snooze"].includes(a.action)) onAfterAction();
         },
         onError: (e) => toast.error(errorMessage(e)),
       },

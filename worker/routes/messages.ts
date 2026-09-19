@@ -11,7 +11,7 @@ import { clampInt, parseJson } from "../lib/util";
 
 export const messageRoutes = new Hono<AppEnv>();
 
-const HIDDEN_FROM_ALL = "('trash','spam','drafts','scheduled')";
+const HIDDEN_FROM_ALL = "('trash','spam','drafts','scheduled','snoozed')";
 
 function encodeCursor(r: { date: string; id: string }) {
   return btoa(`${r.date}|${r.id}`);
@@ -103,11 +103,12 @@ messageRoutes.get("/", async (c) => {
     throw new HTTPException(400, { message: "Unknown view" });
   }
 
-  const orderCol = view === "scheduled" && !q ? "scheduled_at" : "date";
-  const threaded = c.req.query("threads") === "1" && !q && !["drafts", "scheduled"].includes(view);
+  // Scheduled and snoozed lists read as a timeline: soonest first.
+  const orderCol = !q && view === "scheduled" ? "scheduled_at" : !q && view === "snoozed" ? "snoozed_until" : "date";
+  const threaded = c.req.query("threads") === "1" && !q && !["drafts", "scheduled", "snoozed"].includes(view);
   const cursorSql = cursor ? `AND (f.${orderCol} < ? OR (f.${orderCol} = ? AND f.id < ?))` : "";
   const cursorArgs = cursor ? [cursor.date, cursor.date, cursor.id] : [];
-  const dir = view === "scheduled" && !q ? "ASC" : "DESC";
+  const dir = orderCol === "date" ? "DESC" : "ASC";
   const cursorSqlDir = dir === "ASC" ? cursorSql.replace(/</g, ">") : cursorSql;
 
   const labelSub = "(SELECT group_concat(label_id) FROM message_labels ml WHERE ml.message_id = f.id) AS label_ids";
@@ -117,7 +118,7 @@ messageRoutes.get("/", async (c) => {
       latest AS (SELECT thread_id, MAX(date) AS d, SUM(1 - is_read) AS unread FROM f GROUP BY thread_id)
       SELECT f.*, latest.unread AS thread_unread, ${labelSub},
         MAX(1, (SELECT COUNT(*) FROM messages x WHERE x.mailbox_id = f.mailbox_id AND x.thread_id = f.thread_id
-                AND x.folder NOT IN ('trash','spam','drafts','scheduled'))) AS thread_count
+                AND x.folder NOT IN ('trash','spam','drafts','scheduled','snoozed'))) AS thread_count
       FROM f JOIN latest ON latest.thread_id = f.thread_id AND latest.d = f.date
       WHERE 1 = 1 ${cursorSqlDir}
       ORDER BY f.date ${dir}, f.id ${dir} LIMIT ?`;
@@ -133,7 +134,7 @@ messageRoutes.get("/", async (c) => {
   return c.json({
     items: page.map(toListItem),
     nextCursor:
-      results.length > limit && last ? encodeCursor({ date: (orderCol === "scheduled_at" ? last.scheduled_at : last.date) ?? last.date, id: last.id }) : null,
+      results.length > limit && last ? encodeCursor({ date: (orderCol === "scheduled_at" ? last.scheduled_at : orderCol === "snoozed_until" ? last.snoozed_until : last.date) ?? last.date, id: last.id }) : null,
   });
 });
 

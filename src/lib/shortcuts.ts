@@ -57,6 +57,7 @@ export const SHORTCUT_HELP: [string, string][] = [
   ["E", "Archive"],
   ["#", "Delete"],
   ["!", "Report spam"],
+  ["B", "Snooze until tomorrow"],
   ["S", "Star / unstar"],
   ["Shift + I", "Mark as read"],
   ["Shift + U", "Mark as unread"],

@@ -5,9 +5,10 @@ import { toast } from "sonner";
 import type { Folder, MessageListItem, View } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useLabels, useMailboxes, useMe, useMessageAction, useMessages, useInvalidateMail, type BulkInput } from "@/lib/queries";
-import { mailboxLabel } from "@/lib/format";
+import { longDate, mailboxLabel } from "@/lib/format";
 import { useShortcuts } from "@/lib/shortcuts";
 import { useCompose } from "@/components/compose/ComposeProvider";
+import { at } from "@/components/compose/ScheduleDialog";
 import { FOLDER_NAV } from "@/components/layout/Sidebar";
 import { BulkActions } from "@/components/mail/BulkActions";
 import { MessageRow } from "@/components/mail/MessageRow";
@@ -98,9 +99,16 @@ export function MailPage() {
       {
         onSuccess: (r) => {
           const n = r.count;
-          const verb: Record<string, string> = { move: `moved to ${a.folder}`, restore: "restored", delete: "deleted", labelAdd: "labeled", labelRemove: "updated" };
+          const verb: Record<string, string> = {
+            move: `moved to ${a.folder}`,
+            restore: "restored",
+            delete: "deleted",
+            labelAdd: "labeled",
+            labelRemove: "updated",
+            snooze: `snoozed until ${a.until ? longDate(a.until) : "later"}`,
+          };
           if (verb[a.action]) toast.success(`${n} message${n === 1 ? "" : "s"} ${verb[a.action]}`);
-          if (messageId && ids.includes(messageId) && ["move", "restore", "delete"].includes(a.action)) navigate(base);
+          if (messageId && ids.includes(messageId) && ["move", "restore", "delete", "snooze"].includes(a.action)) navigate(base);
           setChecked(new Set());
         },
         onError: (e) => toast.error(errorMessage(e)),
@@ -154,6 +162,7 @@ export function MailPage() {
       e: () => !readOnly && runBulk({ action: "move", folder: "archive" }, target()),
       "#": () => !readOnly && runBulk({ action: "move", folder: "trash" }, target()),
       "!": () => !readOnly && runBulk({ action: "move", folder: "spam" }, target()),
+      b: () => !readOnly && ["inbox", "archive", "all", "starred", "unread"].includes(view) && runBulk({ action: "snooze", until: at(1, 8).toISOString() }, target()),
       s: () => {
         const m = items.find((x) => x.id === target()[0]);
         if (m) onStar(m);
