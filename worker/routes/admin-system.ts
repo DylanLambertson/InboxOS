@@ -117,6 +117,7 @@ const zPolicy = z.object({
   catchAllMailboxId: zId.nullable(),
   sessionDays: z.number().int().min(1).max(90),
   trackingEnabled: z.boolean(),
+  digestDetail: z.enum(["subjects", "count", "off"]),
 });
 
 adminSystemRoutes.put("/settings/brand", async (c) => {
@@ -199,6 +200,28 @@ adminSystemRoutes.get("/email-preview/:name", async (c) => {
     passwordChanged: () => templates.passwordChanged(brand, { name: me.name, appUrl: app, ctx }),
     twoFactor: () => templates.twoFactor(brand, { name: me.name, enabled: true, appUrl: app, ctx }),
     welcome: () => templates.welcome(brand, { name: "Jordan Lee", email: `jordan@${brand.primaryDomain}`, appUrl: app, mailboxes: [`jordan@${brand.primaryDomain}`, `support@${brand.primaryDomain}`] }),
+    verifyPersonalEmail: () => templates.verifyPersonalEmail(brand, { name: me.name, url: sample, account: me.email }),
+    personalEmailAdded: () => templates.personalEmailAdded(brand, { name: me.name, masked: "jo***@gmail.com", appUrl: app, ctx }),
+    unreadDigest: () =>
+      templates.unreadDigest(brand, {
+        name: me.name,
+        total: 4,
+        detail: "subjects",
+        openUrl: `${app}/mail`,
+        offUrl: sample,
+        groups: [
+          {
+            mailbox: `hello@${brand.primaryDomain}`,
+            count: 3,
+            items: [
+              { from: "Priya Shah", subject: "Re: Website redesign proposal", url: sample },
+              { from: "Jordan Lee", subject: "Intro: Jordan <> Acme", url: sample },
+              { from: "Stripe", subject: "Your receipt #2041", url: sample },
+            ],
+          },
+          { mailbox: `support@${brand.primaryDomain}`, count: 1, items: [{ from: "Alex Rivera", subject: "Q4 campaign brief", url: sample }] },
+        ],
+      }),
   }[name]();
   const { html } = renderEmail(brand, app, content);
   return new Response(html, { headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" } });

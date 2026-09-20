@@ -1,4 +1,5 @@
 import type { Env } from "./env";
+import { runDigests } from "./lib/digest";
 import { purgeMessages } from "./lib/messages";
 import { dispatchScheduled } from "./lib/send";
 import { getPolicy } from "./lib/settings";
@@ -10,6 +11,9 @@ export async function runCron(env: Env, scheduledTime: number): Promise<void> {
   if (sent) console.log(`cron: sent ${sent} scheduled message(s)`);
   const woke = await wakeSnoozed(env);
   if (woke) console.log(`cron: ${woke} snoozed message(s) back in the inbox`);
+  // After snoozed mail wakes, so it can be in the digest.
+  const digests = await runDigests(env);
+  if (digests) console.log(`cron: sent ${digests} unread-mail digest(s)`);
   if (new Date(scheduledTime).getUTCMinutes() === 0) await housekeeping(env);
 }
 

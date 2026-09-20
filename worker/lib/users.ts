@@ -1,4 +1,4 @@
-import { DEFAULT_PREFERENCES, type Me, type Preferences, type Role, type UserStatus } from "@shared/types";
+import { DEFAULT_PREFERENCES, DIGEST_HOURS, type DigestHours, type Me, type Preferences, type Role, type UserStatus } from "@shared/types";
 import type { OrgPolicy } from "@shared/brand";
 import { syncDomainAliases } from "./domains";
 import { effectiveRole, storedRole } from "./roles";
@@ -23,6 +23,12 @@ export interface UserRow {
   failed_logins: number;
   locked_until: string | null;
   last_login_at: string | null;
+  personal_email: string | null;
+  personal_email_verified_at: string | null;
+  digest_enabled: number;
+  digest_hours: number;
+  digest_last_at: string | null;
+  digest_next_at: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -40,6 +46,9 @@ export function toMe(u: UserRow, policy: OrgPolicy): Me {
     signatureHtml: u.signature_html,
     preferences: { ...DEFAULT_PREFERENCES, ...parseJson<Partial<Preferences>>(u.preferences, {}) },
     mustEnroll2fa: policy.require2fa && !u.totp_enabled,
+    personalEmail: u.personal_email ?? null,
+    digest: { enabled: !!u.digest_enabled, hours: ((DIGEST_HOURS as readonly number[]).includes(u.digest_hours) ? u.digest_hours : 5) as DigestHours, lastAt: u.digest_last_at ?? null, nextAt: u.digest_next_at ?? null },
+    digestsAllowed: policy.digestDetail !== "off",
   };
 }
 

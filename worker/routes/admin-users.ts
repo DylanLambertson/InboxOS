@@ -7,6 +7,7 @@ import { audit } from "../lib/audit";
 import { getBrand } from "../lib/settings";
 import { templates } from "../lib/email-templates";
 import { sendSystemEmail } from "../lib/system-mail";
+import { maskEmail } from "../lib/digest";
 import { storedRole } from "../lib/roles";
 import { ensureMailbox, getUser, getUserByEmail, insertUser, withRole, type UserRow } from "../lib/users";
 import { newId, now, sha256hex } from "../lib/util";
@@ -37,6 +38,8 @@ adminUserRoutes.get("/", async (c) => {
       mailboxCount: u.mailbox_count,
       lastLoginAt: u.last_login_at,
       lockedUntil: u.locked_until && u.locked_until > now() ? u.locked_until : null,
+      // Masked: admins can see that reminders go outside the company, not the full address.
+      digest: u.digest_enabled && u.personal_email ? { hours: u.digest_hours, to: maskEmail(u.personal_email) } : null,
       createdAt: u.created_at,
     })),
   );
@@ -147,7 +150,11 @@ adminUserRoutes.patch("/:id", async (c) => {
        WHERE id = ?`,
     ).bind(body.name ?? target.name, stored.role, stored.isManager, status, now(), body.unlock ? 1 : 0, body.unlock ? 1 : 0, target.id),
   ];
-  if (status === "disabled") stmts.push(c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id));
+  if (status === "disabled") {
+    stmts.push(c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id));
+    // Offboarding: no more reminders to their personal inbox (they'd have to turn it back on themselves).
+    stmts.push(c.env.DB.prepare("UPDATE users SET digest_enabled = 0, digest_next_at = NULL WHERE id = ?").bind(target.id));
+  }
   await c.env.DB.batch(stmts);
   await audit(c, {
     action: "user.updated",
@@ -155,6 +162,14 @@ adminUserRoutes.patch("/:id", async (c) => {
     targetId: target.id,
     meta: { email: target.email, from: { role: target.role, status: target.status }, to: { role, status }, unlock: !!body.unlock },
   });
+  return c.json({ ok: true });
+});
+
+/** Stop someone's unread-mail reminders to their personal address (e.g. offboarding). */
+adminUserRoutes.post("/:id/digest-off", async (c) => {
+  const target = await loadTarget(c.env.DB, c.get("user"), c.req.param("id"));
+  await c.env.DB.prepare("UPDATE users SET digest_enabled = 0, digest_next_at = NULL WHERE id = ?").bind(target.id).run();
+  await audit(c, { action: "user.digest_disabled", targetType: "user", targetId: target.id, meta: { via: "admin" } });
   return c.json({ ok: true });
 });
 

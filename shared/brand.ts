@@ -91,6 +91,11 @@ export interface OrgPolicy {
   sessionDays: number;
   /** Track opens/clicks (must also be enabled on the domain in Resend). */
   trackingEnabled: boolean;
+  /**
+   * What unread-mail digests sent to personal addresses may show: senders and
+   * subjects, just counts, or "off" to not allow digests at all.
+   */
+  digestDetail: "subjects" | "count" | "off";
 }
 
 export const DEFAULT_POLICY: OrgPolicy = {
@@ -107,6 +112,7 @@ export const DEFAULT_POLICY: OrgPolicy = {
   catchAllMailboxId: null,
   sessionDays: 14,
   trackingEnabled: false,
+  digestDetail: "subjects",
 };
 
 /** Every mail domain, primary first, lowercased and without duplicates. */

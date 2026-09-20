@@ -73,7 +73,16 @@ export interface Me {
   signatureHtml: string;
   preferences: Preferences;
   mustEnroll2fa: boolean;
+  /** A verified personal (non-company) address for the unread-mail digest, or null. */
+  personalEmail: string | null;
+  digest: { enabled: boolean; hours: DigestHours; lastAt: string | null; nextAt: string | null };
+  /** False when an admin turned digests off for the organization. */
+  digestsAllowed: boolean;
 }
+
+/** How often the unread-mail digest may be sent. */
+export const DIGEST_HOURS = [1, 3, 5, 12, 24] as const;
+export type DigestHours = (typeof DIGEST_HOURS)[number];
 
 export interface MailboxSummary {
   id: string;

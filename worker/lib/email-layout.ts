@@ -22,6 +22,10 @@ export interface EmailContent {
   details?: [string, string][];
   /** Muted safety note at the bottom, e.g. "Didn't request this?…" */
   note?: string;
+  /** Grouped lists of linked items (e.g. unread mail per mailbox). Plain text; escaped when rendered. */
+  groups?: { title: string; count: number; items: { label: string; sub?: string; url: string }[]; more?: number }[];
+  /** An extra footer line with a link, e.g. how to turn this email off. */
+  footer?: { text: string; linkLabel: string; url: string };
 }
 
 const HEX = /^#[0-9a-f]{6}$/i;
@@ -73,6 +77,27 @@ export function renderEmail(brand: Brand, appUrl: string, c: EmailContent): { ht
           .join("")}
       </table>`
     : "";
+
+  const groups = (c.groups ?? [])
+    .map(
+      (g) => `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 20px;border:1px solid #ececef;border-radius:12px">
+        <tr><td style="padding:12px 16px;border-bottom:1px solid #ececef;background:#fafafa;border-radius:12px 12px 0 0;font:600 13px/1.4 ${font};color:#18181b">
+          ${e(g.title)} <span style="display:inline-block;margin-left:6px;padding:2px 8px;border-radius:999px;background:${accent};color:${onAccent};font:600 11px/1.4 ${font}">${g.count}</span>
+        </td></tr>
+        ${g.items
+          .map(
+            (it, i) => `<tr><td style="padding:11px 16px;${i ? "border-top:1px solid #f1f1f3;" : ""}">
+          <a href="${e(it.url)}" target="_blank" style="text-decoration:none;display:block">
+            <span style="display:block;font:600 14px/1.4 ${font};color:#18181b">${e(it.label)}</span>
+            ${it.sub ? `<span style="display:block;font:400 13px/1.45 ${font};color:#71717a">${e(it.sub)}</span>` : ""}
+          </a>
+        </td></tr>`,
+          )
+          .join("")}
+        ${g.more ? `<tr><td style="padding:10px 16px;border-top:1px solid #f1f1f3;font:500 13px/1.4 ${font};color:#71717a">and ${g.more} more</td></tr>` : ""}
+      </table>`,
+    )
+    .join("");
 
   const fallback = c.cta
     ? `<p style="margin:0 0 24px;font:400 12px/1.6 ${font};color:#a1a1aa">Button not working? Copy this link into your browser:<br>
@@ -132,6 +157,7 @@ export function renderEmail(brand: Brand, appUrl: string, c: EmailContent): { ht
     <tr><td class="px" bgcolor="#ffffff" style="padding:36px 40px 32px;background:#ffffff;border-radius:0 0 20px 20px">
       ${c.greeting ? `<p style="margin:0 0 16px;font:600 16px/1.5 ${font};color:#18181b">${e(c.greeting)}</p>` : ""}
       ${paragraphs}
+      ${groups}
       ${button}
       ${details}
       ${fallback}
@@ -143,6 +169,7 @@ export function renderEmail(brand: Brand, appUrl: string, c: EmailContent): { ht
       Sent by <strong style="color:#71717a">${e(brand.productName)}</strong> for ${e(brand.companyName)}.
       ${brand.supportEmail ? `<br>Questions? <a href="mailto:${e(brand.supportEmail)}" style="color:#71717a">${e(brand.supportEmail)}</a>` : ""}
       <br>${e(brand.footerText)}
+      ${c.footer ? `<br><br>${e(c.footer.text)} <a href="${e(c.footer.url)}" style="color:#71717a">${e(c.footer.linkLabel)}</a>` : ""}
     </td></tr>
 
   </table>
@@ -157,11 +184,19 @@ export function renderEmail(brand: Brand, appUrl: string, c: EmailContent): { ht
     "",
     c.greeting ?? "",
     ...c.paragraphs.map(strip),
+    ...(c.groups ?? []).flatMap((g) => [
+      "",
+      `${g.title} (${g.count})`,
+      ...g.items.map((it) => `- ${it.label}${it.sub ? ` — ${it.sub}` : ""}\n  ${it.url}`),
+      ...(g.more ? [`  and ${g.more} more`] : []),
+    ]),
+    "",
     c.cta ? `${c.cta.label}: ${c.cta.url}` : "",
     ...(c.details ?? []).map(([k, v]) => `${k}: ${v}`),
     c.note ? `\n${strip(c.note)}` : "",
     "",
     `— ${brand.productName} · ${brand.companyName}`,
+    c.footer ? `${c.footer.text} ${c.footer.linkLabel}: ${c.footer.url}` : "",
   ]
     .filter((l, i, a) => l !== "" || a[i - 1] !== "")
     .join("\n");

@@ -16,6 +16,7 @@ import { attachmentRoutes } from "./routes/attachments";
 import { authRoutes } from "./routes/auth";
 import { composeRoutes } from "./routes/compose";
 import { contactRoutes } from "./routes/contacts";
+import { digestPublicRoutes, digestSettingsRoutes } from "./routes/digest";
 import { labelRoutes, mailboxRoutes } from "./routes/mailboxes";
 import { mcpRoutes } from "./routes/mcp";
 import { meRoutes } from "./routes/me";
@@ -99,6 +100,7 @@ app.get("/manifest.webmanifest", async (c) => {
 });
 
 app.route("/api/auth", authRoutes);
+app.route("/api/digest", digestPublicRoutes);
 app.route("/webhooks", webhookRoutes);
 app.route("/unsubscribe", unsubscribeRoutes);
 
@@ -110,6 +112,7 @@ app.route("/mcp", mcpRoutes);
 const api = new Hono<AppEnv>();
 api.use("*", requireAuth);
 api.route("/me", meRoutes);
+api.route("/me", digestSettingsRoutes);
 api.route("/mailboxes", mailboxRoutes);
 api.route("/labels", labelRoutes);
 api.route("/messages", messageActionRoutes);

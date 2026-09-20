@@ -19,6 +19,9 @@ export function describeDevice(ua: string | null): string {
 const when = (d = new Date()) =>
   d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
 
+/** Sender names and subjects are written by outsiders: keep them short. */
+const clip = (s: string, max = 120) => (s.length > max ? `${s.slice(0, max - 1)}…` : s);
+
 const hi = (name?: string | null) => (name?.trim() ? `Hi ${name.trim().split(/\s+/)[0]},` : "Hi there,");
 
 function contextRows(ctx?: RequestContext): [string, string][] {
@@ -124,6 +127,76 @@ export const templates = {
       cta: { label: `Open ${b.productName}`, url: p.appUrl },
       details: [["Signed in as", p.email], ...(p.mailboxes.length ? ([["Mailboxes", p.mailboxes.join(", ")]] as [string, string][]) : [])],
       note: "Tip: turn on two-factor authentication in Settings → Security to keep your account extra safe.",
+    };
+  },
+
+  /** Sent to a newly added personal address: proves it belongs to them. Contains no mailbox data. */
+  verifyPersonalEmail(b: Brand, p: { name?: string; url: string; account: string }): EmailContent {
+    return {
+      subject: `Confirm your email for ${b.productName} digests`,
+      preheader: "Confirm this address to get unread-mail reminders here.",
+      eyebrow: "Confirm email",
+      heading: "Is this your email?",
+      greeting: hi(p.name),
+      paragraphs: [
+        `Someone signed in to ${e(b.productName)} as <strong style="color:#18181b">${e(p.account)}</strong> asked to send unread-mail reminders to this address.`,
+        "If that was you, confirm below. You'll choose when the reminders start in your settings.",
+      ],
+      cta: { label: "Confirm this email", url: p.url },
+      details: [["Link expires", "In 24 hours"]],
+      note: "Not you? Ignore this email and nothing will be sent here.",
+    };
+  },
+
+  /** Security notice to the company address when a personal address is added. */
+  personalEmailAdded(b: Brand, p: { name?: string; masked: string; appUrl: string; ctx?: RequestContext }): EmailContent {
+    return {
+      subject: `A personal email was added to your ${b.productName} account`,
+      preheader: `Unread-mail reminders can now go to ${p.masked}.`,
+      eyebrow: "Security",
+      tone: "alert",
+      heading: "Personal email added",
+      greeting: hi(p.name),
+      paragraphs: [
+        `<strong style="color:#18181b">${e(p.masked)}</strong> was confirmed as the personal address for unread-mail reminders on your account.`,
+        "If you didn't do this, remove it in Settings → Profile and change your password.",
+      ],
+      cta: { label: "Review your settings", url: `${p.appUrl.replace(/\/$/, "")}/settings/profile` },
+      details: contextRows(p.ctx),
+    };
+  },
+
+  /** The unread-mail digest sent to a personal address every few hours. */
+  unreadDigest(
+    b: Brand,
+    p: {
+      name?: string;
+      total: number;
+      groups: { mailbox: string; count: number; items: { from: string; subject: string; url: string }[] }[];
+      /** "count" hides senders and subjects (admin policy). */
+      detail: "subjects" | "count";
+      openUrl: string;
+      offUrl: string;
+    },
+  ): EmailContent {
+    const n = p.total;
+    const plural = n === 1 ? "email" : "emails";
+    return {
+      subject: `You have ${n} unread ${plural} in ${b.productName}`,
+      preheader: p.groups.map((g) => `${g.mailbox}: ${g.count}`).join(" · "),
+      eyebrow: "Unread mail",
+      heading: `${n} unread ${plural} waiting`,
+      greeting: hi(p.name),
+      paragraphs: [
+        `New mail arrived in your ${e(b.productName)} account and hasn't been read yet.`,
+        ...(p.detail === "count" ? ["Open the app to read it."] : []),
+      ],
+      groups: p.groups.map((g) => {
+        const items = p.detail === "count" ? [] : g.items.map((it) => ({ label: clip(it.subject || "(no subject)"), sub: `From ${clip(it.from)}`, url: it.url }));
+        return { title: g.mailbox, count: g.count, items, more: p.detail === "count" ? 0 : Math.max(0, g.count - items.length) };
+      }),
+      cta: { label: `Open ${b.productName}`, url: p.openUrl },
+      footer: { text: "You get this because you turned on unread-mail reminders.", linkLabel: "Turn them off", url: p.offUrl },
     };
   },
 };

@@ -30,7 +30,13 @@ export async function logSystemEmail(env: Env, e: { resendId: string | null; to:
 }
 
 /** Send a branded transactional email from no-reply@<primary domain>. Never throws. */
-export async function sendSystemEmail(env: Env, to: string, content: EmailContent, category = "system"): Promise<boolean> {
+export async function sendSystemEmail(
+  env: Env,
+  to: string,
+  content: EmailContent,
+  category = "system",
+  opts: { headers?: Record<string, string> } = {},
+): Promise<boolean> {
   const brand = await getBrand(env.DB);
   const { html, text } = renderEmail(brand, env.APP_URL, content);
   try {
@@ -42,6 +48,7 @@ export async function sendSystemEmail(env: Env, to: string, content: EmailConten
       text,
       ...(brand.supportEmail ? { reply_to: [brand.supportEmail] } : {}),
       tags: [{ name: "category", value: category }],
+      ...(opts.headers ? { headers: opts.headers } : {}),
     });
     await logSystemEmail(env, { resendId: res.id, to, subject: content.subject, category });
     return true;

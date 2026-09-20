@@ -11,7 +11,9 @@ export type UnsubscribeView =
   | { kind: "done"; email: string; resubscribeAction: string; already?: boolean }
   | { kind: "stayed" }
   | { kind: "resubscribed"; email: string }
-  | { kind: "invalid" };
+  | { kind: "invalid" }
+  | { kind: "digestConfirm"; action: string }
+  | { kind: "digestOff" };
 
 /** Why people leave; the value is stored with the unsubscribe so the team can see it. */
 export const UNSUBSCRIBE_REASONS = [
@@ -108,6 +110,21 @@ export function renderUnsubscribePage(brand: Brand, view: UnsubscribeView): stri
       content = `${HEART}
         <h1>Welcome back!</h1>
         <p><strong>${e(view.email)}</strong> is subscribed to ${company} again.</p>`;
+      break;
+    case "digestConfirm":
+      title = "Turn off reminders";
+      content = `${ENVELOPE}
+        <h1>Turn off unread-mail reminders?</h1>
+        <p>You'll stop getting emails about unread mail in ${company}. Your mailbox itself isn't affected.</p>
+        <form method="post" action="${e(view.action)}">
+          <button class="btn btn--primary" type="submit">Turn off reminders</button>
+        </form>`;
+      break;
+    case "digestOff":
+      title = "Reminders off";
+      content = `${CHECK}
+        <h1>Reminders are off</h1>
+        <p>You won't get unread-mail reminders anymore. Turn them back on any time in Settings → Profile.</p>`;
       break;
     case "invalid":
       title = "Link not valid";
