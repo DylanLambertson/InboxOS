@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronDown, Copy, Inbox, KeyRound, Lock, LogOut, MailPlus, MoreHorizontal, Search, ShieldOff, Trash2, UserCheck, UserPlus, UserX } from "lucide-react";
+import { BellOff, BellRing, ChevronDown, Copy, Inbox, KeyRound, Lock, LogOut, MailPlus, MoreHorizontal, Search, ShieldOff, Trash2, UserCheck, UserPlus, UserX } from "lucide-react";
 import { toast } from "sonner";
 import type { MailboxRole, Role, UserStatus } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
@@ -24,6 +24,8 @@ interface AdminUser {
   mailboxCount: number;
   lastLoginAt: string | null;
   lockedUntil: string | null;
+  /** Unread-mail reminders to a personal address (masked), if on. */
+  digest: { hours: number; to: string } | null;
   createdAt: string;
 }
 
@@ -257,6 +259,11 @@ export function AdminUsers() {
                       {u.status === "invited" && <Badge tone="accent">Invited</Badge>}
                       {u.status === "disabled" && <Badge>Disabled</Badge>}
                       {u.lockedUntil && <Badge tone="warning"><Lock className="size-3" /> Locked</Badge>}
+                      {u.digest && (
+                        <span title={`Unread-mail reminders every ${u.digest.hours}h to ${u.digest.to}`}>
+                          <Badge className="ml-1"><BellRing className="size-3" /> Digest</Badge>
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-1">
@@ -321,6 +328,9 @@ export function AdminUsers() {
                                 }]
                               : []),
                             ...(u.lockedUntil ? [{ label: "Unlock account", icon: <Lock />, onSelect: () => act(() => api.patch(`admin/users/${u.id}`, { unlock: true }), "Account unlocked") }] : []),
+                            ...(u.digest
+                              ? [{ label: `Stop reminders to ${u.digest.to}`, icon: <BellOff />, onSelect: () => act(() => api.post(`admin/users/${u.id}/digest-off`), "Reminders turned off") }]
+                              : []),
                             { label: "Sign out everywhere", icon: <LogOut />, onSelect: () => act(() => api.post(`admin/users/${u.id}/sign-out`), "Signed out of all sessions") },
                             { separator: true, label: "" },
                             u.status === "disabled"

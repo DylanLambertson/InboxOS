@@ -19,7 +19,7 @@ const OAUTH_ERRORS: Record<string, string> = {
   account_disabled: "Your account has been disabled. Contact an administrator.",
 };
 
-function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
+export function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
   const brand = useBrand();
   return (
     <div className="flex min-h-full bg-bg">

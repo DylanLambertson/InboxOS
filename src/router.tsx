@@ -1,6 +1,7 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppShell } from "./components/layout/AppShell";
 import { InvitePage, LoginPage, ResetPage } from "./pages/Auth";
+import { VerifyEmailPage } from "./pages/VerifyEmail";
 import { MailPage } from "./pages/Mail";
 
 // Settings and Admin load on demand to keep the mail client's first load small.
@@ -12,6 +13,7 @@ export const router = createBrowserRouter([
   { path: "/login", element: <LoginPage /> },
   { path: "/invite/:token", element: <InvitePage /> },
   { path: "/reset/:token", element: <ResetPage /> },
+  { path: "/verify-email/:token", element: <VerifyEmailPage /> },
   {
     element: <AppShell />,
     children: [

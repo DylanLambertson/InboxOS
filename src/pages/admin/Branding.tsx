@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { ExternalLink, Inbox, KeyRound, PartyPopper, RotateCcw, ShieldCheck, Upload, UserPlus } from "lucide-react";
+import { ExternalLink, Inbox, KeyRound, MailCheck, PartyPopper, RotateCcw, ShieldCheck, Upload, UserPlus } from "lucide-react";
 import { toast } from "sonner";
 import { DEFAULT_BRAND, radiusValue, type Brand } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
@@ -255,6 +255,8 @@ export function AdminBranding() {
               {[
                 { name: "invite", label: "Invitation", hint: "Account claim link", icon: UserPlus },
                 { name: "welcome", label: "Welcome", hint: "After someone joins", icon: PartyPopper },
+                { name: "unreadDigest", label: "Unread digest", hint: "To a personal email", icon: Inbox },
+                { name: "verifyPersonalEmail", label: "Confirm personal email", hint: "Before digests start", icon: MailCheck },
                 { name: "reset", label: "Password reset", hint: "Forgot password / admin reset", icon: KeyRound },
                 { name: "passwordChanged", label: "Password changed", hint: "Security alert", icon: ShieldCheck },
                 { name: "twoFactor", label: "Two-factor changed", hint: "Security alert", icon: ShieldCheck },

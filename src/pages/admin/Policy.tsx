@@ -4,7 +4,7 @@ import { toast } from "sonner";
 import type { Brand, OrgPolicy } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
 import { useMe } from "@/lib/queries";
-import { Button, Field, Input, LoadError, PageHeader, Section, Spinner, Switch } from "@/components/ui/primitives";
+import { Button, Field, Input, LoadError, PageHeader, Section, Select, Spinner, Switch } from "@/components/ui/primitives";
 
 function Toggle({ title, description, checked, onChange, disabled }: { title: string; description?: ReactNode; checked: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
@@ -89,6 +89,17 @@ export function AdminPolicy() {
             checked={p.trackingEnabled}
             onChange={(v) => set("trackingEnabled", v)}
           />
+          <Field
+            className="mt-4"
+            label="Unread-mail reminders to personal email"
+            hint="People can get an email every few hours at a personal address listing unread mail. Choose what it may show, or turn it off."
+          >
+            <Select value={p.digestDetail} onChange={(e) => set("digestDetail", e.target.value as OrgPolicy["digestDetail"])} className="w-auto">
+              <option value="subjects">Senders and subjects</option>
+              <option value="count">Only how many unread</option>
+              <option value="off">Off: don't allow reminders</option>
+            </Select>
+          </Field>
         </div>
       </Section>
 
