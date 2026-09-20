@@ -3,6 +3,7 @@ import type { AppEnv } from "../env";
 import { ingestReceived, recordDeliveryEvent } from "../lib/inbound";
 import { sendAutoReplies } from "../lib/mail-rules";
 import { notifyReceived } from "../lib/notify";
+import { pushNewMail } from "../lib/push";
 import { verifySvix } from "../lib/svix";
 import { now } from "../lib/util";
 
@@ -36,6 +37,7 @@ webhookRoutes.post("/resend", async (c) => {
     if (evt.type === "email.received") {
       const r = await ingestReceived(c.env, evt.data);
       if (r.received.length) c.executionCtx.waitUntil(notifyReceived(c.env, r.received));
+      if (r.received.length) c.executionCtx.waitUntil(pushNewMail(c.env, r.received));
       if (r.autoReplies.length) c.executionCtx.waitUntil(sendAutoReplies(c.env, r.autoReplies));
       return c.json({ ok: true, stored: r.stored, unrouted: r.unrouted });
     }

@@ -48,6 +48,8 @@ export interface Preferences {
   conversationView: boolean;
   /** Show a desktop notification when new mail arrives while the app is in the background. */
   desktopNotifications: boolean;
+  /** Push notifications show the sender and subject; off = just "New mail in <mailbox>". */
+  pushShowDetails: boolean;
 }
 
 export const DEFAULT_PREFERENCES: Preferences = {
@@ -59,6 +61,7 @@ export const DEFAULT_PREFERENCES: Preferences = {
   composeMode: "docked",
   conversationView: true,
   desktopNotifications: false,
+  pushShowDetails: true,
 };
 
 export interface Me {

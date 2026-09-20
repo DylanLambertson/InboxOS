@@ -154,6 +154,7 @@ adminUserRoutes.patch("/:id", async (c) => {
     stmts.push(c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id));
     // Offboarding: no more reminders to their personal inbox (they'd have to turn it back on themselves).
     stmts.push(c.env.DB.prepare("UPDATE users SET digest_enabled = 0, digest_next_at = NULL WHERE id = ?").bind(target.id));
+    stmts.push(c.env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").bind(target.id));
   }
   await c.env.DB.batch(stmts);
   await audit(c, {

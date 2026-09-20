@@ -39,6 +39,7 @@ const zPrefs = z
     composeMode: z.enum(["docked", "fullscreen"]),
     conversationView: z.boolean(),
     desktopNotifications: z.boolean(),
+    pushShowDetails: z.boolean(),
   })
   .partial();
 

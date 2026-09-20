@@ -14,6 +14,8 @@ export interface Env {
   /** Where to POST a signed notice when mail arrives (e.g. another service's receiver). */
   NOTIFY_WEBHOOK_URL?: string;
   NOTIFY_WEBHOOK_SECRET?: string;
+  /** VAPID private key (JWK JSON) for Web Push; the public key is derived from it. Unset = push off. */
+  VAPID_PRIVATE_JWK?: string;
 }
 
 export interface SessionUser {
