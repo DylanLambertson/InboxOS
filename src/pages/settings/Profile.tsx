@@ -7,6 +7,7 @@ import { useMe } from "@/lib/queries";
 import { RichTextField } from "@/components/compose/Editor";
 import { Avatar, Button, Field, Input, PageHeader, Section, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { DigestSettings } from "./DigestSettings";
+import { PushSettings } from "./PushSettings";
 
 function Row({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
@@ -142,6 +143,8 @@ export function ProfileSettings() {
           </Row>
         </div>
       </Section>
+
+      <PushSettings me={me} setPref={setPref} />
 
       <DigestSettings me={me} />
     </div>

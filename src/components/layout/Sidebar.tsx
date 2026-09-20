@@ -31,6 +31,7 @@ import { api, errorMessage } from "@/lib/api";
 import { mailboxLabel } from "@/lib/format";
 import { useLabels, useMailboxes, useMe } from "@/lib/queries";
 import { toast } from "sonner";
+import { disablePush } from "@/lib/push";
 import { clearAppCache } from "@/lib/pwa";
 import { useCompose } from "../compose/ComposeProvider";
 import { Avatar, Button, cx } from "../ui/primitives";
@@ -141,6 +142,8 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
     }
   };
   const logout = async () => {
+    // A signed-out device shouldn't keep showing this person's mail.
+    await disablePush().catch(() => undefined);
     await api.post("/api/auth/logout");
     clearAppCache();
     qc.clear();

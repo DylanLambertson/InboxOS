@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Menu as MenuIcon, PenSquare, ShieldAlert } from "lucide-react";
 import { applyTheme } from "@/lib/brand";
 import { useInboxNotifications } from "@/lib/notifications";
+import { syncPush } from "@/lib/push";
 import { useMailboxes, useMe } from "@/lib/queries";
 import { SHORTCUT_HELP, useShortcuts } from "@/lib/shortcuts";
 import { ComposeProvider, useCompose } from "../compose/ComposeProvider";
@@ -36,6 +37,10 @@ export function AppShell() {
   useEffect(() => {
     if (me) applyTheme(me.preferences.theme);
   }, [me]);
+  // Keep this device's push subscription registered to whoever is signed in.
+  useEffect(() => {
+    if (me?.id) syncPush();
+  }, [me?.id]);
   useEffect(() => setDrawer(false), [location.pathname]);
   useShortcuts({ "?": () => setHelp(true) }, []);
 

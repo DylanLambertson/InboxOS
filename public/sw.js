@@ -87,3 +87,47 @@ self.addEventListener("notificationclick", (event) => {
     })(),
   );
 });
+
+// New mail pushed from the server (Web Push). The payload is already end-to-end
+// encrypted to this device; it carries only what the lock screen shows.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { title: "New mail", body: event.data ? event.data.text() : "" };
+  }
+  const title = data.title || "New mail";
+  event.waitUntil(
+    (async () => {
+      if (typeof data.badge === "number" && "setAppBadge" in self.navigator) {
+        await (data.badge > 0 ? self.navigator.setAppBadge(data.badge) : self.navigator.clearAppBadge()).catch(() => undefined);
+      }
+      await self.registration.showNotification(title, {
+        body: data.body || "",
+        tag: data.tag || "inboxos-new-mail",
+        renotify: true,
+        icon: "/api/brand/icons/icon-192.png",
+        badge: "/api/brand/icons/icon-192.png",
+        data: { url: data.url || "/" },
+      });
+    })(),
+  );
+});
+
+// Browsers occasionally rotate a subscription: re-register it so mail keeps arriving.
+self.addEventListener("pushsubscriptionchange", (event) => {
+  event.waitUntil(
+    (async () => {
+      const { publicKey } = await fetch("/api/push/key", { credentials: "same-origin" }).then((r) => r.json());
+      if (!publicKey) return;
+      const sub = await self.registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: publicKey });
+      await fetch("/api/push/subscribe", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(sub.toJSON()),
+      });
+    })().catch(() => undefined),
+  );
+});

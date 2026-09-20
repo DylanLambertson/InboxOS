@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import type { MailboxSummary, Me } from "@shared/types";
 import { useBrand } from "./brand";
+import { pushIsOn } from "./push";
 import { showAppNotification } from "./pwa";
 
 /**
@@ -24,6 +25,8 @@ export function useInboxNotifications(me: Me | undefined, boxes: MailboxSummary[
     // The first load isn't "new" mail.
     if (before === null || unread <= before) return;
     if (!me?.preferences.desktopNotifications || !document.hidden) return;
+    // Push already shows it on this device.
+    if (pushIsOn()) return;
     if (!("Notification" in window) || Notification.permission !== "granted") return;
     const fresh = unread - before;
     // Through the service worker when there is one: phones don't allow page-level notifications.
