@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { AlertTriangle, Ban, ChevronDown, Code2, Download, Forward, ImageOff, MoreHorizontal, Printer, Reply, ReplyAll, Star, Eye, MousePointerClick } from "lucide-react";
+import { AlertTriangle, Ban, ChevronDown, Code2, Download, Filter, Forward, ImageOff, MoreHorizontal, Printer, Reply, ReplyAll, Star, Eye, MousePointerClick } from "lucide-react";
 import type { MessageDetail } from "@shared/types";
+import type { MailRuleInput } from "@shared/mail-rules";
 import { displayName, fullAddress, longDate, relativeTime } from "@/lib/format";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -10,6 +11,7 @@ import { Avatar, Button, cx, IconButton } from "../ui/primitives";
 import { Menu, Modal, useConfirm } from "../ui/overlay";
 import { AttachmentChip } from "./AttachmentChip";
 import { EmailFrame } from "./EmailFrame";
+import { EMPTY_RULE, RuleEditor } from "./RuleEditor";
 import { EVENT_LABELS, StatusBadge } from "./StatusBadge";
 
 export function printMessage(m: MessageDetail) {
@@ -45,6 +47,7 @@ export function MessageCard({
   const [blocked, setBlocked] = useState(0);
   const [showDetails, setShowDetails] = useState(false);
   const [showHeaders, setShowHeaders] = useState(false);
+  const [ruleDraft, setRuleDraft] = useState<Partial<MailRuleInput> | null>(null);
   const qc = useQueryClient();
   const confirm = useConfirm();
   const blockSender = async () => {
@@ -64,6 +67,14 @@ export function MessageCard({
     } catch (e) {
       toast.error(errorMessage(e));
     }
+  };
+  const createRule = () => {
+    const subject = m.subject.replace(/^\s*((re|fwd?|aw|sv|wg)\s*:\s*)+/i, "").trim().slice(0, 300);
+    setRuleDraft({
+      ...EMPTY_RULE,
+      name: `From ${m.from.name || m.from.email}`.slice(0, 100),
+      conditions: [{ field: "from", op: "equals", value: m.from.email }, ...(subject ? [{ field: "subject" as const, op: "contains" as const, value: subject }] : [])],
+    });
   };
   const visibleAttachments = m.attachments.filter((a) => !a.inline || !(m.html ?? "").includes(`cid:${a.contentId}`));
   const isOut = m.direction === "outbound";
@@ -162,6 +173,7 @@ export function MessageCard({
               ...(m.direction === "inbound" && !readOnly
                 ? [
                     { separator: true, label: "" },
+                    { label: "Create rule from this message", icon: <Filter />, onSelect: createRule },
                     { label: `Block ${m.from.email}`, icon: <Ban />, danger: true, onSelect: () => blockSender() },
                   ]
                 : []),
@@ -211,6 +223,7 @@ export function MessageCard({
         )}
       </div>
 
+      {ruleDraft && <RuleEditor open onClose={() => setRuleDraft(null)} mailboxId={m.mailboxId} initial={ruleDraft} />}
       <Modal open={showHeaders} onClose={() => setShowHeaders(false)} title="Message headers" width={720}>
         <div className="space-y-1 font-mono text-xs">
           {m.messageIdHeader && <HeaderRow k="Message-ID" v={m.messageIdHeader} />}
