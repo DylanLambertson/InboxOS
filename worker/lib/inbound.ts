@@ -3,6 +3,7 @@ import type { Env } from "../env";
 import { attachmentKey, bodyKey, contactStatements, ftsStatements, resolveThread } from "./messages";
 import { isBlocked, type AutoReplyCandidate } from "./mail-rules";
 import type { ReceivedNotice } from "./notify";
+import { applyRulesOnIngest } from "./rules";
 import { resend, type ReceivedEmail } from "./resend";
 import { getPolicy } from "./settings";
 import { htmlToText, makeSnippet, newId, normalizeSubject, now, parseAddress, parseAddressList, sanitizeFilename } from "./util";
@@ -103,7 +104,7 @@ export async function ingestReceived(
 
     const id = newId();
     // Blocked senders land in Spam, quietly: no notification, no auto-reply.
-    const folder = !unrouted && (await isBlocked(env.DB, mailboxId, from.email)) ? "spam" : "inbox";
+    const baseFolder = !unrouted && (await isBlocked(env.DB, mailboxId, from.email)) ? "spam" : "inbox";
     const threadId = await resolveThread(env.DB, mailboxId, {
       inReplyTo,
       references,
@@ -139,6 +140,14 @@ export async function ingestReceived(
       );
     }
     const visibleAttachments = files.filter((f) => !(f.meta.content_disposition === "inline" && f.meta.content_id)).length;
+    // Mailbox rules may file it elsewhere; the final folder decides notices and auto-replies below.
+    const ruled = await applyRulesOnIngest(env.DB, {
+      mailboxId,
+      messageId: id,
+      folder: baseFolder,
+      message: { from, to, cc, subject, text, hasAttachments: visibleAttachments > 0, size, headers: lowerHeaders },
+    });
+    const folder = ruled.folder;
     await env.DB.batch([
       env.DB.prepare(
         `INSERT INTO messages (id, mailbox_id, thread_id, direction, folder, status, from_addr, from_name, to_json, cc_json,
@@ -149,7 +158,7 @@ export async function ingestReceived(
         id,
         mailboxId,
         threadId,
-        folder,
+        baseFolder,
         from.email,
         from.name ?? "",
         JSON.stringify(to),
@@ -186,11 +195,12 @@ export async function ingestReceived(
       ),
       ...ftsStatements(env.DB, { id, subject, from, to, cc, text }),
       ...contactStatements(env.DB, [from], false),
+      ...ruled.statements,
     ]);
     stored++;
     // Routed mail is worth telling the panel about; unrouted lands in the admin-only area.
     if (!unrouted && folder === "inbox") {
-      received.push({ mailboxId, message: { id, threadId, from, subject, snippet: makeSnippet(text), date: t } });
+      if (!ruled.read) received.push({ mailboxId, message: { id, threadId, from, subject, snippet: makeSnippet(text), date: t } });
       const ours = await mailboxAddressSet(env.DB, mailboxId);
       const toAddress = recipients.map((r) => (parseAddress(r)?.email ?? r).toLowerCase()).find((r) => ours.has(r)) ?? "";
       autoReplies.push({ mailboxId, toAddress, from, subject, messageIdHeader, references, headers: lowerHeaders });
