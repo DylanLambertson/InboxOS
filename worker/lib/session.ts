@@ -4,8 +4,11 @@ import { HTTPException } from "hono/http-exception";
 import type { AppEnv, Env, SessionUser } from "../env";
 import type { Role } from "@shared/types";
 import { clientIp } from "./audit";
+import { allowlistBlocks, IP_BLOCKED_MESSAGE } from "./ip-allowlist";
+import { rateLimit } from "./ratelimit";
 import { canManage, canViewConsole, roleSql } from "./roles";
 import { getPolicy } from "./settings";
+import { allowlistIp, ipRefused } from "./sign-ins";
 import { newId, now, sha256hex } from "./util";
 
 const TOUCH_INTERVAL_MS = 5 * 60_000;
@@ -95,8 +98,17 @@ export const requireAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (!row) throw new HTTPException(401, { message: "Not signed in" });
   const user: SessionUser = { id: row.id, email: row.email, name: row.name, role: row.role, sessionId: row.sid };
   c.set("user", user);
+  const policy = await getPolicy(c.env.DB);
+  // Checked on every request, not just at sign-in: a session started on an allowed network
+  // must not keep working once the laptop leaves it.
+  if (allowlistBlocks(policy, allowlistIp(c), row.role)) {
+    // Record once per session and address every 10 minutes; the app retries constantly.
+    if (await rateLimit(c.env.DB, `ipblock:${row.sid.slice(0, 16)}:${allowlistIp(c) ?? "none"}`, 1, 600)) {
+      await ipRefused(c, policy, { method: "session", user: { id: row.id, email: row.email, role: row.role } });
+    }
+    throw new HTTPException(403, { message: IP_BLOCKED_MESSAGE });
+  }
   if (Date.now() - Date.parse(row.last_seen_at) > TOUCH_INTERVAL_MS) {
-    const policy = await getPolicy(c.env.DB);
     c.executionCtx.waitUntil(
       c.env.DB.prepare("UPDATE sessions SET last_seen_at = ?, expires_at = ? WHERE id = ?")
         .bind(now(), new Date(Date.now() + policy.sessionDays * 86_400_000).toISOString(), row.sid)

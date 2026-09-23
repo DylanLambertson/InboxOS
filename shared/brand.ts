@@ -96,6 +96,10 @@ export interface OrgPolicy {
    * subjects, just counts, or "off" to not allow digests at all.
    */
   digestDetail: "subjects" | "count" | "off";
+  /** Only allow access from these IPv4/IPv6 addresses or CIDR ranges. Empty = from anywhere. */
+  ipAllowlist: string[];
+  /** Who the allowlist applies to: everyone, or only people who can open the admin console. */
+  ipAllowlistEnforceFor: "everyone" | "admins";
 }
 
 export const DEFAULT_POLICY: OrgPolicy = {
@@ -113,6 +117,8 @@ export const DEFAULT_POLICY: OrgPolicy = {
   sessionDays: 14,
   trackingEnabled: false,
   digestDetail: "subjects",
+  ipAllowlist: [],
+  ipAllowlistEnforceFor: "everyone",
 };
 
 /** Every mail domain, primary first, lowercased and without duplicates. */

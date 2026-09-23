@@ -8,9 +8,11 @@ import { rateLimit } from "../lib/ratelimit";
 import { createSession, destroySession, readSession } from "../lib/session";
 import { getBrand, getPolicy } from "../lib/settings";
 import { templates } from "../lib/email-templates";
+import { ipRefused, recordSignIn } from "../lib/sign-ins";
 import { sendSystemEmail } from "../lib/system-mail";
 import { verifyTotp } from "../lib/totp";
 import { getUser, getUserByEmail } from "../lib/users";
+import { IP_BLOCKED_MESSAGE } from "../lib/ip-allowlist";
 import { newId, now, parseJson, sha256hex } from "../lib/util";
 import { parseBody, zEmail } from "../lib/validate";
 import { googleRoutes } from "./auth-google";
@@ -43,15 +45,24 @@ authRoutes.post("/login", async (c) => {
   }
   const policy = await getPolicy(c.env.DB);
   const user = await getUserByEmail(c.env.DB, email);
+  // Before the password check, so a blocked network can't test passwords. Without a known
+  // active account only an "everyone" allowlist applies, so this can't reveal who exists.
+  const known = user && user.status === "active" && user.password_hash ? user : null;
+  if (await ipRefused(c, policy, { method: "password", user: known, email })) {
+    throw new HTTPException(403, { message: IP_BLOCKED_MESSAGE });
+  }
   if (!user || user.status !== "active" || !user.password_hash) {
     await hashPassword(password); // equalize timing for unknown accounts
     await audit(c, { action: "auth.login_failed", meta: { email, reason: "unknown_or_inactive" }, actor: null });
+    await recordSignIn(c, { outcome: "failed", method: "password", email, reason: "unknown_or_inactive" });
     throw new HTTPException(401, { message: GENERIC });
   }
   if (!policy.passwordLoginEnabled && user.role !== "owner") {
+    await recordSignIn(c, { outcome: "failed", method: "password", user, reason: "password_login_disabled" });
     throw new HTTPException(403, { message: "Password sign-in is disabled. Use Google sign-in." });
   }
   if (user.locked_until && user.locked_until > now()) {
+    await recordSignIn(c, { outcome: "locked", method: "password", user });
     throw new HTTPException(423, { message: "Account temporarily locked after too many failed attempts. Try again later." });
   }
   if (!(await verifyPassword(password, user.password_hash))) {
@@ -61,6 +72,7 @@ authRoutes.post("/login", async (c) => {
       .bind(lock ? 0 : failures, lock, user.id)
       .run();
     await audit(c, { action: "auth.login_failed", targetType: "user", targetId: user.id, meta: { email, locked: !!lock }, actor: null });
+    await recordSignIn(c, { outcome: lock ? "locked" : "failed", method: "password", user, reason: lock ? "too_many_failures" : "wrong_password" });
     throw new HTTPException(401, { message: GENERIC });
   }
   await c.env.DB.prepare("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?").bind(user.id).run();
@@ -72,6 +84,7 @@ authRoutes.post("/login", async (c) => {
   await createSession(c, user.id);
   await c.env.DB.prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(now(), user.id).run();
   await audit(c, { action: "auth.login", targetType: "user", targetId: user.id, actor: { id: user.id, email: user.email }, meta: { method: "password" } });
+  await recordSignIn(c, { outcome: "success", method: "password", user });
   return c.json({ ok: true });
 });
 
@@ -84,6 +97,9 @@ authRoutes.post("/2fa", async (c) => {
   }
   const user = await getUser(c.env.DB, s.id);
   if (!user?.totp_secret) throw new HTTPException(401, { message: "Two-factor is not set up." });
+  if (await ipRefused(c, await getPolicy(c.env.DB), { method: "password+2fa", user })) {
+    throw new HTTPException(403, { message: IP_BLOCKED_MESSAGE });
+  }
 
   // A code is valid for ~90s; refuse a second use so a shoulder-surfed or phished code can't be replayed.
   let ok = (await verifyTotp(user.totp_secret, code)) && (await rateLimit(c.env.DB, `totp-used:${user.id}:${code.replace(/\s/g, "")}`, 1, 120));
@@ -101,6 +117,7 @@ authRoutes.post("/2fa", async (c) => {
   }
   if (!ok) {
     await audit(c, { action: "auth.2fa_failed", targetType: "user", targetId: user.id, actor: { id: user.id, email: user.email } });
+    await recordSignIn(c, { outcome: "2fa_failed", method: "password+2fa", user });
     throw new HTTPException(401, { message: "That code didn't work. Check your authenticator app and try again." });
   }
   await destroySession(c);
@@ -113,6 +130,7 @@ authRoutes.post("/2fa", async (c) => {
     actor: { id: user.id, email: user.email },
     meta: { method: "password+2fa", usedRecovery },
   });
+  await recordSignIn(c, { outcome: "success", method: "password+2fa", user, reason: usedRecovery ? "recovery_code" : undefined });
   return c.json({ ok: true });
 });
 

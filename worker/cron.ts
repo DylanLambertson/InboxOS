@@ -63,6 +63,7 @@ export async function housekeeping(env: Env): Promise<void> {
     stmts.push(
       env.DB.prepare("DELETE FROM email_events WHERE created_at < ?").bind(ago(policy.logRetentionDays)),
       env.DB.prepare("DELETE FROM audit_logs WHERE created_at < ?").bind(ago(policy.logRetentionDays)),
+      env.DB.prepare("DELETE FROM login_events WHERE created_at < ?").bind(ago(policy.logRetentionDays)),
     );
   }
   await env.DB.batch(stmts);

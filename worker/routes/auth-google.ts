@@ -5,6 +5,7 @@ import { audit } from "../lib/audit";
 import { appOrigin } from "../lib/domains";
 import { createSession, readSession } from "../lib/session";
 import { getBrand, getPolicy } from "../lib/settings";
+import { ipRefused, recordSignIn } from "../lib/sign-ins";
 import { ensureMailbox, getUserByEmail, insertUser, withRole, type UserRow } from "../lib/users";
 import { b64decode, domainOf, newId, now, parseJson, sha256hex } from "../lib/util";
 
@@ -128,6 +129,8 @@ googleRoutes.get("/callback", async (c) => {
     withRole(await c.env.DB.prepare("SELECT * FROM users WHERE google_sub = ?").bind(claims.sub).first<UserRow>()) ??
     (await getUserByEmail(c.env.DB, email));
 
+  // Before auto-provisioning, so a refused network can't create accounts either.
+  if (await ipRefused(c, policy, { method: "google", user, email })) return fail("ip_blocked");
   if (!user) {
     if (!policy.googleAutoProvision || !allowed.length || !domainOk) return fail("google_no_account");
     const id = await insertUser(c.env.DB, { email, name: claims.name ?? email.split("@")[0], role: "member", status: "active", googleSub: claims.sub });
@@ -138,9 +141,13 @@ googleRoutes.get("/callback", async (c) => {
     await audit(c, { action: "user.auto_provisioned", targetType: "user", targetId: id, actor: { id, email } });
     user = withRole(await c.env.DB.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>())!;
   }
-  if (user.status === "disabled") return fail("account_disabled");
-  if (!domainOk && user.role !== "owner") return fail("google_domain");
-  if (user.google_sub && user.google_sub !== claims.sub) return fail("google_mismatch");
+  const refuse = async (reason: string) => {
+    await recordSignIn(c, { outcome: "failed", method: "google", user, reason });
+    return fail(reason);
+  };
+  if (user.status === "disabled") return refuse("account_disabled");
+  if (!domainOk && user.role !== "owner") return refuse("google_domain");
+  if (user.google_sub && user.google_sub !== claims.sub) return refuse("google_mismatch");
 
   await c.env.DB.prepare(
     "UPDATE users SET google_sub = ?, status = 'active', name = CASE WHEN name = '' THEN ? ELSE name END, updated_at = ? WHERE id = ?",
@@ -155,5 +162,6 @@ googleRoutes.get("/callback", async (c) => {
   await createSession(c, user.id);
   await c.env.DB.prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(now(), user.id).run();
   await audit(c, { action: "auth.login", targetType: "user", targetId: user.id, actor: { id: user.id, email: user.email }, meta: { method: "google" } });
+  await recordSignIn(c, { outcome: "success", method: "google", user });
   return c.redirect(data.next);
 });

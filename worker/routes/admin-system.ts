@@ -10,6 +10,8 @@ import { likeEscape } from "../lib/search";
 import { quotaUsage } from "../lib/send";
 import { syncDomainAliases } from "../lib/domains";
 import { loadSettings, saveSetting } from "../lib/settings";
+import { allowlistLockoutProblem, isValidCidr } from "../lib/ip-allowlist";
+import { allowlistIp } from "../lib/sign-ins";
 import { clampInt, now } from "../lib/util";
 import { parseBody, zColor, zEmail, zId } from "../lib/validate";
 
@@ -118,6 +120,8 @@ const zPolicy = z.object({
   sessionDays: z.number().int().min(1).max(90),
   trackingEnabled: z.boolean(),
   digestDetail: z.enum(["subjects", "count", "off"]),
+  ipAllowlist: z.array(z.string().trim().max(64).refine(isValidCidr, "Enter IP addresses or ranges like 203.0.113.0/24 or 2001:db8::/32")).max(100),
+  ipAllowlistEnforceFor: z.enum(["everyone", "admins"]),
 });
 
 adminSystemRoutes.put("/settings/brand", async (c) => {
@@ -140,6 +144,10 @@ adminSystemRoutes.put("/settings/policy", async (c) => {
   }
   const { policy } = await loadSettings(c.env.DB);
   const next = { ...policy, ...body };
+  if ("ipAllowlist" in body || "ipAllowlistEnforceFor" in body) {
+    const problem = allowlistLockoutProblem(allowlistIp(c), next.ipAllowlist);
+    if (problem) throw new HTTPException(400, { message: problem });
+  }
   await saveSetting(c.env.DB, "policy", next, u.id);
   const changed = Object.fromEntries(Object.keys(body).map((k) => [k, { from: policy[k as keyof typeof policy], to: next[k as keyof typeof next] }]));
   await audit(c, { action: "settings.policy_updated", targetType: "settings", meta: changed });
@@ -199,6 +207,8 @@ adminSystemRoutes.get("/email-preview/:name", async (c) => {
     reset: () => templates.reset(brand, { name: me.name, url: sample, expires: "1 hour", ctx }),
     passwordChanged: () => templates.passwordChanged(brand, { name: me.name, appUrl: app, ctx }),
     twoFactor: () => templates.twoFactor(brand, { name: me.name, enabled: true, appUrl: app, ctx }),
+    newSignIn: () =>
+      templates.newSignIn(brand, { name: me.name, reasons: ["country", "device"], device: "Chrome on Windows", country: "DE", appUrl: app, ctx: { ip: ctx.ip ?? "203.0.113.7", userAgent: null } }),
     welcome: () => templates.welcome(brand, { name: "Jordan Lee", email: `jordan@${brand.primaryDomain}`, appUrl: app, mailboxes: [`jordan@${brand.primaryDomain}`, `support@${brand.primaryDomain}`] }),
     verifyPersonalEmail: () => templates.verifyPersonalEmail(brand, { name: me.name, url: sample, account: me.email }),
     personalEmailAdded: () => templates.personalEmailAdded(brand, { name: me.name, masked: "jo***@gmail.com", appUrl: app, ctx }),

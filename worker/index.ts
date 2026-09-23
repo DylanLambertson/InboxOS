@@ -8,6 +8,7 @@ import { getBrand } from "./lib/settings";
 import { adminApiKeyRoutes } from "./routes/admin-apikeys";
 import { adminSuppressionRoutes } from "./routes/admin-suppressions";
 import { adminMailboxRoutes } from "./routes/admin-mailboxes";
+import { adminSecurityRoutes } from "./routes/admin-security";
 import { adminSystemRoutes } from "./routes/admin-system";
 import { adminTrafficRoutes } from "./routes/admin-traffic";
 import { adminUserRoutes } from "./routes/admin-users";
@@ -133,6 +134,7 @@ admin.route("/mailboxes", adminMailboxRoutes);
 admin.route("/traffic", adminTrafficRoutes);
 admin.route("/api-keys", adminApiKeyRoutes);
 admin.route("/suppressions", adminSuppressionRoutes);
+admin.route("/security", adminSecurityRoutes);
 admin.route("/", adminSystemRoutes);
 api.route("/admin", admin);
 

@@ -16,6 +16,17 @@ export function describeDevice(ua: string | null): string {
   return os ? `${browser} on ${os}` : browser;
 }
 
+/** "DE" → "Germany (DE)". Cloudflare uses XX for unknown and T1 for Tor. */
+export function countryName(code: string): string {
+  if (code === "T1") return "Tor network";
+  try {
+    const name = new Intl.DisplayNames(["en"], { type: "region" }).of(code);
+    return name && name !== code ? `${name} (${code})` : code;
+  } catch {
+    return code;
+  }
+}
+
 const when = (d = new Date()) =>
   d.toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit", timeZone: "UTC", timeZoneName: "short" });
 
@@ -109,6 +120,31 @@ export const templates = {
       cta: { label: p.enabled ? "View security settings" : "Turn two-factor back on", url: `${p.appUrl.replace(/\/$/, "")}/settings/security` },
       details: contextRows(p.ctx),
       note: `Didn't make this change? Reset your password immediately${b.supportEmail ? ` and let <a href="mailto:${e(b.supportEmail)}" style="color:#52525b">${e(b.supportEmail)}</a> know` : ""}.`,
+    };
+  },
+
+  /** Successful sign-in from a country or browser the account hasn't used recently. */
+  newSignIn(
+    b: Brand,
+    p: { name?: string; reasons: ("country" | "device")[]; device: string; country: string | null; appUrl: string; ctx: RequestContext },
+  ): EmailContent {
+    const what = p.reasons.includes("country") && p.reasons.includes("device") ? "a new device and location" : p.reasons.includes("country") ? "a new location" : "a new device";
+    return {
+      subject: `New sign-in to your ${b.productName} account`,
+      preheader: `Your account was just signed in to from ${what}.`,
+      eyebrow: "Security alert",
+      tone: "alert",
+      heading: `New sign-in from ${what}`,
+      greeting: hi(p.name),
+      paragraphs: [`Your ${e(b.productName)} account was just signed in to from ${what}. If this was you, there's nothing else to do.`],
+      details: [
+        ["When", when(p.ctx.at)],
+        ["Device", p.device],
+        ["Location", p.country ? countryName(p.country) : "Unknown"],
+        ["IP address", p.ctx.ip ?? "Unknown"],
+      ],
+      note: `<strong>Wasn't you?</strong> Change your password right away and sign out of other sessions in Settings → Security${b.supportEmail ? `, then let <a href="mailto:${e(b.supportEmail)}" style="color:#52525b">${e(b.supportEmail)}</a> know` : ""}.`,
+      cta: { label: "Review account security", url: `${p.appUrl.replace(/\/$/, "")}/settings/security` },
     };
   },
 
