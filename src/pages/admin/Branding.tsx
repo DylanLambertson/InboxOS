@@ -260,6 +260,7 @@ export function AdminBranding() {
                 { name: "reset", label: "Password reset", hint: "Forgot password / admin reset", icon: KeyRound },
                 { name: "passwordChanged", label: "Password changed", hint: "Security alert", icon: ShieldCheck },
                 { name: "twoFactor", label: "Two-factor changed", hint: "Security alert", icon: ShieldCheck },
+                { name: "newSignIn", label: "New sign-in", hint: "New device or country", icon: ShieldCheck },
               ].map((t) => (
                 <a
                   key={t.name}

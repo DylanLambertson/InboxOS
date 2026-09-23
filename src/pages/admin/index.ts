@@ -9,3 +9,4 @@ export { AdminLogs } from "./Logs";
 export { AdminSetup } from "./Setup";
 export { AdminApiKeys } from "./ApiKeys";
 export { AdminUnsubscribes } from "./Unsubscribes";
+export { AdminSecurity } from "./Security";

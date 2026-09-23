@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Menu as MenuIcon, PenSquare, ShieldAlert } from "lucide-react";
+import { api, ApiError } from "@/lib/api";
 import { applyTheme } from "@/lib/brand";
 import { useInboxNotifications } from "@/lib/notifications";
 import { syncPush } from "@/lib/push";
@@ -48,6 +49,25 @@ export function AppShell() {
     return (
       <div className="flex h-full items-center justify-center">
         <Spinner className="size-5" />
+      </div>
+    );
+  }
+  // Refused by the IP allowlist: the session is fine, the network isn't, so explain instead of
+  // bouncing to the sign-in page (which would send a signed-in user straight back here).
+  if (error instanceof ApiError && error.status === 403) {
+    return (
+      <div className="flex h-full flex-col items-center justify-center gap-4 px-6 text-center">
+        <ShieldAlert className="size-8 text-warning" />
+        <p className="max-w-sm text-sm text-fg-muted">{error.message}</p>
+        <button
+          className="h-8 rounded-ui border border-line bg-surface px-3 text-[13px] font-medium hover:bg-subtle"
+          onClick={async () => {
+            await api.post("/api/auth/logout").catch(() => {});
+            window.location.assign("/login");
+          }}
+        >
+          Sign out
+        </button>
       </div>
     );
   }

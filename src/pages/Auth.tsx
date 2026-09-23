@@ -17,6 +17,7 @@ const OAUTH_ERRORS: Record<string, string> = {
   google_domain: "That Google account's domain isn't allowed.",
   google_mismatch: "This account is linked to a different Google user.",
   account_disabled: "Your account has been disabled. Contact an administrator.",
+  ip_blocked: "Your organization only allows sign-in from approved networks. Connect from one and try again.",
 };
 
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {

@@ -55,6 +55,9 @@ export function AdminPolicy() {
       for (const k of ["require2fa", "passwordLoginEnabled", "googleSsoEnabled", "googleAllowedDomains", "googleAutoProvision", "sessionDays"] as const) delete next[k];
     }
     delete next.catchAllMailboxId;
+    // Edited in Admin → Security; don't overwrite it with a stale copy.
+    delete next.ipAllowlist;
+    delete next.ipAllowlistEnforceFor;
     try {
       await api.put("admin/settings/policy", next as Record<string, unknown>);
       qc.invalidateQueries({ queryKey: ["admin-settings"] });
