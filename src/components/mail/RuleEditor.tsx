@@ -106,6 +106,7 @@ function ConditionRow({ c, onChange, onRemove }: { c: RuleCondition; onChange: (
 
 function ActionRow({ a, mailboxId, onChange, onRemove }: { a: RuleAction; mailboxId: string; onChange: (a: RuleAction) => void; onRemove?: () => void }) {
   const { data: labels = [] } = useLabels(mailboxId);
+  const known = a.type === "label" && labels.some((l) => l.id === a.labelId);
   const setType = (type: RuleAction["type"]) =>
     onChange(type === "label" ? { type, labelId: labels[0]?.id ?? "" } : type === "move" ? { type, folder: "archive" } : { type });
   return (
@@ -119,8 +120,9 @@ function ActionRow({ a, mailboxId, onChange, onRemove }: { a: RuleAction; mailbo
       </Select>
       {a.type === "label" &&
         (labels.length ? (
-          <Select value={a.labelId} onChange={(e) => onChange({ type: "label", labelId: e.target.value })} className="w-44" aria-label="Label">
-            {!a.labelId && <option value="">Choose a label</option>}
+          // A deleted label shows as unset so the user picks another instead of hitting a save error.
+          <Select value={known ? a.labelId : ""} onChange={(e) => onChange({ type: "label", labelId: e.target.value })} className="w-44" aria-label="Label">
+            {!known && <option value="">Choose a label</option>}
             {labels.map((l) => (
               <option key={l.id} value={l.id}>
                 {l.name}
@@ -202,8 +204,9 @@ export function RuleEditor({ open, onClose, mailboxId, rule, initial }: { open: 
       const saved = rule ? await api.put<MailRule>(`mailboxes/${mailboxId}/rules/${rule.id}`, { ...draft }) : await api.post<MailRule>(`mailboxes/${mailboxId}/rules`, { ...draft });
       qc.invalidateQueries({ queryKey: ["rules", mailboxId] });
       toast.success(rule ? "Rule saved" : "Rule created");
-      if (applyExisting) await runExisting(saved.id);
+      // Close before the run so a failed run can't lead to saving a second copy.
       onClose();
+      if (applyExisting) runExisting(saved.id).catch((e) => toast.error(errorMessage(e)));
     } catch (e) {
       toast.error(errorMessage(e));
     } finally {

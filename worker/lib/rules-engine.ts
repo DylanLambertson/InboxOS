@@ -35,8 +35,15 @@ export interface RuleOutcome {
 
 type EvalRule = Pick<MailRule, "id" | "enabled" | "position" | "match" | "conditions" | "actions" | "stopProcessing">;
 
-/** Wildcard matching walks text × pattern in the worst case, so very long bodies are cut. */
-const WILDCARD_TEXT_LIMIT = 20_000;
+/** Wildcard matching walks text × pattern in the worst case, so long text is cut... */
+const WILDCARD_TEXT_LIMIT = 2_000;
+/** ...and all wildcard conditions on one message share a step budget, so no rule set can stall ingest. */
+export const WILDCARD_STEP_BUDGET = 500_000;
+
+/** Mutable step allowance shared by the wildcard checks for one message. */
+export interface StepBudget {
+  left: number;
+}
 
 /** Unicode-aware case folding: "STRASSE" ≡ "straße", "ΟΔΟΣ" ≡ "οδος". */
 export function fold(s: string): string {
@@ -48,14 +55,16 @@ export function fold(s: string): string {
  * single-star backtracking, so it is O(text × pattern) at worst and never exponential;
  * users never get to supply a regex.
  */
-export function wildcardMatch(text: string, pattern: string): boolean {
-  const t = Array.from(text);
+export function wildcardMatch(text: string | string[], pattern: string, budget: StepBudget = { left: WILDCARD_STEP_BUDGET }): boolean {
+  const t = typeof text === "string" ? Array.from(text) : text;
   const p = Array.from(pattern.replace(/\*+/g, "*"));
   let ti = 0;
   let pi = 0;
   let star = -1;
   let mark = 0;
   while (ti < t.length) {
+    // Out of budget counts as no match: a pathological pattern just stops matching.
+    if (--budget.left < 0) return false;
     if (pi < p.length && p[pi] !== "*" && (p[pi] === "?" || p[pi] === t[ti])) {
       ti++;
       pi++;
@@ -95,7 +104,22 @@ function headerValue(headers: Record<string, string>, name: string): string | nu
 /** Folded strings a text condition is compared against, computed once per message. */
 class Prepared {
   private cache = new Map<string, string[]>();
-  constructor(readonly m: RuleMessage) {}
+  private chars = new Map<string, string[][]>();
+  constructor(
+    readonly m: RuleMessage,
+    readonly budget: StepBudget = { left: WILDCARD_STEP_BUDGET },
+  ) {}
+
+  /** Candidates as code-point arrays, cut for wildcard matching; cached like candidates(). */
+  wildcardCandidates(field: RuleField, header?: string): string[][] {
+    const key = field === "header" ? `header:${(header ?? "").toLowerCase()}` : field;
+    let v = this.chars.get(key);
+    if (!v) {
+      v = this.candidates(field, header).map((s) => Array.from(s.length > WILDCARD_TEXT_LIMIT ? s.slice(0, WILDCARD_TEXT_LIMIT) : s));
+      this.chars.set(key, v);
+    }
+    return v;
+  }
 
   candidates(field: RuleField, header?: string): string[] {
     const key = field === "header" ? `header:${(header ?? "").toLowerCase()}` : field;
@@ -161,7 +185,7 @@ export function conditionMatches(c: RuleCondition, p: Prepared | RuleMessage): b
     case "ends_with":
       return cands.some((s) => s.trimEnd().endsWith(value));
     case "wildcard":
-      return cands.some((s) => wildcardMatch(s.length > WILDCARD_TEXT_LIMIT ? s.slice(0, WILDCARD_TEXT_LIMIT) : s, value));
+      return prep.wildcardCandidates(c.field, c.header).some((s) => wildcardMatch(s, value, prep.budget));
     default:
       return false;
   }
@@ -177,11 +201,11 @@ export function ruleMatches(rule: Pick<EvalRule, "match" | "conditions">, msg: R
 /**
  * Run rules in position order and merge their actions. The first rule that moves the
  * message decides the folder (higher rules win); labels accumulate; a matching rule
- * with stopProcessing ends evaluation.
+ * with stopProcessing ends evaluation. Bulk callers pass one shared budget for the whole run.
  */
-export function evaluateRules(msg: RuleMessage, rules: EvalRule[]): RuleOutcome {
+export function evaluateRules(msg: RuleMessage, rules: EvalRule[], budget?: StepBudget): RuleOutcome {
   const out: RuleOutcome = { folder: null, labelIds: [], read: false, starred: false, important: false, matched: [] };
-  const p = new Prepared(msg);
+  const p = new Prepared(msg, budget);
   const ordered = rules.map((r, i) => ({ r, i })).sort((a, b) => a.r.position - b.r.position || a.i - b.i);
   for (const { r } of ordered) {
     if (!r.enabled || !ruleMatches(r, p)) continue;

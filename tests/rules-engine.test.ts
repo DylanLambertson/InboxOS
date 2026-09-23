@@ -57,6 +57,19 @@ describe("wildcardMatch", () => {
     expect(wildcardMatch(text, `${"*a".repeat(50)}b`)).toBe(false);
     expect(Date.now() - start).toBeLessThan(1500);
   });
+  it("gives up once the shared step budget is spent", () => {
+    const budget = { left: 10 };
+    expect(wildcardMatch("abcdefghijklmnop", "*p", budget)).toBe(false);
+    expect(budget.left).toBeLessThan(0);
+    expect(wildcardMatch("abc", "a?c")).toBe(true);
+  });
+  it("caps total work across many wildcard rules on a huge body", () => {
+    const big = msg({ text: "a".repeat(100_000) });
+    const hostile = Array.from({ length: 50 }, () => rule(Array.from({ length: 10 }, () => cond("body", "wildcard", `${"*a".repeat(40)}b`)), [{ type: "read" }]));
+    const start = Date.now();
+    expect(evaluateRules(big, hostile).matched).toEqual([]);
+    expect(Date.now() - start).toBeLessThan(1500);
+  });
 });
 
 describe("fold", () => {

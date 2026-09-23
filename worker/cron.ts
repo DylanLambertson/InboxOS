@@ -35,7 +35,7 @@ export async function housekeeping(env: Env): Promise<void> {
 
   // Trash & spam retention.
   const { results: expired } = await env.DB.prepare(
-    `SELECT id FROM messages WHERE (folder = 'trash' AND trashed_at < ?1) OR (folder = 'spam' AND date < ?1)
+    `SELECT id FROM messages WHERE (folder = 'trash' AND trashed_at < ?1) OR (folder = 'spam' AND COALESCE(trashed_at, date) < ?1)
        OR (mailbox_id = 'system-unrouted' AND date < ?1) LIMIT 500`,
   )
     .bind(ago(policy.trashRetentionDays))

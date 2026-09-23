@@ -1,6 +1,6 @@
-import type { Address } from "@shared/types";
+import { UNROUTED_MAILBOX_ID, type Address } from "@shared/types";
 import type { MailRule, RuleAction, RuleCondition } from "@shared/mail-rules";
-import { evaluateRules, fieldsUsed, type RuleMessage, type RuleOutcome } from "./rules-engine";
+import { evaluateRules, fieldsUsed, type RuleMessage, type RuleOutcome, type StepBudget } from "./rules-engine";
 import { now, parseJson } from "./util";
 
 /** Database side of mail rules: loading, applying outcomes, and bulk runs. */
@@ -45,7 +45,10 @@ export async function loadRules(db: D1Database, mailboxId: string, enabledOnly =
   return results.map(toRule);
 }
 
-/** Saved contacts and people we've written to count; auto-collected senders don't. */
+/**
+ * Saved contacts and people we've written to count; auto-collected senders don't.
+ * Contacts are org-wide in this app, so this is "known to the team", not per mailbox.
+ */
 const KNOWN_CONTACT = "(is_saved = 1 OR times_contacted > 0)";
 
 async function knownContacts(db: D1Database, emails: string[]): Promise<Set<string>> {
@@ -58,13 +61,22 @@ async function knownContacts(db: D1Database, emails: string[]): Promise<Set<stri
   return new Set(results.map((r) => r.email));
 }
 
-/** Statements that apply an outcome to one stored message (labels are checked against the mailbox). */
-function outcomeStatements(db: D1Database, mailboxId: string, messageId: string, o: RuleOutcome, t: string): D1PreparedStatement[] {
+/**
+ * Statements that apply one outcome to stored messages (at most 50 ids, within D1's
+ * bound-parameter limit). Labels are checked against the mailbox.
+ */
+function outcomeStatements(db: D1Database, mailboxId: string, ids: string[], o: RuleOutcome, t: string): D1PreparedStatement[] {
+  if (!ids.length) return [];
   const stmts: D1PreparedStatement[] = [];
+  const ph = ids.map(() => "?").join(",");
   const sets: string[] = [];
   const binds: unknown[] = [];
   if (o.folder === "trash") {
     sets.push("folder_before_trash = folder", "folder = 'trash'", "trashed_at = ?");
+    binds.push(t);
+  } else if (o.folder === "spam") {
+    // Spam retention counts from trashed_at when set, so old mail filed now isn't purged at once.
+    sets.push("folder = 'spam'", "trashed_at = ?");
     binds.push(t);
   } else if (o.folder) {
     sets.push("folder = ?");
@@ -74,13 +86,17 @@ function outcomeStatements(db: D1Database, mailboxId: string, messageId: string,
   if (o.starred) sets.push("is_starred = 1");
   if (o.important) sets.push("priority = 'high'");
   if (sets.length) {
-    stmts.push(db.prepare(`UPDATE messages SET ${sets.join(", ")}, updated_at = ? WHERE id = ? AND mailbox_id = ?`).bind(...binds, t, messageId, mailboxId));
+    stmts.push(db.prepare(`UPDATE messages SET ${sets.join(", ")}, updated_at = ? WHERE mailbox_id = ? AND id IN (${ph})`).bind(...binds, t, mailboxId, ...ids));
   }
   for (const labelId of o.labelIds) {
     stmts.push(
       db
-        .prepare("INSERT OR IGNORE INTO message_labels (message_id, label_id) SELECT ?, id FROM labels WHERE id = ? AND mailbox_id = ?")
-        .bind(messageId, labelId, mailboxId),
+        .prepare(
+          `INSERT OR IGNORE INTO message_labels (message_id, label_id)
+           SELECT m.id, l.id FROM messages m JOIN labels l ON l.id = ? AND l.mailbox_id = m.mailbox_id
+           WHERE m.mailbox_id = ? AND m.id IN (${ph})`,
+        )
+        .bind(labelId, mailboxId, ...ids),
     );
   }
   return stmts;
@@ -103,7 +119,7 @@ export async function applyRulesOnIngest(
   args: { mailboxId: string; messageId: string; folder: string; message: Omit<RuleMessage, "senderInContacts"> },
 ): Promise<{ folder: string; read: boolean; statements: D1PreparedStatement[] }> {
   // Only mail headed for the inbox is filtered; blocked senders and unrouted mail stay put.
-  if (args.folder !== "inbox") return { folder: args.folder, read: false, statements: [] };
+  if (args.folder !== "inbox" || args.mailboxId === UNROUTED_MAILBOX_ID) return { folder: args.folder, read: false, statements: [] };
   const rules = await loadRules(db, args.mailboxId, true);
   if (!rules.length) return { folder: args.folder, read: false, statements: [] };
   const msg: RuleMessage = { ...args.message };
@@ -111,7 +127,7 @@ export async function applyRulesOnIngest(
   const o = evaluateRules(msg, rules);
   if (!o.matched.length) return { folder: args.folder, read: false, statements: [] };
   const t = now();
-  const statements = outcomeStatements(db, args.mailboxId, args.messageId, o, t);
+  const statements = outcomeStatements(db, args.mailboxId, [args.messageId], o, t);
   statements.push(hitStatement(db, o.matched, t)!);
   return { folder: o.folder ?? args.folder, read: o.read, statements };
 }
@@ -167,8 +183,9 @@ export async function testRule(db: D1Database, mailboxId: string, rule: MailRule
   const rows = await selectMessages(db, [rule], "mailbox_id = ? AND direction = 'inbound' AND folder NOT IN ('trash','drafts')", [mailboxId], limit);
   const msgs = await toRuleMessages(db, rows, [rule]);
   const live = { ...rule, enabled: true, stopProcessing: false };
+  const budget: StepBudget = { left: 5_000_000 };
   const matches = rows
-    .filter((_, i) => evaluateRules(msgs[i], [live]).matched.length > 0)
+    .filter((_, i) => evaluateRules(msgs[i], [live], budget).matched.length > 0)
     .map((r) => ({ id: r.id, from: r.from_name ? `${r.from_name} <${r.from_addr}>` : r.from_addr, subject: r.subject, date: r.date }));
   return { checked: rows.length, matches };
 }
@@ -177,6 +194,8 @@ export async function testRule(db: D1Database, mailboxId: string, rule: MailRule
 export async function runRuleOnExisting(db: D1Database, mailboxId: string, rule: MailRule, max = 500): Promise<{ checked: number; matched: number }> {
   const CHUNK = 50;
   const live = { ...rule, enabled: true, stopProcessing: false };
+  // One budget for the whole run keeps a pathological wildcard from burning the request's CPU.
+  const budget: StepBudget = { left: 20_000_000 };
   let checked = 0;
   let matched = 0;
   let cursor: { date: string; id: string } | null = null;
@@ -191,14 +210,19 @@ export async function runRuleOnExisting(db: D1Database, mailboxId: string, rule:
     cursor = { date: rows[rows.length - 1].date, id: rows[rows.length - 1].id };
     const msgs = await toRuleMessages(db, rows, [rule]);
     const t = now();
-    const stmts: D1PreparedStatement[] = [];
-    rows.forEach((r, i) => {
-      const o = evaluateRules(msgs[i], [live]);
-      if (!o.matched.length) return;
-      matched++;
-      stmts.push(...outcomeStatements(db, mailboxId, r.id, o, t));
-    });
-    if (stmts.length) await db.batch(stmts);
+    // A single rule yields the same outcome for every match, so a chunk needs only a few statements.
+    let outcome: RuleOutcome | null = null;
+    const ids: string[] = [];
+    for (let i = 0; i < rows.length; i++) {
+      const o = evaluateRules(msgs[i], [live], budget);
+      if (!o.matched.length) continue;
+      outcome = o;
+      ids.push(rows[i].id);
+    }
+    if (outcome && ids.length) {
+      matched += ids.length;
+      await db.batch([...outcomeStatements(db, mailboxId, ids, outcome, t), hitStatement(db, [rule.id], t, ids.length)!]);
+    }
     if (rows.length < CHUNK) break;
   }
   return { checked, matched };
