@@ -34,6 +34,8 @@ googleRoutes.get("/start", async (c) => {
   if (mode === "link") {
     const s = await readSession(c);
     if (!s) return c.redirect("/login");
+    // Linking changes how the account signs in, so it obeys the allowlist like any signed-in request.
+    if (await ipRefused(c, policy, { method: "session", user: { id: s.id, email: s.email, role: s.role } })) return c.redirect("/login?error=ip_blocked");
     userId = s.id;
   }
   const raw = newId(24);

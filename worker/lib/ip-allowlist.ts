@@ -87,6 +87,8 @@ export function parseCidr(input: string | null | undefined): Cidr | null {
     if (!/^(0|[1-9]\d{0,2})$/.test(p)) return null;
     len = Number(p);
     if (len > max) return null;
+    // "::ffff:10.0.0.0/8" is a /8 of the whole IPv6 space (every IPv4 client), not of 10.x.
+    if (v6 && addr.includes(".") && len < 96) return null;
   }
   const prefix = v6 ? len : 96 + len;
   return { base: base & maskFor(prefix), prefix };

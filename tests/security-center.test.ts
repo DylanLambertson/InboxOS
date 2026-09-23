@@ -104,8 +104,8 @@ describe("CIDR matching", () => {
   });
 
   it("validates allowlist entries", () => {
-    for (const ok of ["10.0.0.0/8", "203.0.113.7", "2001:db8::/32", "::1", "::/0", "0.0.0.0/0", "::ffff:1.2.3.4/128"]) expect(isValidCidr(ok), ok).toBe(true);
-    for (const bad of ["", "10.0.0.0/33", "10.0.0/8", "2001:db8::/129", "example.com", "10.0.0.0/8/8", "1.2.3.4 /8"]) expect(isValidCidr(bad), bad).toBe(false);
+    for (const ok of ["10.0.0.0/8", "203.0.113.7", "2001:db8::/32", "::1", "::/0", "0.0.0.0/0", "::ffff:1.2.3.4/128", "::ffff:10.0.0.0/104"]) expect(isValidCidr(ok), ok).toBe(true);
+    for (const bad of ["", "10.0.0.0/33", "10.0.0/8", "2001:db8::/129", "example.com", "10.0.0.0/8/8", "1.2.3.4 /8", "::ffff:10.0.0.0/8"]) expect(isValidCidr(bad), bad).toBe(false);
     expect(parseCidr("10.0.0.0/8")?.prefix).toBe(104);
     expect(parseCidr("2001:db8::/32")?.prefix).toBe(32);
   });
