@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { Activity, Lock, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
-import { describeEvent, mentionHandle, NOTE_MAX, noteSegments, type ConversationEvent, type ConversationNote, type MailboxMember } from "@shared/collab";
+import { describeEvent, memberHandles, NOTE_MAX, noteSegments, type ConversationEvent, type ConversationNote, type MailboxMember } from "@shared/collab";
 import { errorMessage } from "@/lib/api";
 import { useConversationActions } from "@/lib/collab";
 import { longDate, relativeTime } from "@/lib/format";
@@ -11,7 +11,7 @@ import { personName } from "./CollabControls";
 
 /** Note text with links and @mentions. Rendered as React text nodes only, so a note can never inject markup. */
 function NoteBody({ body, members, meId }: { body: string; members: MailboxMember[]; meId?: string }) {
-  const byHandle = useMemo(() => new Map(members.map((m) => [mentionHandle(m.email), m])), [members]);
+  const byHandle = useMemo(() => memberHandles(members), [members]);
   const segments = useMemo(() => noteSegments(body, new Set(byHandle.keys())), [body, byHandle]);
   return (
     <p className="text-[13px] leading-relaxed break-words whitespace-pre-wrap text-fg">
@@ -150,11 +150,12 @@ function NoteEditor({
   const [active, setActive] = useState(0);
   const ref = useRef<HTMLTextAreaElement>(null);
 
+  const handles = useMemo(() => [...memberHandles(members)].map(([handle, m]) => ({ handle, m })), [members]);
   const suggestions = useMemo(() => {
     if (query === null) return [];
     const q = query.toLowerCase();
-    return members.filter((m) => mentionHandle(m.email).startsWith(q) || m.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q))).slice(0, 6);
-  }, [members, query]);
+    return handles.filter(({ handle, m }) => handle.startsWith(q) || m.name.toLowerCase().split(/\s+/).some((w) => w.startsWith(q))).slice(0, 6);
+  }, [handles, query]);
 
   const sync = (value: string, caret: number) => {
     const m = value.slice(0, caret).match(MENTION_AT_CARET);
@@ -162,11 +163,11 @@ function NoteEditor({
     setActive(0);
   };
 
-  const insert = (m: MailboxMember) => {
+  const insert = ({ handle }: { handle: string }) => {
     const el = ref.current;
     if (!el) return;
     const caret = el.selectionStart;
-    const before = text.slice(0, caret).replace(MENTION_AT_CARET, `@${mentionHandle(m.email)} `);
+    const before = text.slice(0, caret).replace(MENTION_AT_CARET, `@${handle} `);
     const next = before + text.slice(caret);
     setText(next);
     setQuery(null);
@@ -226,19 +227,19 @@ function NoteEditor({
       />
       {suggestions.length > 0 && (
         <div role="listbox" aria-label="Mention a teammate" className="absolute bottom-full left-0 z-30 mb-1 w-72 rounded-ui border border-line bg-raised p-1 shadow-ui-lg">
-          {suggestions.map((m, i) => (
+          {suggestions.map(({ handle, m }, i) => (
             <button
               key={m.id}
               type="button"
               role="option"
               aria-selected={i === active}
-              onMouseDown={(e) => (e.preventDefault(), insert(m))}
+              onMouseDown={(e) => (e.preventDefault(), insert({ handle }))}
               onMouseEnter={() => setActive(i)}
               className={cx("flex w-full items-center gap-2 rounded-ui-sm px-2 py-1.5 text-left text-[13px]", i === active && "bg-muted")}
             >
               <Avatar name={m.name} email={m.email} color={m.color} size={20} />
               <span className="min-w-0 flex-1 truncate">{personName(m)}</span>
-              <span className="text-xs text-fg-faint">@{mentionHandle(m.email)}</span>
+              <span className="max-w-32 truncate text-xs text-fg-faint">@{handle}</span>
             </button>
           ))}
         </div>

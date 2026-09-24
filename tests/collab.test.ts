@@ -27,6 +27,12 @@ describe("mentions", () => {
     expect(findMentions("@nobody here", members)).toEqual([]);
     expect(findMentions("@dylan @dylan", members)).toEqual(["u1"]);
   });
+  it("uses the full address when two members share a local part", () => {
+    const twins = [...members, { id: "u4", email: "dylan@other.co" }];
+    expect(findMentions("@dylan", twins)).toEqual([]);
+    expect(findMentions("ping @dylan@other.co.", twins)).toEqual(["u4"]);
+    expect(findMentions("@sam", twins)).toEqual(["u3"]);
+  });
 });
 
 describe("noteSegments", () => {

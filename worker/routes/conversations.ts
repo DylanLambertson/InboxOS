@@ -37,6 +37,8 @@ import { parseBody, zId } from "../lib/validate";
 
 export const conversationRoutes = new Hono<AppEnv>();
 
+/** Matches what the Assigned / Mentions lists hide, so badges count only what the lists show. */
+const VISIBLE_EXCLUDED = "('trash','spam','drafts','scheduled','snoozed')";
 const zThreadId = z.string().min(1).max(200);
 const zBody = z.string().trim().min(1, "Write something first").max(NOTE_MAX, `Notes can be up to ${NOTE_MAX} characters`);
 
@@ -79,13 +81,15 @@ conversationRoutes.get("/counts", async (c) => {
       `SELECT COUNT(*) AS n FROM conversations cv
        JOIN mailbox_members mm ON mm.mailbox_id = cv.mailbox_id AND mm.user_id = ?1
        JOIN mailboxes m ON m.id = cv.mailbox_id AND m.is_active = 1
-       WHERE cv.assignee_id = ?1 AND cv.status <> 'closed'`,
+       WHERE cv.assignee_id = ?1 AND cv.status <> 'closed'
+         AND EXISTS (SELECT 1 FROM messages x WHERE x.mailbox_id = cv.mailbox_id AND x.thread_id = cv.thread_id AND x.folder NOT IN ${VISIBLE_EXCLUDED})`,
     ).bind(u.id),
     c.env.DB.prepare(
       `SELECT COUNT(DISTINCT cm.mailbox_id || '|' || cm.thread_id) AS n FROM conversation_mentions cm
        JOIN mailbox_members mm ON mm.mailbox_id = cm.mailbox_id AND mm.user_id = cm.user_id
        JOIN mailboxes m ON m.id = cm.mailbox_id AND m.is_active = 1
-       WHERE cm.user_id = ? AND cm.seen_at IS NULL`,
+       WHERE cm.user_id = ? AND cm.seen_at IS NULL
+         AND EXISTS (SELECT 1 FROM messages x WHERE x.mailbox_id = cm.mailbox_id AND x.thread_id = cm.thread_id AND x.folder NOT IN ${VISIBLE_EXCLUDED})`,
     ).bind(u.id),
   ]);
   return c.json<CollabCounts>({ assigned: assigned.results[0]?.n ?? 0, mentions: mentions.results[0]?.n ?? 0 });
@@ -115,7 +119,7 @@ conversationRoutes.get("/t/:mailboxId/:threadId", async (c) => {
       .prepare(
         `SELECT n.id, n.author_id, n.body, n.created_at, n.edited_at, u.name, u.email, u.avatar_color
          FROM conversation_notes n LEFT JOIN users u ON u.id = n.author_id
-         WHERE n.mailbox_id = ? AND n.thread_id = ? ORDER BY n.created_at LIMIT 500`,
+         WHERE n.mailbox_id = ? AND n.thread_id = ? ORDER BY n.created_at DESC LIMIT 500`,
       )
       .bind(key.mailboxId, key.threadId),
     db
@@ -144,7 +148,7 @@ conversationRoutes.get("/t/:mailboxId/:threadId", async (c) => {
     threadId: key.threadId,
     status: cv?.status ?? "open",
     assignee: cv ? person(cv.id, cv.name, cv.email, cv.avatar_color) : null,
-    notes: (notes.results as (U & { id: string; author_id: string | null; body: string; created_at: string; edited_at: string | null })[]).map<ConversationNote>(
+    notes: (notes.results.reverse() as (U & { id: string; author_id: string | null; body: string; created_at: string; edited_at: string | null })[]).map<ConversationNote>(
       (n) => ({
         id: n.id,
         author: person(n.author_id, n.name, n.email, n.avatar_color),
@@ -206,8 +210,11 @@ conversationRoutes.post("/t/:mailboxId/:threadId/status", async (c) => {
 });
 
 /** Insert or refresh mention rows for a note, returning who's newly mentioned (they get a push). */
-async function syncMentions(db: D1Database, key: ConversationKey, noteId: string, body: string, isNew: boolean): Promise<string[]> {
-  const mentioned = findMentions(body, await members(db, key.mailboxId)).slice(0, 50);
+async function syncMentions(db: D1Database, key: ConversationKey, noteId: string, body: string, isNew: boolean, authorId: string): Promise<string[]> {
+  // Mentioning yourself would only light up your own badge.
+  const mentioned = findMentions(body, await members(db, key.mailboxId))
+    .filter((id) => id !== authorId)
+    .slice(0, 50);
   const existing = isNew
     ? new Set<string>()
     : new Set((await db.prepare("SELECT user_id FROM conversation_mentions WHERE note_id = ?").bind(noteId).all<{ user_id: string }>()).results.map((r) => r.user_id));
@@ -244,7 +251,7 @@ conversationRoutes.post("/t/:mailboxId/:threadId/notes", async (c) => {
       "INSERT INTO conversation_events (id, mailbox_id, thread_id, actor_id, type, target_user_id, value, created_at) VALUES (?, ?, ?, ?, 'note', NULL, ?, ?)",
     ).bind(newId(), key.mailboxId, key.threadId, u.id, id, t),
   ]);
-  const added = await syncMentions(c.env.DB, key, id, body.body, true);
+  const added = await syncMentions(c.env.DB, key, id, body.body, true, u.id);
   if (added.length) later(c, notifyMentioned(c.env, { userIds: added, author: u, anchor, body: body.body }));
   return c.json({ ok: true, id });
 });
@@ -266,7 +273,7 @@ conversationRoutes.patch("/notes/:id", async (c) => {
   const body = await parseBody(c, z.object({ body: zBody }));
   await c.env.DB.prepare("UPDATE conversation_notes SET body = ?, edited_at = ? WHERE id = ?").bind(body.body, now(), note.id).run();
   const key = { mailboxId: note.mailbox_id, threadId: note.thread_id };
-  const added = await syncMentions(c.env.DB, key, note.id, body.body, false);
+  const added = await syncMentions(c.env.DB, key, note.id, body.body, false, u.id);
   if (added.length) {
     const anchor = await conversationAnchor(c.env.DB, key);
     if (anchor) later(c, notifyMentioned(c.env, { userIds: added, author: u, anchor, body: body.body }));
@@ -346,10 +353,17 @@ conversationRoutes.post("/bulk", async (c) => {
   if (!pairs.size) throw new HTTPException(404, { message: "Messages not found" });
 
   const boxes = [...new Set([...pairs.values()].map((p) => p.mailboxId))];
+  const { results: roleRows } = await db
+    .prepare(
+      `SELECT mm.mailbox_id, mm.role FROM mailbox_members mm JOIN mailboxes m ON m.id = mm.mailbox_id
+       WHERE mm.user_id = ? AND m.is_active = 1 AND mm.mailbox_id IN (${boxes.map(() => "?").join(",")})`,
+    )
+    .bind(u.id, ...boxes)
+    .all<{ mailbox_id: string; role: MailboxRole }>();
+  const roles = new Map(roleRows.map((r) => [r.mailbox_id, r.role]));
   for (const mb of boxes) {
-    const role = await mailboxRole(db, u.id, mb);
-    if (!role) throw new HTTPException(404, { message: "Messages not found" });
-    if (!canWriteConversation(role)) throw new HTTPException(403, { message: "You have read-only access to this mailbox." });
+    if (!roles.has(mb)) throw new HTTPException(404, { message: "Messages not found" });
+    if (!canWriteConversation(roles.get(mb))) throw new HTTPException(403, { message: "You have read-only access to this mailbox." });
   }
   if (body.assigneeId) {
     const { results } = await db

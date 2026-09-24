@@ -70,12 +70,18 @@ export function useBulkConversation() {
 export function useReplyingPresence(messageId: string | undefined) {
   useEffect(() => {
     if (!messageId) return;
-    const ping = () => api.post("conversations/presence", { messageId }).catch(() => undefined);
-    void ping();
+    let stopped = false;
+    let inflight: Promise<unknown> = Promise.resolve();
+    const ping = () => {
+      if (!stopped) inflight = api.post("conversations/presence", { messageId }).catch(() => undefined);
+    };
+    ping();
     const timer = window.setInterval(ping, PRESENCE_REFRESH_MS);
     return () => {
+      stopped = true;
       window.clearInterval(timer);
-      void api.del("conversations/presence", { messageId }).catch(() => undefined);
+      // Clear after any in-flight ping lands, or that ping would resurrect the marker for a minute.
+      void inflight.then(() => api.del("conversations/presence", { messageId })).catch(() => undefined);
     };
   }, [messageId]);
 }
