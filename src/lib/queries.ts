@@ -29,9 +29,11 @@ export interface ListParams {
   label?: string | null;
   q?: string;
   threads: boolean;
+  /** Conversation status chip: open / pending / closed. */
+  status?: string | null;
 }
 
-export const messagesKey = (p: ListParams) => ["messages", p.mailboxId, p.view, p.label ?? "", p.q ?? "", p.threads] as const;
+export const messagesKey = (p: ListParams) => ["messages", p.mailboxId, p.view, p.label ?? "", p.q ?? "", p.threads, p.status ?? ""] as const;
 
 export function useMessages(p: ListParams | null) {
   return useInfiniteQuery({
@@ -42,6 +44,7 @@ export function useMessages(p: ListParams | null) {
       const qs = new URLSearchParams({ mailbox: p!.mailboxId, view: p!.view, threads: p!.threads ? "1" : "0", limit: "50" });
       if (p!.label) qs.set("label", p!.label);
       if (p!.q) qs.set("q", p!.q);
+      if (p!.status) qs.set("status", p!.status);
       if (pageParam) qs.set("cursor", pageParam);
       return api.get<Paged<MessageListItem>>(`messages?${qs}`);
     },

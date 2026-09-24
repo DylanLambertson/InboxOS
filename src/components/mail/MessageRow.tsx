@@ -1,5 +1,5 @@
 import { memo } from "react";
-import { AlarmClock, AlertCircle, Clock, Paperclip, Star } from "lucide-react";
+import { AlarmClock, AlertCircle, CheckCircle2, Clock, Hourglass, Paperclip, Star } from "lucide-react";
 import type { Label, MessageListItem } from "@shared/types";
 import { displayName, mailboxLabel, shortDate } from "@/lib/format";
 import { Avatar, Checkbox, cx } from "../ui/primitives";
@@ -69,6 +69,13 @@ export const MessageRow = memo(function MessageRow({ m, selected, checked, focus
           {m.hasAttachments && <Paperclip className="size-3.5 shrink-0 text-fg-faint" />}
           {m.folder === "scheduled" && <Clock className="size-3.5 shrink-0 text-accent" />}
           {m.folder === "snoozed" && <AlarmClock className="size-3.5 shrink-0 text-accent" aria-label="Snoozed until" />}
+          {m.convStatus === "pending" && <Hourglass className="size-3.5 shrink-0 text-warning" aria-label="Pending" />}
+          {m.convStatus === "closed" && <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label="Closed" />}
+          {m.assignee && (
+            <span className="inline-flex shrink-0" title={`Assigned to ${m.assignee.name || m.assignee.email}`}>
+              <Avatar name={m.assignee.name} email={m.assignee.email} color={m.assignee.color} size={18} />
+            </span>
+          )}
           <span className={cx("shrink-0 text-xs tabular-nums", unread ? "font-semibold text-fg" : "text-fg-muted")}>{shortDate(date)}</span>
         </div>
         <div className="mt-0.5 flex items-center gap-2">

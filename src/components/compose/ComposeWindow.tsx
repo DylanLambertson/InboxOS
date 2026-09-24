@@ -23,6 +23,7 @@ import { mailDomains } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { useMailboxes, useMe, useTemplates } from "@/lib/queries";
+import { useReplyingPresence } from "@/lib/collab";
 import { useQueryClient } from "@tanstack/react-query";
 import { EmailFrame } from "../mail/EmailFrame";
 import { AttachmentChip } from "../mail/AttachmentChip";
@@ -49,6 +50,8 @@ export function ComposeWindow({ req, minimized, defaultFullscreen, onToggleMinim
   const signature = box?.signatureHtml || me?.signatureHtml || "";
   const draft = useDraft(req, signature);
   const { state } = draft;
+  // Teammates looking at this conversation see "<you> is replying…" while this is open.
+  useReplyingPresence(req.mode !== "forward" ? req.sourceId : undefined);
 
   if (draft.loadError) {
     return (

@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   AlarmClock,
   Archive,
+  AtSign,
   ChevronDown,
   Clock,
   File,
@@ -24,12 +25,15 @@ import {
   Sun,
   Tag,
   Trash2,
+  UserRound,
+  UserRoundX,
   Users,
 } from "lucide-react";
 import type { MailboxSummary } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { mailboxLabel } from "@/lib/format";
 import { useLabels, useMailboxes, useMe } from "@/lib/queries";
+import { useCollabCounts } from "@/lib/collab";
 import { toast } from "sonner";
 import { disablePush } from "@/lib/push";
 import { clearAppCache } from "@/lib/pwa";
@@ -50,6 +54,13 @@ export const FOLDER_NAV = [
   { view: "archive", label: "Archive", icon: Archive },
   { view: "spam", label: "Spam", icon: ShieldAlert, count: "spam" },
   { view: "trash", label: "Trash", icon: Trash2 },
+] as const;
+
+/** Shared-inbox views. "Assigned to me" and "Mentions" always span every mailbox; "Unassigned" follows the current one. */
+export const COLLAB_NAV = [
+  { view: "assigned", label: "Assigned to me", icon: UserRound },
+  { view: "mentions", label: "Mentions", icon: AtSign },
+  { view: "unassigned", label: "Unassigned", icon: UserRoundX },
 ] as const;
 
 /** Every mailbox the user can open, plus a unified "All inboxes" view. Switching keeps the current folder. */
@@ -127,6 +138,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const scopeId = unified ? "all" : current?.id;
   const unreadFor = (key: string) => (unified ? boxes.reduce((n, b) => n + (b.unread[key] ?? 0), 0) : current?.unread[key]);
   const { data: labels = [] } = useLabels(current?.id);
+  const { data: collabCounts } = useCollabCounts();
   const compose = useCompose();
   const navigate = useNavigate();
   const qc = useQueryClient();
@@ -185,6 +197,19 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                   icon={f.icon}
                   label={f.label}
                   count={"count" in f ? unreadFor(f.count) : undefined}
+                  onNavigate={onNavigate}
+                />
+              ))}
+            </div>
+            <div className="mt-5 mb-1 px-2.5 text-[11px] font-semibold tracking-wide text-fg-faint uppercase">Team</div>
+            <div className="space-y-0.5">
+              {COLLAB_NAV.map((f) => (
+                <NavItem
+                  key={f.view}
+                  to={`/mail/${f.view === "unassigned" ? scopeId : "all"}/${f.view}`}
+                  icon={f.icon}
+                  label={f.label}
+                  count={f.view === "assigned" ? collabCounts?.assigned : f.view === "mentions" ? collabCounts?.mentions : undefined}
                   onNavigate={onNavigate}
                 />
               ))}

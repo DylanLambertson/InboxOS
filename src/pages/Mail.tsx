@@ -5,12 +5,14 @@ import { toast } from "sonner";
 import type { Folder, MessageListItem, View } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useLabels, useMailboxes, useMe, useMessageAction, useMessages, useInvalidateMail, type BulkInput } from "@/lib/queries";
+import { useBulkConversation, useMembers } from "@/lib/collab";
+import { CONVERSATION_STATUSES, type ConversationStatus } from "@shared/collab";
 import { longDate, mailboxLabel } from "@/lib/format";
 import { useShortcuts } from "@/lib/shortcuts";
 import { useCompose } from "@/components/compose/ComposeProvider";
 import { at } from "@/components/compose/ScheduleDialog";
-import { FOLDER_NAV } from "@/components/layout/Sidebar";
-import { BulkActions } from "@/components/mail/BulkActions";
+import { COLLAB_NAV, FOLDER_NAV } from "@/components/layout/Sidebar";
+import { BulkActions, type BulkCollab } from "@/components/mail/BulkActions";
 import { MessageRow } from "@/components/mail/MessageRow";
 import { ThreadView } from "@/components/mail/ThreadView";
 import { Button, Checkbox, cx, EmptyState, IconButton, LoadError, Spinner } from "@/components/ui/primitives";
@@ -25,12 +27,19 @@ const EMPTY_COPY: Record<string, { title: string; body: string }> = {
   archive: { title: "Archive is empty", body: "Archived messages are out of your inbox but still searchable." },
   spam: { title: "No spam", body: "Messages you report as spam land here." },
   trash: { title: "Trash is empty", body: "Deleted messages are removed permanently after the retention period." },
+  assigned: { title: "Nothing assigned to you", body: "Conversations teammates assign to you show up here." },
+  unassigned: { title: "Everything has an owner", body: "Inbox conversations nobody has taken yet show up here." },
+  mentions: { title: "No mentions", body: "When a teammate @mentions you in a note, the conversation shows up here." },
 };
+
+const COLLAB_VIEWS = ["assigned", "unassigned", "mentions"];
 
 export function MailPage() {
   const { mailboxId = "", view: rawView = "inbox", messageId } = useParams();
   const [params, setParams] = useSearchParams();
   const q = params.get("q") ?? "";
+  const rawStatus = params.get("status");
+  const convStatus = (CONVERSATION_STATUSES as readonly string[]).includes(rawStatus ?? "") ? (rawStatus as ConversationStatus) : null;
   const navigate = useNavigate();
   const { data: boxes, isLoading: boxesLoading, error: boxesError, refetch: refetchBoxes } = useMailboxes();
   const { data: me } = useMe();
@@ -44,10 +53,13 @@ export function MailPage() {
   const labelId = isLabel ? rawView.slice(6) : null;
   const view = (isLabel ? "all" : rawView) as View;
   const threads = (me?.preferences.conversationView ?? true) && !["drafts", "scheduled"].includes(view);
-  const listParams = mailbox ? { mailboxId: mailbox.id, view, label: labelId, q, threads } : null;
+  const showStatusChips = !["drafts", "scheduled", "sent"].includes(view);
+  const listParams = mailbox ? { mailboxId: mailbox.id, view, label: labelId, q, threads, status: showStatusChips ? convStatus : null } : null;
   const list = useMessages(listParams);
   const items = useMemo(() => list.data?.pages.flatMap((p) => p.items) ?? [], [list.data]);
   const action = useMessageAction();
+  const bulkConv = useBulkConversation();
+  const { data: members = [] } = useMembers(unified ? undefined : mailbox?.id);
   const compose = useCompose();
   const confirm = useConfirm();
   const invalidate = useInvalidateMail();
@@ -59,18 +71,23 @@ export function MailPage() {
   const [searchText, setSearchText] = useState(q);
   const compact = me?.preferences.density === "compact";
   const base = `/mail/${mailboxId}/${rawView}`;
-  const folderForActions: Folder | "starred" | "all" | "unread" | "label" = isLabel ? "label" : (view as Folder);
-  const title = isLabel ? labels.find((l) => l.id === labelId)?.name ?? "Label" : FOLDER_NAV.find((f) => f.view === view)?.label ?? "Mail";
+  // Search and the status chip survive opening and closing messages.
+  const keep = new URLSearchParams([...(q ? [["q", q]] : []), ...(convStatus ? [["status", convStatus]] : [])]).toString();
+  const suffix = keep ? `?${keep}` : "";
+  const folderForActions: Folder | "starred" | "all" | "unread" | "label" = isLabel ? "label" : COLLAB_VIEWS.includes(view) ? "all" : (view as Folder);
+  const title = isLabel
+    ? labels.find((l) => l.id === labelId)?.name ?? "Label"
+    : [...FOLDER_NAV, ...COLLAB_NAV].find((f) => f.view === view)?.label ?? "Mail";
 
-  useEffect(() => setChecked(new Set()), [mailboxId, rawView, q]);
+  useEffect(() => setChecked(new Set()), [mailboxId, rawView, q, convStatus]);
   useEffect(() => setSearchText(q), [q]);
 
   const open = useCallback(
     (m: MessageListItem) => {
       if (m.folder === "drafts") return compose.open({ mailboxId: m.mailboxId, draftId: m.id });
-      navigate(`${base}/${m.id}${q ? `?q=${encodeURIComponent(q)}` : ""}`);
+      navigate(`${base}/${m.id}${suffix}`);
     },
-    [base, compose, navigate, q],
+    [base, compose, navigate, suffix],
   );
 
   const onCheck = useCallback(
@@ -108,12 +125,39 @@ export function MailPage() {
             snooze: `snoozed until ${a.until ? longDate(a.until) : "later"}`,
           };
           if (verb[a.action]) toast.success(`${n} message${n === 1 ? "" : "s"} ${verb[a.action]}`);
-          if (messageId && ids.includes(messageId) && ["move", "restore", "delete", "snooze"].includes(a.action)) navigate(base);
+          if (messageId && ids.includes(messageId) && ["move", "restore", "delete", "snooze"].includes(a.action)) navigate(`${base}${suffix}`);
           setChecked(new Set());
         },
         onError: (e) => toast.error(errorMessage(e)),
       },
     );
+  };
+
+  const bulkCollab: BulkCollab = {
+    members,
+    meId: me?.id,
+    onAssign: (assigneeId) =>
+      bulkConv.mutate(
+        { ids: [...checked], assigneeId },
+        {
+          onSuccess: (r) => (toast.success(`${r.count} conversation${r.count === 1 ? "" : "s"} ${assigneeId ? "assigned" : "unassigned"}`), setChecked(new Set())),
+          onError: (e) => toast.error(errorMessage(e)),
+        },
+      ),
+    onStatus: (status) =>
+      bulkConv.mutate(
+        { ids: [...checked], status },
+        {
+          onSuccess: (r) => (toast.success(`${r.count} conversation${r.count === 1 ? "" : "s"} marked ${status}`), setChecked(new Set())),
+          onError: (e) => toast.error(errorMessage(e)),
+        },
+      ),
+  };
+  const setStatusChip = (s: ConversationStatus | null) => {
+    const next = new URLSearchParams(params);
+    if (s) next.set("status", s);
+    else next.delete("status");
+    setParams(next);
   };
 
   const emptyFolder = async () => {
@@ -136,7 +180,7 @@ export function MailPage() {
   };
   const afterAction = () => {
     const next = items[currentIdx + 1] ?? items[currentIdx - 1];
-    navigate(next && next.id !== messageId ? `${base}/${next.id}` : base);
+    navigate(next && next.id !== messageId ? `${base}/${next.id}${suffix}` : `${base}${suffix}`);
   };
 
   useEffect(() => {
@@ -157,8 +201,8 @@ export function MailPage() {
       k: () => step(-1),
       o: () => items[focusIdx] && !messageId && open(items[focusIdx]),
       Enter: () => items[focusIdx] && !messageId && open(items[focusIdx]),
-      u: () => messageId && navigate(base),
-      Escape: () => (messageId ? navigate(base) : setChecked(new Set())),
+      u: () => messageId && navigate(`${base}${suffix}`),
+      Escape: () => (messageId ? navigate(`${base}${suffix}`) : setChecked(new Set())),
       e: () => !readOnly && runBulk({ action: "move", folder: "archive" }, target()),
       "#": () => !readOnly && runBulk({ action: "move", folder: "trash" }, target()),
       "!": () => !readOnly && runBulk({ action: "move", folder: "spam" }, target()),
@@ -178,7 +222,7 @@ export function MailPage() {
       "g d": () => navigate(`/mail/${mailboxId}/drafts`),
       "g a": () => navigate(`/mail/${mailboxId}/all`),
     },
-    [items, focusIdx, messageId, checked, mailbox, base],
+    [items, focusIdx, messageId, checked, mailbox, base, suffix],
   );
 
   if (boxesLoading) {
@@ -244,7 +288,7 @@ export function MailPage() {
           {checked.size > 0 ? (
             <>
               <span className="mr-1 text-xs font-medium text-fg-muted">{checked.size} selected</span>
-              <BulkActions folder={folderForActions} anyUnread={anyUnread} labels={labels} readOnly={readOnly} run={(a) => runBulk(a)} size="sm" />
+              <BulkActions folder={folderForActions} anyUnread={anyUnread} labels={labels} readOnly={readOnly} run={(a) => runBulk(a)} size="sm" collab={bulkCollab} />
             </>
           ) : (
             <>
@@ -263,6 +307,25 @@ export function MailPage() {
             </>
           )}
         </div>
+
+        {showStatusChips && (
+          <div role="radiogroup" aria-label="Filter by status" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-line px-3 py-1.5">
+            {([null, ...CONVERSATION_STATUSES] as const).map((s) => (
+              <button
+                key={s ?? "all"}
+                role="radio"
+                aria-checked={convStatus === s}
+                onClick={() => setStatusChip(s)}
+                className={cx(
+                  "h-6 shrink-0 rounded-full px-2.5 text-xs font-medium transition-colors",
+                  convStatus === s ? "bg-accent-soft text-accent" : "text-fg-muted hover:bg-muted hover:text-fg",
+                )}
+              >
+                {s ? s[0].toUpperCase() + s.slice(1) : "All"}
+              </button>
+            ))}
+          </div>
+        )}
 
         <div
           ref={listRef}
@@ -319,7 +382,7 @@ export function MailPage() {
             key={messageId}
             messageId={messageId}
             mailboxes={boxes ?? []}
-            onBack={() => navigate(`${base}${q ? `?q=${encodeURIComponent(q)}` : ""}`)}
+            onBack={() => navigate(`${base}${suffix}`)}
             onNavigate={step}
             onAfterAction={afterAction}
           />

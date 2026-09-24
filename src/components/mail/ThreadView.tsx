@@ -1,13 +1,16 @@
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ChevronDown, ChevronUp, Clock, Forward, PenSquare, Printer, Reply, ReplyAll, X } from "lucide-react";
 import { toast } from "sonner";
 import type { MailboxSummary } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { longDate } from "@/lib/format";
 import { useInvalidateMail, useLabels, useMe, useMessageAction, useThread, type BulkInput } from "@/lib/queries";
+import { useConversation, useMembers } from "@/lib/collab";
 import { useCompose } from "../compose/ComposeProvider";
 import { Button, EmptyState, IconButton, Spinner } from "../ui/primitives";
 import { BulkActions } from "./BulkActions";
+import { ConversationControls, ReplyingBanner } from "./CollabControls";
+import { EventLine, NoteCard, NoteComposer } from "./ConversationNotes";
 import { MessageCard, printMessage } from "./MessageCard";
 
 export function ThreadView({
@@ -33,6 +36,16 @@ export function ThreadView({
   const mailbox = mailboxes.find((b) => b.id === thread?.[0]?.mailboxId);
   const { data: labels = [] } = useLabels(mailbox?.id);
   const readOnly = !mailbox || mailbox.role === "viewer";
+  const { data: conv } = useConversation(mailbox?.id, thread?.[0]?.threadId);
+  const { data: members = [] } = useMembers(mailbox?.id);
+  // Messages, internal notes and activity, interleaved by time.
+  const timeline = useMemo(() => {
+    const items: ({ at: string; kind: "note"; id: string } | { at: string; kind: "event"; id: string })[] = [
+      ...(conv?.notes ?? []).map((n) => ({ at: n.createdAt, kind: "note" as const, id: n.id })),
+      ...(conv?.events ?? []).map((e) => ({ at: e.createdAt, kind: "event" as const, id: e.id })),
+    ];
+    return items.sort((a, b) => a.at.localeCompare(b.at));
+  }, [conv]);
 
   // Expand unread messages and the latest one; mark the conversation read.
   useEffect(() => {
@@ -83,6 +96,20 @@ export function ThreadView({
       },
     );
   };
+
+  /** Timeline items in (from, to]; open-ended on either side. */
+  const renderBetween = (from: string | null, to: string | null) =>
+    conv &&
+    timeline
+      .filter((t) => (from === null || t.at > from) && (to === null || t.at <= to))
+      .map((t) => {
+        if (t.kind === "note") {
+          const note = conv.notes.find((n) => n.id === t.id)!;
+          return <NoteCard key={t.id} note={note} members={members} meId={me?.id} mailboxId={conv.mailboxId} threadId={conv.threadId} />;
+        }
+        const event = conv.events.find((e) => e.id === t.id)!;
+        return <EventLine key={t.id} event={event} meId={me?.id} />;
+      });
 
   const unschedule = async () => {
     try {
@@ -137,7 +164,10 @@ export function ThreadView({
               ))}
             </div>
           )}
+          {conv && <ConversationControls info={conv} members={members} meId={me?.id} />}
         </div>
+
+        {conv && <ReplyingBanner people={conv.replying} />}
 
         {primary.folder === "scheduled" && (
           <div className="mx-5 mb-3 flex flex-wrap items-center gap-3 rounded-ui border border-accent/30 bg-accent-softer px-4 py-3 text-[13px]">
@@ -152,17 +182,21 @@ export function ThreadView({
         )}
 
         <div className="border-t border-line">
-          {thread.map((m) => (
-            <MessageCard
-              key={m.id}
-              m={m}
-              readOnly={readOnly}
-              expanded={expanded.has(m.id)}
-              onToggle={() => setExpanded((s) => new Set(s).add(m.id))}
-              onStar={() => action.mutate({ ids: [m.id], action: m.isStarred ? "unstar" : "star" })}
-              onReply={(mode) => compose.open({ mailboxId: mailbox.id, sourceId: m.id, mode })}
-            />
+          {thread.map((m, i) => (
+            <Fragment key={m.id}>
+              {/* Notes and activity that happened before this message (all of it, for the first one). */}
+              {conv && renderBetween(i === 0 ? null : thread[i - 1].date, m.date)}
+              <MessageCard
+                m={m}
+                readOnly={readOnly}
+                expanded={expanded.has(m.id)}
+                onToggle={() => setExpanded((s) => new Set(s).add(m.id))}
+                onStar={() => action.mutate({ ids: [m.id], action: m.isStarred ? "unstar" : "star" })}
+                onReply={(mode) => compose.open({ mailboxId: mailbox.id, sourceId: m.id, mode })}
+              />
+            </Fragment>
           ))}
+          {conv && renderBetween(last.date, null)}
         </div>
 
         {!readOnly && primary.folder !== "scheduled" && primary.folder !== "drafts" && (
@@ -180,6 +214,7 @@ export function ThreadView({
             </Button>
           </div>
         )}
+        {conv?.canWrite && <NoteComposer members={members} mailboxId={conv.mailboxId} threadId={conv.threadId} />}
       </div>
     </div>
   );

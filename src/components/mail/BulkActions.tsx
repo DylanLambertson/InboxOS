@@ -1,10 +1,20 @@
 import { useState } from "react";
-import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, CalendarClock, Inbox, MailOpen, Mail, ShieldAlert, ShieldCheck, Tag, Trash2, Undo2, XCircle } from "lucide-react";
+import { AlarmClock, AlarmClockOff, Archive, ArchiveRestore, CalendarClock, CircleDot, Inbox, MailOpen, Mail, ShieldAlert, ShieldCheck, Tag, Trash2, Undo2, UserPlus, XCircle } from "lucide-react";
+import type { ConversationStatus, MailboxMember } from "@shared/collab";
 import type { Folder, Label } from "@shared/types";
 import { IconButton } from "../ui/primitives";
 import { Menu, useConfirm } from "../ui/overlay";
 import { ScheduleDialog, snoozePresets } from "../compose/ScheduleDialog";
 import type { BulkInput } from "@/lib/queries";
+import { assigneeMenuItems, STATUS_META } from "./CollabControls";
+
+/** Shared-inbox actions for a list selection: assign and set status. */
+export interface BulkCollab {
+  members: MailboxMember[];
+  meId: string | undefined;
+  onAssign: (assigneeId: string | null) => void;
+  onStatus: (status: ConversationStatus) => void;
+}
 
 /** Folder-aware action buttons shared by the list toolbar and the reader toolbar. */
 export function BulkActions({
@@ -14,6 +24,7 @@ export function BulkActions({
   readOnly,
   run,
   size = "md",
+  collab,
 }: {
   folder: Folder | "starred" | "all" | "unread" | "label";
   anyUnread: boolean;
@@ -21,6 +32,7 @@ export function BulkActions({
   readOnly: boolean;
   run: (a: Omit<BulkInput, "ids">) => void;
   size?: "sm" | "md";
+  collab?: BulkCollab;
 }) {
   const confirm = useConfirm();
   const [pickSnooze, setPickSnooze] = useState(false);
@@ -140,6 +152,31 @@ export function BulkActions({
             </IconButton>
           )}
         />
+      )}
+      {collab && !readOnly && !isDraftish && (
+        <>
+          <Menu
+            width={260}
+            items={assigneeMenuItems({ members: collab.members, meId: collab.meId, onPick: collab.onAssign })}
+            trigger={(p) => (
+              <IconButton size={size} label="Assign" {...p}>
+                <UserPlus className={icon} />
+              </IconButton>
+            )}
+          />
+          <Menu
+            width={180}
+            items={(Object.keys(STATUS_META) as ConversationStatus[]).map((s) => {
+              const meta = STATUS_META[s];
+              return { label: `Mark ${meta.label.toLowerCase()}`, icon: <meta.icon className={meta.tone} />, onSelect: () => collab.onStatus(s) };
+            })}
+            trigger={(p) => (
+              <IconButton size={size} label="Set status" {...p}>
+                <CircleDot className={icon} />
+              </IconButton>
+            )}
+          />
+        </>
       )}
       {!readOnly && (folder === "inbox" || folder === "all" || folder === "starred" || folder === "label" || folder === "unread") && (
         <Menu
