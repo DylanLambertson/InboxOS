@@ -17,6 +17,7 @@ import { attachmentRoutes } from "./routes/attachments";
 import { authRoutes } from "./routes/auth";
 import { composeRoutes } from "./routes/compose";
 import { contactRoutes } from "./routes/contacts";
+import { conversationRoutes } from "./routes/conversations";
 import { digestPublicRoutes, digestSettingsRoutes } from "./routes/digest";
 import { labelRoutes, mailboxRoutes } from "./routes/mailboxes";
 import { mailRuleRoutes } from "./routes/mail-rules";
@@ -125,6 +126,7 @@ api.route("/messages", messageRoutes);
 api.route("/drafts", composeRoutes);
 api.route("/attachments", attachmentRoutes);
 api.route("/contacts", contactRoutes);
+api.route("/conversations", conversationRoutes);
 api.route("/templates", templateRoutes);
 
 const admin = new Hono<AppEnv>();

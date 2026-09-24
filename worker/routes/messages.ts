@@ -4,6 +4,7 @@ import type { Address, EmailEvent, MessageDetail, View } from "@shared/types";
 import { FOLDERS } from "@shared/types";
 import type { AppEnv } from "../env";
 import { requireMailbox, requireMessage, userMailboxIds } from "../lib/access";
+import { collabFilter, isCollabView } from "../lib/collab";
 import { toAttachmentInfo, toListItem, type AttachmentRow, type MessageRow } from "../lib/messages";
 import { resend } from "../lib/resend";
 import { ftsExpression, likeEscape, parseQuery } from "../lib/search";
@@ -44,6 +45,7 @@ messageRoutes.get("/", async (c) => {
   const q = (c.req.query("q") ?? "").trim().slice(0, 500);
   const limit = clampInt(c.req.query("limit"), 1, 100, 50);
   const cursor = decodeCursor(c.req.query("cursor"));
+  const convStatus = c.req.query("status") || null;
 
   const where: string[] = [`mailbox_id IN ${inMailboxes}`];
   const args: unknown[] = [...mailboxIds];
@@ -96,11 +98,22 @@ messageRoutes.get("/", async (c) => {
     where.push(`is_read = 0 AND folder NOT IN ${HIDDEN_FROM_ALL}`);
   } else if (view === "all") {
     where.push(`folder NOT IN ${HIDDEN_FROM_ALL}`);
+  } else if (isCollabView(view)) {
+    const f = collabFilter({ view, status: null, userId: u.id, mailboxIds, hiddenFolders: HIDDEN_FROM_ALL });
+    where.push(...f.where);
+    args.push(...f.args);
   } else if ((FOLDERS as readonly string[]).includes(view)) {
     where.push("folder = ?");
     args.push(view);
   } else {
     throw new HTTPException(400, { message: "Unknown view" });
+  }
+
+  // Status chips (Open / Pending / Closed) narrow any list to conversations in that state.
+  if (convStatus) {
+    const f = collabFilter({ view: null, status: convStatus, userId: u.id, mailboxIds, hiddenFolders: HIDDEN_FROM_ALL });
+    where.push(...f.where);
+    args.push(...f.args);
   }
 
   // Scheduled and snoozed lists read as a timeline: soonest first.
@@ -112,18 +125,22 @@ messageRoutes.get("/", async (c) => {
   const cursorSqlDir = dir === "ASC" ? cursorSql.replace(/</g, ">") : cursorSql;
 
   const labelSub = "(SELECT group_concat(label_id) FROM message_labels ml WHERE ml.message_id = f.id) AS label_ids";
+  // Conversation status and assignee, as one JSON value so it works without joins (and column clashes) in both list shapes.
+  const convSub = `(SELECT json_object('status', cv.status, 'id', au.id, 'name', au.name, 'email', au.email, 'color', au.avatar_color)
+      FROM conversations cv LEFT JOIN users au ON au.id = cv.assignee_id
+      WHERE cv.mailbox_id = f.mailbox_id AND cv.thread_id = f.thread_id) AS conv_json`;
   let sql: string;
   if (threaded) {
     sql = `WITH f AS (SELECT * FROM messages WHERE ${where.join(" AND ")}),
       latest AS (SELECT thread_id, MAX(date) AS d, SUM(1 - is_read) AS unread FROM f GROUP BY thread_id)
-      SELECT f.*, latest.unread AS thread_unread, ${labelSub},
+      SELECT f.*, latest.unread AS thread_unread, ${labelSub}, ${convSub},
         MAX(1, (SELECT COUNT(*) FROM messages x WHERE x.mailbox_id = f.mailbox_id AND x.thread_id = f.thread_id
                 AND x.folder NOT IN ('trash','spam','drafts','scheduled','snoozed'))) AS thread_count
       FROM f JOIN latest ON latest.thread_id = f.thread_id AND latest.d = f.date
       WHERE 1 = 1 ${cursorSqlDir}
       ORDER BY f.date ${dir}, f.id ${dir} LIMIT ?`;
   } else {
-    sql = `SELECT f.*, ${labelSub} FROM messages f WHERE ${where.join(" AND ")} ${cursorSqlDir}
+    sql = `SELECT f.*, ${labelSub}, ${convSub} FROM messages f WHERE ${where.join(" AND ")} ${cursorSqlDir}
       ORDER BY f.${orderCol} ${dir}, f.id ${dir} LIMIT ?`;
   }
   const { results } = await c.env.DB.prepare(sql)

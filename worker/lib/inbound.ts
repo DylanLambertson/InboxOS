@@ -1,5 +1,6 @@
 import { UNROUTED_MAILBOX_ID, type Address, type MessageStatus } from "@shared/types";
 import type { Env } from "../env";
+import { reopenOnInbound } from "./collab";
 import { attachmentKey, bodyKey, contactStatements, ftsStatements, resolveThread } from "./messages";
 import { isBlocked, type AutoReplyCandidate } from "./mail-rules";
 import type { ReceivedNotice } from "./notify";
@@ -198,6 +199,8 @@ export async function ingestReceived(
       ...ruled.statements,
     ]);
     stored++;
+    // A customer reply puts a pending/closed conversation back in front of the team.
+    if (!unrouted && folder === "inbox") await reopenOnInbound(env.DB, { mailboxId, threadId });
     // Routed mail is worth telling the panel about; unrouted lands in the admin-only area.
     if (!unrouted && folder === "inbox") {
       if (!ruled.read) received.push({ mailboxId, message: { id, threadId, from, subject, snippet: makeSnippet(text), date: t } });

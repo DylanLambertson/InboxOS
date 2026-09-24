@@ -1,4 +1,5 @@
 /** Types shared by the Worker API and the web client. */
+import type { ConversationStatus, Person } from "./collab";
 
 /** Hidden system mailbox that holds mail sent to addresses with no mailbox (see Admin → All traffic). */
 export const UNROUTED_MAILBOX_ID = "system-unrouted";
@@ -12,7 +13,7 @@ export type MailboxType = "personal" | "shared";
 export const FOLDERS = ["inbox", "sent", "drafts", "scheduled", "snoozed", "archive", "spam", "trash"] as const;
 export type Folder = (typeof FOLDERS)[number];
 /** Virtual views that aren't stored folders. */
-export type View = Folder | "starred" | "all" | "unread";
+export type View = Folder | "starred" | "all" | "unread" | "assigned" | "unassigned" | "mentions";
 
 export type MessageStatus =
   | "received"
@@ -122,6 +123,10 @@ export interface MessageListItem {
   scheduledAt: string | null;
   /** When a snoozed message comes back to the inbox. */
   snoozedUntil: string | null;
+  /** Shared-inbox status of the conversation (no row yet = open). */
+  convStatus?: ConversationStatus;
+  /** Teammate the conversation is assigned to. */
+  assignee?: Person | null;
 }
 
 export interface AttachmentInfo {

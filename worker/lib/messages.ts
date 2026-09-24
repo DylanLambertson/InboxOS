@@ -1,3 +1,4 @@
+import type { ConversationStatus } from "@shared/collab";
 import type { Address, AttachmentInfo, Folder, MessageListItem, MessageStatus } from "@shared/types";
 import { newId, normalizeSubject, now, parseJson } from "./util";
 
@@ -46,6 +47,8 @@ export interface MessageRow {
   thread_count?: number;
   label_ids?: string | null;
   thread_unread?: number;
+  /** JSON {status, id, name, email, color} of the conversation (collaboration), when the list joined it. */
+  conv_json?: string | null;
 }
 
 export interface AttachmentRow {
@@ -105,6 +108,15 @@ export function toListItem(r: MessageRow): MessageListItem {
     threadCount: r.thread_count ?? 1,
     scheduledAt: r.scheduled_at,
     snoozedUntil: r.snoozed_until ?? null,
+    ...conversationFields(r.conv_json),
+  };
+}
+
+function conversationFields(json: string | null | undefined): Pick<MessageListItem, "convStatus" | "assignee"> {
+  const cv = parseJson<{ status?: ConversationStatus; id?: string | null; name?: string | null; email?: string | null; color?: string | null } | null>(json, null);
+  return {
+    convStatus: cv?.status ?? "open",
+    assignee: cv?.id && cv.email ? { id: cv.id, name: cv.name ?? "", email: cv.email, color: cv.color ?? "#64748b" } : null,
   };
 }
 
