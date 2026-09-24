@@ -28,5 +28,5 @@ export interface SessionUser {
 
 export type AppEnv = {
   Bindings: Env;
-  Variables: { user: SessionUser; apiKey: ApiKey; scope: RequestScope };
+  Variables: { user: SessionUser; apiKey: ApiKey; scope: RequestScope; scimTokenId: string };
 };

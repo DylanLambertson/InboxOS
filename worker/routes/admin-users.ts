@@ -9,7 +9,7 @@ import { templates } from "../lib/email-templates";
 import { sendSystemEmail } from "../lib/system-mail";
 import { maskEmail } from "../lib/digest";
 import { storedRole } from "../lib/roles";
-import { ensureMailbox, getUser, getUserByEmail, insertUser, withRole, type UserRow } from "../lib/users";
+import { ensureMailbox, getUser, getUserByEmail, insertUser, offboardStatements, withRole, type UserRow } from "../lib/users";
 import { newId, now, sha256hex } from "../lib/util";
 import { parseBody, zEmail } from "../lib/validate";
 
@@ -45,7 +45,7 @@ adminUserRoutes.get("/", async (c) => {
   );
 });
 
-async function issueToken(env: Env, userId: string, type: "invite" | "reset", createdBy: string, hours: number): Promise<string> {
+export async function issueToken(env: Env, userId: string, type: "invite" | "reset", createdBy: string, hours: number): Promise<string> {
   const raw = newId(32);
   await env.DB.batch([
     // Only the newest link of each kind stays valid.
@@ -62,7 +62,7 @@ async function issueToken(env: Env, userId: string, type: "invite" | "reset", cr
   return `${env.APP_URL.replace(/\/$/, "")}/${type === "invite" ? "invite" : "reset"}/${raw}`;
 }
 
-async function emailInvite(env: Env, to: string, url: string, inviter: string, name?: string) {
+export async function emailInvite(env: Env, to: string, url: string, inviter: string, name?: string) {
   const brand = await getBrand(env.DB);
   return sendSystemEmail(env, to, templates.invite(brand, { name, email: to, inviter, url, days: 7 }), "invite");
 }
@@ -150,12 +150,7 @@ adminUserRoutes.patch("/:id", async (c) => {
        WHERE id = ?`,
     ).bind(body.name ?? target.name, stored.role, stored.isManager, status, now(), body.unlock ? 1 : 0, body.unlock ? 1 : 0, target.id),
   ];
-  if (status === "disabled") {
-    stmts.push(c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id));
-    // Offboarding: no more reminders to their personal inbox (they'd have to turn it back on themselves).
-    stmts.push(c.env.DB.prepare("UPDATE users SET digest_enabled = 0, digest_next_at = NULL WHERE id = ?").bind(target.id));
-    stmts.push(c.env.DB.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").bind(target.id));
-  }
+  if (status === "disabled") stmts.push(...offboardStatements(c.env.DB, target.id));
   await c.env.DB.batch(stmts);
   await audit(c, {
     action: "user.updated",

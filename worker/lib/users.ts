@@ -29,6 +29,7 @@ export interface UserRow {
   digest_hours: number;
   digest_last_at: string | null;
   digest_next_at: string | null;
+  scim_external_id?: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -59,6 +60,17 @@ export const withRole = <T extends { role: string; is_manager?: number | null }>
 export const getUser = async (db: D1Database, id: string) => withRole(await db.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>());
 export const getUserByEmail = async (db: D1Database, email: string) =>
   withRole(await db.prepare("SELECT * FROM users WHERE email = ?").bind(email.trim().toLowerCase()).first<UserRow>());
+
+/**
+ * What disabling an account also does, shared by the admin console and SCIM: sign out
+ * everywhere, stop unread-mail reminders to their personal inbox (they'd have to turn it back
+ * on themselves), and forget their push devices.
+ */
+export const offboardStatements = (db: D1Database, userId: string): D1PreparedStatement[] => [
+  db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId),
+  db.prepare("UPDATE users SET digest_enabled = 0, digest_next_at = NULL WHERE id = ?").bind(userId),
+  db.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").bind(userId),
+];
 
 /** Insert a user row; returns the new id. */
 export async function insertUser(

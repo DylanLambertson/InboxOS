@@ -6,6 +6,7 @@ import { runCron } from "./cron";
 import { requireAuth, requireConsole, sameOrigin } from "./lib/session";
 import { getBrand } from "./lib/settings";
 import { adminApiKeyRoutes } from "./routes/admin-apikeys";
+import { adminScimRoutes } from "./routes/admin-scim";
 import { adminSuppressionRoutes } from "./routes/admin-suppressions";
 import { adminMailboxRoutes } from "./routes/admin-mailboxes";
 import { adminSecurityRoutes } from "./routes/admin-security";
@@ -23,6 +24,7 @@ import { labelRoutes, mailboxRoutes } from "./routes/mailboxes";
 import { mailRuleRoutes } from "./routes/mail-rules";
 import { mcpRoutes } from "./routes/mcp";
 import { pushRoutes } from "./routes/push";
+import { scimRoutes } from "./routes/scim";
 import { meRoutes } from "./routes/me";
 import { messageActionRoutes } from "./routes/message-actions";
 import { messageRoutes } from "./routes/messages";
@@ -112,6 +114,9 @@ app.route("/unsubscribe", unsubscribeRoutes);
 app.route("/api/v1", apiV1Routes);
 app.route("/mcp", mcpRoutes);
 
+// ---- SCIM provisioning (Okta, Entra ID), bearer-token auth --------------------------------
+app.route("/scim/v2", scimRoutes);
+
 // ---- Signed-in ------------------------------------------------------------
 const api = new Hono<AppEnv>();
 api.use("*", requireAuth);
@@ -135,6 +140,7 @@ admin.route("/users", adminUserRoutes);
 admin.route("/mailboxes", adminMailboxRoutes);
 admin.route("/traffic", adminTrafficRoutes);
 admin.route("/api-keys", adminApiKeyRoutes);
+admin.route("/provisioning", adminScimRoutes);
 admin.route("/suppressions", adminSuppressionRoutes);
 admin.route("/security", adminSecurityRoutes);
 admin.route("/", adminSystemRoutes);
