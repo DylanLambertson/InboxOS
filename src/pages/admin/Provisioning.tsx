@@ -148,7 +148,7 @@ export function AdminProvisioning() {
         <div className="space-y-5">
           <Toggle
             title="Create a personal mailbox"
-            description="Gives them name@ your primary domain, unless that address is already in use."
+            description="For people on one of your mail domains: gives them name@ your primary domain, unless that address is already in use."
             checked={settings.createMailbox}
             onChange={(v) => save({ ...settings, createMailbox: v })}
             disabled={!editable}
@@ -159,7 +159,7 @@ export function AdminProvisioning() {
               <option value="invite">Send an invite email</option>
             </Select>
           </Field>
-          <p className="text-xs text-fg-muted">Owners and admins can't be deactivated or renamed to another email through SCIM. Deprovisioned people are deactivated, never deleted, so their mail stays.</p>
+          <p className="text-xs text-fg-muted">Owners and admins can't be deactivated, reactivated or moved to another email through SCIM; manage them in Admin → Users. Deprovisioned people are deactivated, never deleted, so their mail stays.</p>
         </div>
       </Section>
 

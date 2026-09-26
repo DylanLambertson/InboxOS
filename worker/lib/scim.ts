@@ -100,9 +100,13 @@ function applyAttr(state: ScimUserState, op: "add" | "replace" | "remove", path:
       // Removing "active" leaves it unchanged rather than silently deactivating someone.
       if (!remove) state.active = scimBool(value);
       return;
-    case "displayname":
+    case "displayname": {
+      // When the formatted name just mirrors displayName (an existing user), a displayName-only PATCH renames them.
+      const mirrored = state.displayName !== undefined && state.name.formatted === state.displayName;
       state.displayName = remove ? "" : str(value, "displayName", 120);
+      if (mirrored && state.displayName) state.name = { formatted: state.displayName };
       return;
+    }
     case "name":
       if (remove) state.name = {};
       else if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -307,6 +311,27 @@ export function parseFilterParam(raw: string | undefined): ScimFilter | null {
   }
 }
 
+/** Addresses that belong to the organization, never to one provisioned person. */
+const ROLE_LOCALS = new Set(["postmaster", "abuse", "hostmaster", "webmaster", "security", "root", "admin", "administrator", "mailer-daemon", "noreply", "no-reply"]);
+
+/**
+ * The personal mailbox address for a provisioned user: <local part>@<primary domain>, but only
+ * when their email is already on one of the team's mail domains (so jane@gmail.com can't claim
+ * jane@ on ours) and the local part is a plain, non-role name. `mailDomains` is primary first.
+ */
+export function personalMailboxAddress(email: string, mailDomains: string[]): string | null {
+  const [local, domain] = email.toLowerCase().split("@");
+  if (!local || !domain || !mailDomains.includes(domain)) return null;
+  if (!/^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/.test(local) || ROLE_LOCALS.has(local)) return null;
+  return `${local}@${mailDomains[0]}`;
+}
+
+/** Whether SCIM may move a member to this email: only onto the team's own or SSO-allowed domains. */
+export function emailDomainAllowed(email: string, allowedDomains: string[]): boolean {
+  const domain = email.toLowerCase().split("@")[1] ?? "";
+  return allowedDomains.some((d) => d.toLowerCase() === domain);
+}
+
 // ---- Discovery documents (RFC 7644 §4) ------------------------------------------------------
 
 export function serviceProviderConfig(docsUrl: string) {
@@ -318,7 +343,8 @@ export function serviceProviderConfig(docsUrl: string) {
     filter: { supported: true, maxResults: MAX_PAGE },
     changePassword: { supported: false },
     sort: { supported: false },
-    etag: { supported: true },
+    // ETags are returned for caching, but If-Match isn't enforced.
+    etag: { supported: false },
     authenticationSchemes: [
       { type: "oauthbearertoken", name: "Bearer token", description: "The SCIM token from Admin → Provisioning, sent as Authorization: Bearer <token>.", primary: true },
     ],

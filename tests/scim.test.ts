@@ -4,7 +4,9 @@ import {
   appToScim,
   appToState,
   applyPatch,
+  emailDomainAllowed,
   listResponse,
+  personalMailboxAddress,
   pageParams,
   parseFilterParam,
   parsePatchBody,
@@ -204,6 +206,25 @@ describe("SCIM PATCH", () => {
   it("never mutates the starting state", () => {
     patch([{ op: "replace", value: { active: false, displayName: "x" } }]);
     expect(start.active).toBe(true);
+  });
+});
+
+describe("SCIM provisioning guards", () => {
+  const domains = ["example.com", "example.org"];
+  it("only gives team-domain people a personal mailbox, never a role address", () => {
+    expect(personalMailboxAddress("jane@example.org", domains)).toBe("jane@example.com");
+    expect(personalMailboxAddress("Jane.Doe@example.com", domains)).toBe("jane.doe@example.com");
+    expect(personalMailboxAddress("jane@gmail.com", domains)).toBeNull();
+    expect(personalMailboxAddress("postmaster@example.com", domains)).toBeNull();
+    expect(personalMailboxAddress("a+b@example.com", domains)).toBeNull();
+    expect(personalMailboxAddress("jane@example.com", [])).toBeNull();
+  });
+  it("only moves members onto allowed domains", () => {
+    expect(emailDomainAllowed("x@Example.org", domains)).toBe(true);
+    expect(emailDomainAllowed("x@evil.example", domains)).toBe(false);
+  });
+  it("a displayName-only PATCH renames an existing user", () => {
+    expect(scimToApp(applyPatch(appToState(user), [{ op: "Replace", path: "displayName", value: "Countess Ada" }])).name).toBe("Countess Ada");
   });
 });
 
