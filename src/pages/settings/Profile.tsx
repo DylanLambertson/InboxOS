@@ -5,6 +5,8 @@ import type { Me, Preferences } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useMe } from "@/lib/queries";
 import { RichTextField } from "@/components/compose/Editor";
+import { EnforcedSignature } from "@/components/compose/DlpDialog";
+import { useOrgSignature } from "@/lib/outbound";
 import { Avatar, Button, Field, Input, PageHeader, Section, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { DigestSettings } from "./DigestSettings";
 import { PushSettings } from "./PushSettings";
@@ -25,15 +27,29 @@ export function ProfileSettings() {
   const { data: me } = useMe();
   const qc = useQueryClient();
   const [name, setName] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [phone, setPhone] = useState("");
   const [signature, setSignature] = useState("");
+  // Bumped to remount the editor when its content is replaced from outside.
+  const [sigKey, setSigKey] = useState(0);
   const [saving, setSaving] = useState(false);
+  const { data: org } = useOrgSignature(undefined);
 
   useEffect(() => {
     if (me) {
       setName(me.name);
+      setJobTitle(me.jobTitle);
+      setPhone(me.phone);
       setSignature(me.signatureHtml);
     }
   }, [me]);
+  // Suggest mode: start an empty signature from the company template.
+  useEffect(() => {
+    if (me && !me.signatureHtml && org?.mode === "suggest" && org.html) {
+      setSignature(org.html);
+      setSigKey((k) => k + 1);
+    }
+  }, [me, org]);
 
   if (!me) return <Spinner />;
 
@@ -62,16 +78,23 @@ export function ProfileSettings() {
             <Field label="Sign-in email" hint="Contact an admin to change this.">
               <Input value={me.email} disabled />
             </Field>
+            <Field label="Job title" hint="Used in your company signature.">
+              <Input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={120} placeholder="e.g. Account Manager" />
+            </Field>
+            <Field label="Phone" hint="Used in your company signature.">
+              <Input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} type="tel" placeholder="+1 555 123 4567" />
+            </Field>
           </div>
         </div>
         <div className="mt-4 flex justify-end">
           <Button
             variant="primary"
             loading={saving}
-            disabled={name.trim() === me.name || !name.trim()}
+            disabled={!name.trim() || (name.trim() === me.name && jobTitle.trim() === me.jobTitle && phone.trim() === me.phone)}
             onClick={async () => {
               setSaving(true);
-              await patch({ name: name.trim() }, "Profile updated");
+              await patch({ name: name.trim(), jobTitle: jobTitle.trim(), phone: phone.trim() }, "Profile updated");
+              qc.invalidateQueries({ queryKey: ["org-signature"] });
               setSaving(false);
             }}
           >
@@ -80,14 +103,27 @@ export function ProfileSettings() {
         </div>
       </Section>
 
-      <Section title="Personal signature" description="Added to new messages. A mailbox signature (set per mailbox) takes priority when one exists.">
-        <RichTextField value={signature} onChange={setSignature} placeholder="Your name · Title · Phone" minHeight={110} />
-        <div className="mt-4 flex justify-end">
-          <Button variant="primary" onClick={() => patch({ signatureHtml: signature === "<p></p>" ? "" : signature }, "Signature saved")}>
-            Save signature
-          </Button>
-        </div>
-      </Section>
+      {org?.mode === "enforce" ? (
+        <Section title="Signature" description="Your organization sets everyone's signature. It's added to every message you send, filled in with your name, job title and phone above.">
+          <div className="rounded-ui border border-line bg-subtle px-3 py-2.5">
+            <EnforcedSignature html={org.html} />
+          </div>
+        </Section>
+      ) : (
+        <Section title="Personal signature" description="Added to new messages. A mailbox signature (set per mailbox) takes priority when one exists.">
+          <RichTextField key={sigKey} value={signature} onChange={setSignature} placeholder="Your name · Title · Phone" minHeight={110} />
+          <div className="mt-4 flex justify-end gap-2">
+            {org?.mode === "suggest" && org.html && (
+              <Button variant="secondary" onClick={() => (setSignature(org.html), setSigKey((k) => k + 1))}>
+                Use company signature
+              </Button>
+            )}
+            <Button variant="primary" onClick={() => patch({ signatureHtml: signature === "<p></p>" ? "" : signature }, "Signature saved")}>
+              Save signature
+            </Button>
+          </div>
+        </Section>
+      )}
 
       <Section title="Preferences">
         <div className="divide-y divide-line">

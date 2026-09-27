@@ -33,6 +33,8 @@ import { EditorToolbar, useMailEditor } from "./Editor";
 import { RecipientInput } from "./RecipientInput";
 import { ScheduleDialog } from "./ScheduleDialog";
 import { useDraft, type ComposeRequest } from "./useDraft";
+import { checkDraft, useOrgSignature, type OrgSignature } from "@/lib/outbound";
+import { EnforcedSignature, useDlpDialog } from "./DlpDialog";
 
 interface Props {
   req: ComposeRequest;
@@ -43,11 +45,27 @@ interface Props {
   onSend: (draftId: string, mailboxId: string, scheduledAt?: string | null) => void;
 }
 
-export function ComposeWindow({ req, minimized, defaultFullscreen, onToggleMinimize, onClose, onSend }: Props) {
+export function ComposeWindow(props: Props) {
+  const org = useOrgSignature(props.req.mailboxId);
+  // The draft picks its signature once, on creation, so wait for the company policy.
+  if (org.isPending) {
+    return (
+      <Shell minimized={props.minimized} fullscreen={false} title="Loading…" onClose={props.onClose} onToggleMinimize={props.onToggleMinimize}>
+        <div className="flex h-60 items-center justify-center">
+          <Spinner />
+        </div>
+      </Shell>
+    );
+  }
+  return <ComposeDraft {...props} org={org.data} />;
+}
+
+function ComposeDraft({ req, minimized, defaultFullscreen, onToggleMinimize, onClose, onSend, org }: Props & { org?: OrgSignature }) {
   const { data: me } = useMe();
   const { data: boxes = [] } = useMailboxes();
   const box = boxes.find((b) => b.id === req.mailboxId);
-  const signature = box?.signatureHtml || me?.signatureHtml || "";
+  // Enforced company signatures are added by the server, so nothing goes in the editor.
+  const signature = org?.mode === "enforce" ? "" : box?.signatureHtml || me?.signatureHtml || (org?.mode === "suggest" ? org.html : "");
   const draft = useDraft(req, signature);
   const { state } = draft;
   // Teammates looking at this conversation see "<you> is replying…" while this is open.
@@ -93,6 +111,8 @@ function ComposeBody({
   const [scheduleOpen, setScheduleOpen] = useState(false);
   const [dragging, setDragging] = useState(false);
   const [busy, setBusy] = useState(false);
+  const dlp = useDlpDialog();
+  const { data: org } = useOrgSignature(state.mailboxId);
   const fileInput = useRef<HTMLInputElement>(null);
   const imageInput = useRef<HTMLInputElement>(null);
 
@@ -168,6 +188,9 @@ function ComposeBody({
     setBusy(true);
     try {
       const saved = await draft.flush();
+      // Advisory only: if the check itself fails, the server still enforces blocks at send time.
+      const findings = await checkDraft(saved.id).then((r) => r.findings, () => []);
+      if (findings.length && !(await dlp.ask(findings))) return;
       onSend(saved.id, saved.mailboxId, scheduledAt ?? null);
     } catch (e) {
       toast.error(errorMessage(e));
@@ -345,6 +368,7 @@ function ComposeBody({
 
         <div className="min-h-0 flex-1 cursor-text overflow-y-auto px-4 py-3" onClick={(e) => e.target === e.currentTarget && editor?.commands.focus("end")}>
           <EditorContent editor={editor} />
+          {org?.mode === "enforce" && <EnforcedSignature html={org.html} />}
           {state.quoteHtml && state.keepQuote && (
             <div className="mt-2">
               <div className="flex items-center gap-1">
@@ -458,6 +482,7 @@ function ComposeBody({
           send(iso);
         }}
       />
+      {dlp.dialog}
     </Shell>
   );
 }
