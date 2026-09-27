@@ -45,6 +45,8 @@ export const router = createBrowserRouter([
           { path: "provisioning", lazy: lazy(admin, (m) => m.AdminProvisioning) },
           { path: "unsubscribes", lazy: lazy(admin, (m) => m.AdminUnsubscribes) },
           { path: "security/:tab?", lazy: lazy(admin, (m) => m.AdminSecurity) },
+          { path: "compliance", lazy: lazy(admin, (m) => m.AdminCompliance) },
+          { path: "outbound", lazy: lazy(admin, (m) => m.AdminOutboundPolicy) },
           { path: "logs/:kind?", lazy: lazy(admin, (m) => m.AdminLogs) },
           { path: "setup", lazy: lazy(admin, (m) => m.AdminSetup) },
         ],

@@ -14,7 +14,6 @@ import { useAdminMailboxes } from "./MailboxAccess";
 import { useCanManage } from "@/lib/queries";
 
 type Scope = "all" | "inbound" | "outbound" | "unrouted" | "problems";
-const ATT_BASE = "/api/admin/traffic/attachments";
 
 interface TrafficItem {
   id: string;
@@ -132,14 +131,16 @@ function DeliverPanel({ msg, onDone }: { msg: TrafficDetail; onDone: () => void 
   );
 }
 
-function TrafficViewer({ id, onClose }: { id: string; onClose: () => void }) {
-  const { data: msg, isLoading, error } = useQuery({ queryKey: ["admin-traffic-msg", id], queryFn: () => api.get<TrafficDetail>(`admin/traffic/${id}`), staleTime: Infinity });
+/** `base` lets other audited admin views (eDiscovery) reuse this viewer; `readOnly` hides deliver/delete. */
+export function TrafficViewer({ id, onClose, base = "admin/traffic", readOnly = false }: { id: string; onClose: () => void; base?: string; readOnly?: boolean }) {
+  const ATT_BASE = `/api/${base}/attachments`;
+  const { data: msg, isLoading, error } = useQuery({ queryKey: [base, "msg", id], queryFn: () => api.get<TrafficDetail>(`${base}/${id}`), staleTime: Infinity });
   const [allowRemote, setAllowRemote] = useState(false);
   const [blocked, setBlocked] = useState(0);
   const [headers, setHeaders] = useState(false);
   const confirm = useConfirm();
   const qc = useQueryClient();
-  const editable = useCanManage();
+  const editable = useCanManage() && !readOnly;
   const visible = msg?.attachments.filter((a) => !a.inline || !(msg.html ?? "").includes(`cid:${a.contentId}`)) ?? [];
 
   return (

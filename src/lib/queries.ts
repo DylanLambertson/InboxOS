@@ -1,3 +1,4 @@
+import { toast } from "sonner";
 import { useInfiniteQuery, useMutation, useQuery, useQueryClient, type InfiniteData } from "@tanstack/react-query";
 import type { Contact, Label, MailboxSummary, Me, MessageDetail, MessageListItem, Paged, Template, View } from "@shared/types";
 import { api } from "./api";
@@ -75,7 +76,9 @@ export interface BulkInput {
 export function useMessageAction() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (input: BulkInput) => api.post<{ ok: boolean; count: number }>("messages/bulk", input as unknown as Record<string, unknown>),
+    mutationFn: (input: BulkInput) => api.post<{ ok: boolean; count: number; notice?: string }>("messages/bulk", input as unknown as Record<string, unknown>),
+    // Mail under legal hold isn't deleted; say so rather than letting it silently reappear.
+    onSuccess: (r) => void (r.notice && toast.info(r.notice)),
     onMutate: async (input) => {
       const patch: Partial<MessageListItem> | null =
         input.action === "read" ? { isRead: true }

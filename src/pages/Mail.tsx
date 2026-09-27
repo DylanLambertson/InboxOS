@@ -163,8 +163,9 @@ export function MailPage() {
   const emptyFolder = async () => {
     if (!(await confirm({ title: `Empty ${view}?`, body: "All messages in this folder will be permanently deleted.", confirmLabel: "Empty", danger: true }))) return;
     try {
-      const r = await api.post<{ count: number }>("messages/empty", { mailboxId, folder: view });
+      const r = await api.post<{ count: number; notice?: string }>("messages/empty", { mailboxId, folder: view });
       toast.success(`Deleted ${r.count} message${r.count === 1 ? "" : "s"}`);
+      if (r.notice) toast.info(r.notice);
       invalidate();
     } catch (e) {
       toast.error(errorMessage(e));

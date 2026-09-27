@@ -21,6 +21,7 @@ interface AdminMailbox {
   color: string;
   isActive: boolean;
   isCatchAll: boolean;
+  legalHold?: boolean;
   createdAt: string;
   messageCount: number;
   storageBytes: number;
@@ -363,6 +364,7 @@ export function AdminMailboxes() {
                   <Badge>{b.type === "shared" ? "Shared" : "Personal"}</Badge>
                   {!b.isActive && <Badge tone="warning">Inactive</Badge>}
                   {b.isCatchAll && <Badge tone="accent">Catch-all</Badge>}
+                  {b.legalHold && <Badge tone="danger">Legal hold</Badge>}
                 </p>
                 <p className="truncate text-xs text-fg-muted">
                   {b.displayName ? `Sends as “${b.displayName}”` : "No sender name"} · {b.members.length} member{b.members.length === 1 ? "" : "s"}
