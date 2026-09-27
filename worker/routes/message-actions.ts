@@ -6,6 +6,8 @@ import type { AppEnv } from "../env";
 import { mailboxRole } from "../lib/access";
 import { audit } from "../lib/audit";
 import { purgeMessages } from "../lib/messages";
+
+const HELD_NOTICE = "Some mail is under a retention hold and was kept. Your administrator can tell you more.";
 import { now } from "../lib/util";
 import { parseBody, zId } from "../lib/validate";
 
@@ -155,9 +157,9 @@ messageActionRoutes.post("/bulk", async (c) => {
       if (rows.some((r) => !["trash", "spam", "drafts"].includes(r.folder))) {
         throw new HTTPException(400, { message: "Move messages to Trash before deleting them forever." });
       }
-      await purgeMessages(db, c.env.FILES, ids);
-      await audit(c, { action: "message.deleted", targetType: "message", meta: { count: ids.length, mailboxes: [...roles.keys()] } });
-      return c.json({ ok: true, count: ids.length });
+      const { purged, kept } = await purgeMessages(db, c.env.FILES, ids);
+      await audit(c, { action: "message.deleted", targetType: "message", meta: { count: purged, kept, mailboxes: [...roles.keys()] } });
+      return c.json({ ok: true, count: purged, ...(kept ? { kept, notice: HELD_NOTICE } : {}) });
     }
   }
   for (let i = 0; i < stmts.length; i += 50) await db.batch(stmts.slice(i, i + 50));
@@ -173,7 +175,7 @@ messageActionRoutes.post("/empty", async (c) => {
   const { results } = await c.env.DB.prepare("SELECT id FROM messages WHERE mailbox_id = ? AND folder = ? LIMIT 2000")
     .bind(body.mailboxId, body.folder)
     .all<{ id: string }>();
-  await purgeMessages(c.env.DB, c.env.FILES, results.map((r) => r.id));
-  await audit(c, { action: `mailbox.emptied_${body.folder}`, targetType: "mailbox", targetId: body.mailboxId, meta: { count: results.length } });
-  return c.json({ ok: true, count: results.length });
+  const { purged, kept } = await purgeMessages(c.env.DB, c.env.FILES, results.map((r) => r.id));
+  await audit(c, { action: `mailbox.emptied_${body.folder}`, targetType: "mailbox", targetId: body.mailboxId, meta: { count: purged, kept } });
+  return c.json({ ok: true, count: purged, ...(kept ? { kept, notice: HELD_NOTICE } : {}) });
 });

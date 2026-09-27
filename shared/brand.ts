@@ -100,6 +100,10 @@ export interface OrgPolicy {
   ipAllowlist: string[];
   /** Who the allowlist applies to: everyone, or only people who can open the admin console. */
   ipAllowlistEnforceFor: "everyone" | "admins";
+  /** Retention: permanently delete mail older than this many days. 0 = off (keep forever). */
+  retentionDays: number;
+  /** Which mail retention applies to: every folder except drafts/scheduled, or only Archive. */
+  retentionScope: "all" | "archive";
 }
 
 export const DEFAULT_POLICY: OrgPolicy = {
@@ -119,6 +123,8 @@ export const DEFAULT_POLICY: OrgPolicy = {
   digestDetail: "subjects",
   ipAllowlist: [],
   ipAllowlistEnforceFor: "everyone",
+  retentionDays: 0,
+  retentionScope: "all",
 };
 
 /** Every mail domain, primary first, lowercased and without duplicates. */

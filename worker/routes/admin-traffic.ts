@@ -4,6 +4,7 @@ import { z } from "zod";
 import { UNROUTED_MAILBOX_ID, type Address } from "@shared/types";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
+import { isHeld } from "../lib/legal-hold";
 import { purgeMessages, resolveThread, type AttachmentRow, type MessageRow } from "../lib/messages";
 import { ftsExpression, likeEscape } from "../lib/search";
 import { clampInt, now, parseJson } from "../lib/util";
@@ -164,6 +165,8 @@ adminTrafficRoutes.post("/:id/deliver", async (c) => {
   const body = await parseBody(c, z.object({ mailboxId: zId, aliasAddress: zEmail.optional() }));
   const m = await loadMessage(c.env.DB, c.req.param("id"));
   if (m.mailbox_id !== UNROUTED_MAILBOX_ID) throw new HTTPException(409, { message: "Only unrouted messages can be delivered." });
+  // Moving held mail into an unheld mailbox would let it be deleted there.
+  if (await isHeld(c.env.DB, UNROUTED_MAILBOX_ID)) throw new HTTPException(409, { message: "Unrouted mail is under legal hold and can't be moved." });
   const target = await c.env.DB.prepare("SELECT address FROM mailboxes WHERE id = ? AND is_system = 0").bind(body.mailboxId).first<{ address: string }>();
   if (!target) throw new HTTPException(404, { message: "Mailbox not found" });
 
@@ -198,7 +201,8 @@ adminTrafficRoutes.post("/:id/deliver", async (c) => {
 adminTrafficRoutes.delete("/:id", async (c) => {
   const m = await loadMessage(c.env.DB, c.req.param("id"));
   if (m.mailbox_id !== UNROUTED_MAILBOX_ID) throw new HTTPException(409, { message: "Only unrouted messages can be deleted here. Mailbox owners manage their own mail." });
-  await purgeMessages(c.env.DB, c.env.FILES, [m.id]);
+  const { kept } = await purgeMessages(c.env.DB, c.env.FILES, [m.id]);
+  if (kept) throw new HTTPException(409, { message: "Unrouted mail is under legal hold and can't be deleted." });
   await audit(c, { action: "admin.message_deleted", targetType: "message", targetId: m.id, meta: { subject: m.subject, from: m.from_addr } });
   return c.json({ ok: true });
 });

@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { MailboxRole } from "@shared/types";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
+import { heldMailboxIds, isHeld, snapshotMembershipStatement } from "../lib/legal-hold";
 import { purgeMessages } from "../lib/messages";
 import { getPolicy, saveSetting } from "../lib/settings";
 import { ensureMailbox } from "../lib/users";
@@ -37,7 +38,7 @@ adminMailboxRoutes.get("/", async (c) => {
       .prepare("SELECT mailbox_id, COUNT(*) AS messages, COALESCE(SUM(size), 0) AS bytes, MAX(date) AS last FROM messages GROUP BY mailbox_id")
       .all<{ mailbox_id: string; messages: number; bytes: number; last: string | null }>(),
   ]);
-  const policy = await getPolicy(db);
+  const [policy, held] = await Promise.all([getPolicy(db), heldMailboxIds(db)]);
   return c.json(
     boxes.map((b) => {
       const s = stats.find((x) => x.mailbox_id === b.id);
@@ -51,6 +52,7 @@ adminMailboxRoutes.get("/", async (c) => {
         signatureHtml: b.signature_html,
         isActive: !!b.is_active,
         isCatchAll: policy.catchAllMailboxId === b.id,
+        legalHold: held.has(b.id),
         createdAt: b.created_at,
         messageCount: s?.messages ?? 0,
         storageBytes: s?.bytes ?? 0,
@@ -142,6 +144,8 @@ adminMailboxRoutes.delete("/:id", async (c) => {
   const mb = await c.env.DB.prepare("SELECT address FROM mailboxes WHERE id = ? AND is_system = 0").bind(id).first<{ address: string }>();
   if (!mb) throw new HTTPException(404, { message: "Mailbox not found" });
   if (confirm.toLowerCase() !== mb.address.toLowerCase()) throw new HTTPException(400, { message: "Type the mailbox address to confirm." });
+  // Deleting the mailbox row would cascade to its messages, so a held mailbox can't be deleted at all.
+  if (await isHeld(c.env.DB, id)) throw new HTTPException(409, { message: "This mailbox is under legal hold and can't be deleted. Release the hold first (Admin → Compliance)." });
   // Purge in chunks so large mailboxes don't exceed per-request limits; the client retries until done.
   const { results } = await c.env.DB.prepare("SELECT id FROM messages WHERE mailbox_id = ? LIMIT 500").bind(id).all<{ id: string }>();
   await purgeMessages(c.env.DB, c.env.FILES, results.map((r) => r.id));
@@ -176,7 +180,10 @@ adminMailboxRoutes.put("/:id/members/:userId", async (c) => {
 
 adminMailboxRoutes.delete("/:id/members/:userId", async (c) => {
   const { id, userId } = c.req.param();
-  await c.env.DB.prepare("DELETE FROM mailbox_members WHERE mailbox_id = ? AND user_id = ?").bind(id, userId).run();
+  await c.env.DB.batch([
+    snapshotMembershipStatement(c.env.DB, userId, id),
+    c.env.DB.prepare("DELETE FROM mailbox_members WHERE mailbox_id = ? AND user_id = ?").bind(id, userId),
+  ]);
   await audit(c, { action: "mailbox.member_removed", targetType: "mailbox", targetId: id, meta: { userId } });
   return c.json({ ok: true });
 });

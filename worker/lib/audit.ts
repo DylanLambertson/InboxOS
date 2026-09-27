@@ -44,3 +44,18 @@ export async function audit(c: Context<AppEnv>, e: AuditEntry): Promise<void> {
     console.error("audit failed", err);
   }
 }
+
+/** Records an event from a scheduled job (no request, no actor). Never throws. */
+export async function auditSystem(db: D1Database, e: Omit<AuditEntry, "actor">): Promise<void> {
+  try {
+    await db
+      .prepare(
+        `INSERT INTO audit_logs (id, actor_id, actor_email, action, target_type, target_id, ip, user_agent, meta, created_at)
+         VALUES (?, NULL, 'system', ?, ?, ?, NULL, NULL, ?, ?)`,
+      )
+      .bind(newId(), e.action, e.targetType ?? null, e.targetId ?? null, JSON.stringify(e.meta ?? {}), now())
+      .run();
+  } catch (err) {
+    console.error("audit failed", err);
+  }
+}

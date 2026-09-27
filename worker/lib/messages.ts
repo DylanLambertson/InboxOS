@@ -1,5 +1,6 @@
 import type { ConversationStatus } from "@shared/collab";
 import type { Address, AttachmentInfo, Folder, MessageListItem, MessageStatus } from "@shared/types";
+import { heldMailboxIds, partitionHeld } from "./legal-hold";
 import { newId, normalizeSubject, now, parseJson } from "./util";
 
 export interface MessageRow {
@@ -215,11 +216,41 @@ export function contactStatements(db: D1Database, addrs: Address[], outbound: bo
     );
 }
 
-/** Delete messages (and their R2 objects) permanently. */
-export async function purgeMessages(db: D1Database, files: R2Bucket, ids: string[]): Promise<void> {
+/**
+ * Delete messages (and their R2 objects) permanently. This is the only way mail
+ * is permanently deleted, so it enforces legal hold: messages in a held mailbox
+ * are never deleted; any not already in Trash/Spam are moved to Trash instead.
+ */
+export async function purgeMessages(
+  db: D1Database,
+  files: R2Bucket,
+  ids: string[],
+  held?: Set<string>,
+): Promise<{ purged: number; kept: number }> {
+  if (!ids.length) return { purged: 0, kept: 0 };
+  const heldSet = held ?? (await heldMailboxIds(db));
+  let purged = 0;
+  let kept = 0;
   for (let i = 0; i < ids.length; i += 50) {
-    const chunk = ids.slice(i, i + 50);
-    const ph = chunk.map(() => "?").join(",");
+    const { results: rows } = await db
+      .prepare(`SELECT id, mailbox_id, folder FROM messages WHERE id IN (${chunkPh(ids.slice(i, i + 50))})`)
+      .bind(...ids.slice(i, i + 50))
+      .all<{ id: string; mailbox_id: string; folder: string }>();
+    const split = partitionHeld(rows, heldSet);
+    const toTrash = split.kept.filter((r) => r.folder !== "trash" && r.folder !== "spam").map((r) => r.id);
+    if (toTrash.length) {
+      await db
+        .prepare(
+          `UPDATE messages SET folder_before_trash = folder, folder = 'trash', trashed_at = ?, updated_at = ?
+           WHERE id IN (${chunkPh(toTrash)})`,
+        )
+        .bind(now(), now(), ...toTrash)
+        .run();
+    }
+    kept += split.kept.length;
+    const chunk = split.deletable.map((r) => r.id);
+    if (!chunk.length) continue;
+    const ph = chunkPh(chunk);
     const { results: atts } = await db
       .prepare(`SELECT r2_key FROM attachments WHERE message_id IN (${ph})`)
       .bind(...chunk)
@@ -236,5 +267,9 @@ export async function purgeMessages(db: D1Database, files: R2Bucket, ids: string
       db.prepare(`DELETE FROM message_labels WHERE message_id IN (${ph})`).bind(...chunk),
       db.prepare(`DELETE FROM messages WHERE id IN (${ph})`).bind(...chunk),
     ]);
+    purged += chunk.length;
   }
+  return { purged, kept };
 }
+
+const chunkPh = (ids: string[]) => ids.map(() => "?").join(",");

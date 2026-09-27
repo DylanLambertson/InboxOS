@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Role, UserStatus } from "@shared/types";
 import type { AppEnv, Env, SessionUser } from "../env";
 import { audit } from "../lib/audit";
+import { isUserHeld } from "../lib/legal-hold";
 import { getBrand } from "../lib/settings";
 import { templates } from "../lib/email-templates";
 import { sendSystemEmail } from "../lib/system-mail";
@@ -219,6 +220,10 @@ adminUserRoutes.delete("/:id", async (c) => {
   if (target.id === actor.id) throw new HTTPException(400, { message: "You can't delete yourself." });
   if (target.role === "owner" && target.status === "active" && (await activeOwnerCount(c.env.DB)) <= 1) {
     throw new HTTPException(400, { message: "There must always be at least one active owner." });
+  }
+  // Deleting the user drops their memberships, which is what a user hold covers.
+  if (await isUserHeld(c.env.DB, target.id)) {
+    throw new HTTPException(409, { message: "This person is under legal hold and can't be deleted. Disable them instead, or release the hold first." });
   }
   await c.env.DB.prepare("DELETE FROM users WHERE id = ?").bind(target.id).run();
   await audit(c, { action: "user.deleted", targetType: "user", targetId: target.id, meta: { email: target.email } });

@@ -2,6 +2,8 @@ import type { Env } from "./env";
 import { runDigests } from "./lib/digest";
 import { purgeMessages } from "./lib/messages";
 import { dispatchScheduled } from "./lib/send";
+import { heldMailboxIds, heldParam, notHeldSql } from "./lib/legal-hold";
+import { runRetention } from "./lib/retention";
 import { getPolicy } from "./lib/settings";
 import { now } from "./lib/util";
 
@@ -33,14 +35,17 @@ export async function housekeeping(env: Env): Promise<void> {
   const t = now();
   const ago = (days: number) => new Date(Date.now() - days * 86_400_000).toISOString();
 
-  // Trash & spam retention.
+  // Trash & spam retention. Held mailboxes are skipped in the query itself so they can't crowd out the batch.
+  const held = await heldMailboxIds(env.DB);
   const { results: expired } = await env.DB.prepare(
-    `SELECT id FROM messages WHERE (folder = 'trash' AND trashed_at < ?1) OR (folder = 'spam' AND COALESCE(trashed_at, date) < ?1)
-       OR (mailbox_id = 'system-unrouted' AND date < ?1) LIMIT 500`,
+    `SELECT id FROM messages WHERE ((folder = 'trash' AND trashed_at < ?1) OR (folder = 'spam' AND COALESCE(trashed_at, date) < ?1)
+       OR (mailbox_id = 'system-unrouted' AND date < ?1)) AND ${notHeldSql("mailbox_id", "?2")} LIMIT 500`,
   )
-    .bind(ago(policy.trashRetentionDays))
+    .bind(ago(policy.trashRetentionDays), heldParam(held))
     .all<{ id: string }>();
-  if (expired.length) await purgeMessages(env.DB, env.FILES, expired.map((r) => r.id));
+  if (expired.length) await purgeMessages(env.DB, env.FILES, expired.map((r) => r.id), held);
+
+  await runRetention(env, policy, held);
 
   // Uploads that never got attached to a draft.
   const { results: orphans } = await env.DB.prepare("SELECT id, r2_key FROM attachments WHERE message_id IS NULL AND created_at < ? LIMIT 500")
