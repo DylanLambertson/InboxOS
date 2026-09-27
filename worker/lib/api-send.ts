@@ -6,6 +6,7 @@ import { allowedMailboxes } from "./api-ops";
 import { apiActor, mailboxAllowed, requireScope } from "./apikeys";
 import { audit } from "./audit";
 import { bodyKey, ftsStatements, purgeMessages, type ComposeMeta, type MessageRow } from "./messages";
+import { apiSignature, dlpBlocks, PolicyBlockedError } from "./outbound";
 import { prefixSubject } from "./quote";
 import { rateLimit } from "./ratelimit";
 import { deliverMessage, SendError } from "./send";
@@ -159,9 +160,10 @@ export async function apiSend(c: Context<AppEnv>, input: ApiSendInput): Promise<
   let html = input.html ?? plainToHtml(input.text!);
   let text = input.text ?? "";
   const extra: string[] = [];
-  const sig = input.signature && !rawHtml ? mailbox.signature_html.trim() : "";
+  const senderId = c.get("scope").userId ?? key.createdBy;
+  const sig = input.signature && !rawHtml ? await apiSignature(db, { mailboxId: mailbox.id, mailboxSignature: mailbox.signature_html, userId: senderId, fromAddress: address }) : "";
   if (sig) {
-    extra.push(`<div style="margin-top:16px">${sig}</div>`);
+    extra.push(sig);
     if (text) text += `\n\n${htmlToText(sig)}`;
   }
   let headers: Record<string, string> | undefined;
@@ -206,7 +208,7 @@ export async function apiSend(c: Context<AppEnv>, input: ApiSendInput): Promise<
         src?.message_id_header ?? null,
         refs || null,
         JSON.stringify(meta),
-        c.get("scope").userId ?? key.createdBy,
+        senderId,
         t,
         t,
         t,
@@ -236,6 +238,12 @@ export async function apiSend(c: Context<AppEnv>, input: ApiSendInput): Promise<
     if (!(at > Date.now() + 30_000) || at > Date.now() + 365 * 86_400_000) {
       await purgeMessages(db, env.FILES, [id]);
       throw new HTTPException(400, { message: "Schedule between 1 minute and 1 year from now (ISO 8601 with timezone)." });
+    }
+    // Refuse blocked content now rather than failing quietly when the schedule fires.
+    const blocks = await dlpBlocks(db, { subject, bodyHtml: html, quoteHtml: "", apiText: text || undefined, recipients: everyone, filenames: [] });
+    if (blocks.length) {
+      await purgeMessages(db, env.FILES, [id]);
+      throw new HTTPException(422, { message: new PolicyBlockedError(blocks).message });
     }
     const iso = new Date(at).toISOString();
     await db.prepare("UPDATE messages SET status = 'scheduled', folder = 'scheduled', scheduled_at = ? WHERE id = ?").bind(iso, id).run();

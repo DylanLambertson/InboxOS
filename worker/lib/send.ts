@@ -1,6 +1,7 @@
 import type { Address } from "@shared/types";
 import type { Env } from "../env";
 import { contactStatements, ftsStatements, type AttachmentRow, type ComposeMeta, type MessageRow } from "./messages";
+import { applyOutboundPolicy, PolicyBlockedError } from "./outbound";
 import { resend, ResendError, type ResendAttachment } from "./resend";
 import { getBrand, getPolicy } from "./settings";
 import { b64encode, domainOf, formatAddress, htmlToText, makeSnippet, newId, now, parseJson } from "./util";
@@ -113,12 +114,31 @@ export async function deliverMessage(env: Env, messageId: string): Promise<Messa
     throw new SendError(`Attachments exceed ${policy.maxAttachmentMb} MB`);
   }
   const meta = parseJson<ComposeMeta>(msg.compose_meta, {});
-  let html = "";
+  let body = "";
   if (msg.html_key) {
     const obj = await env.FILES.get(msg.html_key);
-    html = obj ? await obj.text() : "";
+    body = obj ? await obj.text() : "";
   }
-  html += meta.quoteHtml ?? "";
+  const fromAddress = msg.from_addr || mailbox.address;
+  // Outbound policy runs here so no send path (web, scheduled, API, MCP) can skip
+  // the DLP re-check, the enforced company signature or the legal disclaimer.
+  const outbound = await applyOutboundPolicy(env.DB, brand, {
+    messageId: msg.id,
+    userId: msg.created_by,
+    mailboxId: msg.mailbox_id,
+    fromAddress,
+    subject: msg.subject,
+    bodyHtml: body,
+    quoteHtml: meta.quoteHtml ?? "",
+    apiText: meta.api?.text,
+    rawHtml: !!meta.api?.rawHtml,
+    fromApi: !!meta.api,
+    recipients: [...to, ...cc, ...bcc],
+    filenames: atts.map((a) => a.filename),
+  }).catch((err) => {
+    throw err instanceof PolicyBlockedError ? new SendError(err.message, 422) : err;
+  });
+  let html = outbound.html;
   // Images pasted into the editor point at our API; turn them into cid: references.
   for (const a of atts) {
     if (!a.inline || !a.content_id) continue;
@@ -139,8 +159,7 @@ export async function deliverMessage(env: Env, messageId: string): Promise<Messa
     });
   }
 
-  const text = meta.api?.text || htmlToText(html) || msg.text_body;
-  const fromAddress = msg.from_addr || mailbox.address;
+  const text = outbound.text || htmlToText(html) || msg.text_body;
   const messageIdHeader = msg.message_id_header ?? `<${newId(12)}.${Date.now()}@${domainOf(fromAddress)}>`;
 
   const headers: Record<string, string> = { ...meta.api?.headers, "Message-ID": messageIdHeader };

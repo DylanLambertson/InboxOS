@@ -9,6 +9,7 @@ import { audit, requestContext } from "../lib/audit";
 import { templates } from "../lib/email-templates";
 import { sendSystemEmail } from "../lib/system-mail";
 import { hashPassword, passwordProblem, verifyPassword } from "../lib/password";
+import { signatureMode } from "../lib/outbound";
 import { getBrand, getPolicy } from "../lib/settings";
 import { generateTotpSecret, totpUri, verifyTotp } from "../lib/totp";
 import { getUser, toMe } from "../lib/users";
@@ -46,14 +47,31 @@ const zPrefs = z
 meRoutes.patch("/", async (c) => {
   const body = await parseBody(
     c,
-    z.object({ name: z.string().trim().min(1).max(120).optional(), signatureHtml: z.string().max(20_000).optional(), preferences: zPrefs.optional() }),
+    z.object({
+      name: z.string().trim().min(1).max(120).optional(),
+      signatureHtml: z.string().max(20_000).optional(),
+      jobTitle: z.string().trim().max(120).optional(),
+      phone: z.string().trim().max(40).regex(/^[0-9+().\-\s/x]*$/i, "Use digits, spaces and + ( ) - only").optional(),
+      preferences: zPrefs.optional(),
+    }),
   );
   const uid = c.get("user").id;
   const user = await getUser(c.env.DB, uid);
   if (!user) throw new HTTPException(404);
+  if (body.signatureHtml !== undefined && (await signatureMode(c.env.DB)) === "enforce") {
+    throw new HTTPException(403, { message: "Your organization sets everyone's signature. Ask an admin to change it." });
+  }
   const prefs: Preferences = { ...DEFAULT_PREFERENCES, ...parseJson<Partial<Preferences>>(user.preferences, {}), ...body.preferences };
-  await c.env.DB.prepare("UPDATE users SET name = ?, signature_html = ?, preferences = ?, updated_at = ? WHERE id = ?")
-    .bind(body.name ?? user.name, body.signatureHtml ?? user.signature_html, JSON.stringify(prefs), now(), uid)
+  await c.env.DB.prepare("UPDATE users SET name = ?, signature_html = ?, job_title = ?, phone = ?, preferences = ?, updated_at = ? WHERE id = ?")
+    .bind(
+      body.name ?? user.name,
+      body.signatureHtml ?? user.signature_html,
+      body.jobTitle ?? user.job_title ?? "",
+      body.phone ?? user.phone ?? "",
+      JSON.stringify(prefs),
+      now(),
+      uid,
+    )
     .run();
   const updated = await getUser(c.env.DB, uid);
   return c.json(toMe(updated!, await getPolicy(c.env.DB)));

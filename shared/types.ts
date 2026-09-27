@@ -75,6 +75,9 @@ export interface Me {
   hasPassword: boolean;
   googleLinked: boolean;
   signatureHtml: string;
+  /** Fill the company signature template (Admin → Signatures & DLP). */
+  jobTitle: string;
+  phone: string;
   preferences: Preferences;
   mustEnroll2fa: boolean;
   /** A verified personal (non-company) address for the unread-mail digest, or null. */

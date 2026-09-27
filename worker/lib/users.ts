@@ -19,6 +19,8 @@ export interface UserRow {
   recovery_codes: string | null;
   google_sub: string | null;
   signature_html: string;
+  job_title?: string | null;
+  phone?: string | null;
   preferences: string;
   failed_logins: number;
   locked_until: string | null;
@@ -45,6 +47,8 @@ export function toMe(u: UserRow, policy: OrgPolicy): Me {
     hasPassword: !!u.password_hash,
     googleLinked: !!u.google_sub,
     signatureHtml: u.signature_html,
+    jobTitle: u.job_title ?? "",
+    phone: u.phone ?? "",
     preferences: { ...DEFAULT_PREFERENCES, ...parseJson<Partial<Preferences>>(u.preferences, {}) },
     mustEnroll2fa: policy.require2fa && !u.totp_enabled,
     personalEmail: u.personal_email ?? null,
