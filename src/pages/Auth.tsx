@@ -1,12 +1,13 @@
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, CheckCircle2, KeyRound } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FingerprintPattern, KeyRound } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { Logo } from "@/components/layout/Logo";
 import { AuthHero } from "@/components/auth/AuthHero";
 import { Button, Field, Input, Spinner } from "@/components/ui/primitives";
+import { cancelPasskeyPrompt, isPasskeyCancel, passkeysSupported, signInWithPasskey } from "@/lib/passkeys";
 
 const OAUTH_ERRORS: Record<string, string> = {
   google_disabled: "Google sign-in isn't enabled.",
@@ -18,7 +19,15 @@ const OAUTH_ERRORS: Record<string, string> = {
   google_mismatch: "This account is linked to a different Google user.",
   account_disabled: "Your account has been disabled. Contact an administrator.",
   ip_blocked: "Your organization only allows sign-in from approved networks. Connect from one and try again.",
+  passkey_required: "Your organization requires two-factor sign-in. Use \"Sign in with a passkey\" on the address where you added it.",
 };
+
+interface AuthOptions {
+  password: boolean;
+  google: boolean;
+  /** Passkeys can be used on this host. */
+  passkeys?: boolean;
+}
 
 export function AuthLayout({ title, subtitle, children }: { title: string; subtitle?: ReactNode; children: ReactNode }) {
   const brand = useBrand();
@@ -137,6 +146,20 @@ function GoogleButton({ next }: { next: string }) {
   );
 }
 
+function PasskeyButton({ onClick, disabled }: { onClick: () => void; disabled?: boolean }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="flex h-9 w-full items-center justify-center gap-2 rounded-ui border border-line bg-surface text-sm font-medium shadow-ui-sm transition-colors hover:bg-subtle disabled:opacity-60"
+    >
+      <FingerprintPattern className="size-4" aria-hidden />
+      Sign in with a passkey
+    </button>
+  );
+}
+
 export function LoginPage() {
   const brand = useBrand();
   const [params] = useSearchParams();
@@ -150,8 +173,11 @@ export function LoginPage() {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(OAUTH_ERRORS[params.get("error") ?? ""] ?? null);
-  const { data: options } = useQuery({ queryKey: ["auth-options"], queryFn: () => api.get<{ password: boolean; google: boolean }>("/api/auth/options") });
+  const { data: options } = useQuery({ queryKey: ["auth-options"], queryFn: () => api.get<AuthOptions>("/api/auth/options") });
   const { data: state } = useQuery({ queryKey: ["auth-state"], queryFn: () => api.get<{ signedIn: boolean; mfaPending: boolean }>("/api/auth/state") });
+  const passkeys = !!options?.passkeys && passkeysSupported();
+  // Bumped to re-arm passkey autofill after a button-started attempt ends.
+  const [autofillRun, setAutofillRun] = useState(0);
 
   useEffect(() => {
     if (state?.signedIn) navigate(next, { replace: true });
@@ -161,6 +187,37 @@ export function LoginPage() {
   const done = async () => {
     await qc.invalidateQueries();
     navigate(next, { replace: true });
+  };
+
+  // Conditional UI: the browser lists this site's passkeys in the email field's suggestions.
+  useEffect(() => {
+    // Wait for the auth state so this runs once, not once before and once after it loads.
+    if (!passkeys || step !== "password" || !state || state.signedIn) return;
+    let live = true;
+    signInWithPasskey(true, () => live)
+      .then((ok) => {
+        // Once verified the session exists, so finish even if this effect was superseded.
+        if (ok) return done();
+      })
+      .catch((err) => live && !isPasskeyCancel(err) && setError(errorMessage(err)));
+    return () => {
+      live = false;
+      cancelPasskeyPrompt();
+    };
+  }, [passkeys, step, !!state, state?.signedIn, autofillRun]);
+
+  const passkeySignIn = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await signInWithPasskey(false);
+      await done();
+    } catch (err) {
+      if (!isPasskeyCancel(err)) setError(errorMessage(err));
+      setAutofillRun((n) => n + 1);
+    } finally {
+      setBusy(false);
+    }
   };
 
   const submit = async (e: FormEvent) => {
@@ -240,10 +297,13 @@ export function LoginPage() {
   return (
     <AuthLayout title={brand.loginHeadline} subtitle={brand.loginTagline}>
       {error && <ErrorNote>{error}</ErrorNote>}
-      {options?.google && (
+      {(options?.google || passkeys) && (
         <>
-          <GoogleButton next={next} />
-          {options.password && (
+          <div className="space-y-2">
+            {options?.google && <GoogleButton next={next} />}
+            {passkeys && <PasskeyButton onClick={passkeySignIn} disabled={busy} />}
+          </div>
+          {options?.password && (
             <div className="my-5 flex items-center gap-3 text-xs text-fg-faint">
               <span className="h-px flex-1 bg-line" /> or <span className="h-px flex-1 bg-line" />
             </div>
@@ -253,7 +313,7 @@ export function LoginPage() {
       {(options?.password ?? true) && (
         <form onSubmit={submit} className="space-y-4">
           <Field label="Email" htmlFor="email">
-            <EmailField id="email" value={email} onChange={setEmail} autoComplete="username" autoFocus />
+            <EmailField id="email" value={email} onChange={setEmail} autoComplete={passkeys ? "username webauthn" : "username"} autoFocus />
           </Field>
           <Field
             label={
@@ -273,7 +333,7 @@ export function LoginPage() {
           </Button>
         </form>
       )}
-      {options && !options.password && !options.google && <p className="text-center text-[13px] text-fg-muted">Sign-in is currently disabled.</p>}
+      {options && !options.password && !options.google && !passkeys && <p className="text-center text-[13px] text-fg-muted">Sign-in is currently disabled.</p>}
     </AuthLayout>
   );
 }

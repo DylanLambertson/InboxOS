@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { BellOff, BellRing, ChevronDown, Copy, Inbox, KeyRound, Lock, LogOut, MailPlus, MoreHorizontal, Search, ShieldOff, Trash2, UserCheck, UserPlus, UserX } from "lucide-react";
+import { BellOff, BellRing, ChevronDown, Copy, FingerprintPattern, Inbox, KeyRound, Lock, LogOut, MailPlus, MoreHorizontal, Search, ShieldOff, Trash2, UserCheck, UserPlus, UserX } from "lucide-react";
 import { toast } from "sonner";
 import type { MailboxRole, Role, UserStatus } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
@@ -21,6 +21,7 @@ interface AdminUser {
   totpEnabled: boolean;
   googleLinked: boolean;
   hasPassword: boolean;
+  passkeyCount: number;
   mailboxCount: number;
   lastLoginAt: string | null;
   lockedUntil: string | null;
@@ -268,6 +269,11 @@ export function AdminUsers() {
                     <td className="px-3 py-3">
                       <div className="flex flex-wrap gap-1">
                         {u.totpEnabled ? <Badge tone="success">2FA</Badge> : <Badge>No 2FA</Badge>}
+                        {u.passkeyCount > 0 && (
+                          <span title={`${u.passkeyCount} passkey${u.passkeyCount === 1 ? "" : "s"}`}>
+                            <Badge tone="success"><FingerprintPattern className="size-3" /> Passkey</Badge>
+                          </span>
+                        )}
                         {u.googleLinked && <Badge>Google</Badge>}
                       </div>
                     </td>
@@ -324,6 +330,16 @@ export function AdminUsers() {
                                   onSelect: async () => {
                                     if (await confirm({ title: `Reset 2FA for ${u.name || u.email}?`, body: "They'll be signed out and can sign in with just their password until they set it up again.", confirmLabel: "Reset 2FA", danger: true }))
                                       act(() => api.post(`admin/users/${u.id}/reset-2fa`), "Two-factor reset");
+                                  },
+                                }]
+                              : []),
+                            ...(u.passkeyCount > 0
+                              ? [{
+                                  label: "Remove passkeys",
+                                  icon: <FingerprintPattern />,
+                                  onSelect: async () => {
+                                    if (await confirm({ title: `Remove ${u.name || u.email}'s passkeys?`, body: `For a lost or stolen device. All ${u.passkeyCount} passkey${u.passkeyCount === 1 ? "" : "s"} will stop working and they'll be signed out everywhere. They can add new ones after signing in.`, confirmLabel: "Remove passkeys", danger: true }))
+                                      act(() => api.post(`admin/users/${u.id}/remove-passkeys`), "Passkeys removed");
                                   },
                                 }]
                               : []),

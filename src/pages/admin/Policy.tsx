@@ -115,7 +115,7 @@ export function AdminPolicy() {
 
       <Section title="Security" description={isOwner ? undefined : "Only owners can change security settings."}>
         <div className="divide-y divide-line">
-          <Toggle title="Require two-factor authentication" description="Everyone must set up an authenticator app before using the app." checked={p.require2fa} onChange={(v) => set("require2fa", v)} disabled={!isOwner} />
+          <Toggle title="Require two-factor authentication" description="Everyone must add a passkey or set up an authenticator app before using the app." checked={p.require2fa} onChange={(v) => set("require2fa", v)} disabled={!isOwner} />
           <Toggle title="Allow password sign-in" description="Turn off to require Google sign-in. Owners can always use their password as a break-glass." checked={p.passwordLoginEnabled} onChange={(v) => set("passwordLoginEnabled", v)} disabled={!isOwner} />
           <div className="py-3">
             <NumberField label="Session length" hint="How long people stay signed in without activity." value={p.sessionDays} min={1} onChange={(n) => set("sessionDays", Math.min(90, n))} suffix="days" />

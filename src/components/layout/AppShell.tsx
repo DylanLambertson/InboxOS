@@ -103,7 +103,7 @@ export function AppShell() {
           <InstallPrompt />
           {me.mustEnroll2fa && (
             <div className="flex items-center gap-2 border-b border-warning/30 bg-warning-soft px-4 py-2 text-[13px] text-warning">
-              <ShieldAlert className="size-4" /> Your organization requires two-factor authentication. Set it up below to continue.
+              <ShieldAlert className="size-4" /> Your organization requires two-factor authentication. Add a passkey or set up an authenticator app below to continue.
             </div>
           )}
           <div className="min-h-0 flex-1">

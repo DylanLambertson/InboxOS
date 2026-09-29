@@ -261,6 +261,7 @@ export function AdminBranding() {
                 { name: "passwordChanged", label: "Password changed", hint: "Security alert", icon: ShieldCheck },
                 { name: "twoFactor", label: "Two-factor changed", hint: "Security alert", icon: ShieldCheck },
                 { name: "newSignIn", label: "New sign-in", hint: "New device or country", icon: ShieldCheck },
+                { name: "passkeyAdded", label: "Passkey added", hint: "Security alert", icon: ShieldCheck },
               ].map((t) => (
                 <a
                   key={t.name}

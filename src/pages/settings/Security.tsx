@@ -9,6 +9,7 @@ import { parseUserAgent, relativeTime } from "@/lib/format";
 import { useMe } from "@/lib/queries";
 import { Badge, Button, Field, Input, PageHeader, Section } from "@/components/ui/primitives";
 import { Modal, useConfirm } from "@/components/ui/overlay";
+import { PasskeysSection } from "./Passkeys";
 
 interface SessionInfo {
   id: string;
@@ -210,6 +211,7 @@ export function SecuritySettings() {
   return (
     <div className="space-y-6">
       <PageHeader title="Security" description="Protect your account and review where you're signed in." />
+      <PasskeysSection />
       <TwoFactorSection enabled={me.totpEnabled} />
       <PasswordSection hasPassword={me.hasPassword} />
 
