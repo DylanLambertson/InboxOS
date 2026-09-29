@@ -139,6 +139,11 @@ describe("applyOutboundPolicy", () => {
     expect(result.html.match(/data-io-disclaimer/g)).toHaveLength(1);
   });
 
+  it("can't be switched off by a marker in the sender's own body", async () => {
+    const { result } = await run({ disclaimer }, { bodyHtml: `<p>${disclaimerHtml("fake")}</p>`, fromApi: true });
+    expect(result.html).toContain("This email is confidential.");
+  });
+
   it("adds the disclaimer to an explicit text part and inside a raw HTML document", async () => {
     const { result } = await run({ disclaimer }, { apiText: "Plain body", rawHtml: true, fromApi: true, bodyHtml: "<html><body><p>x</p></body></html>" });
     expect(result.text).toBe("Plain body\n\n--\nThis email is confidential.");

@@ -3,7 +3,6 @@ import {
   isExternal,
   renderSignature,
   signatureBlock,
-  SIGNATURE_MARKER,
   withOutboundDefaults,
   type DlpFinding,
   type OutboundPolicy,
@@ -105,8 +104,7 @@ export async function apiSignature(
 const DISCLAIMER_MARKER = "data-io-disclaimer";
 
 /** Already carries our disclaimer, e.g. a reply quoting an earlier message of ours. */
-export const hasDisclaimer = (html: string) => html.includes(DISCLAIMER_MARKER) || html.includes("<!--io-disclaimer-->");
-export const hasSignature = (html: string) => html.includes(SIGNATURE_MARKER);
+export const hasDisclaimer = (html: string) => new RegExp(`<div[^>]*\\s${DISCLAIMER_MARKER}=["']?1`, "i").test(html) || html.includes("<!--io-disclaimer-->");
 
 export function disclaimerHtml(text: string): string {
   const body = escapeHtml(text.trim()).replace(/\r?\n/g, "<br>");
@@ -191,7 +189,8 @@ export async function applyOutboundPolicy(db: D1Database, brand: Brand, input: O
   if (findings.length) await logDlp(db, input, "dlp.warned_sent", findings);
 
   let body = input.bodyHtml;
-  if (policy.signature.mode === "enforce" && !input.fromApi && !input.rawHtml && !hasSignature(body)) {
+  // Compose never puts the company signature in the editor when enforced, so always add it here.
+  if (policy.signature.mode === "enforce" && !input.fromApi && !input.rawHtml) {
     const sig = await companySignature(db, policy, brand, input);
     if (sig) body += signatureBlock(sig);
   }
@@ -200,7 +199,9 @@ export async function applyOutboundPolicy(db: D1Database, brand: Brand, input: O
 
   const d = policy.disclaimer;
   const wantsDisclaimer = d.enabled && d.text.trim() && (!d.externalOnly || externalRecipients(input.recipients, brand).length > 0);
-  if (wantsDisclaimer && !hasDisclaimer(html)) {
+  // Only the server-built quote counts: a marker typed into the body (or sent by an API
+  // caller) must not be able to switch the disclaimer off.
+  if (wantsDisclaimer && !hasDisclaimer(input.quoteHtml)) {
     html = input.rawHtml ? insertBeforeBodyEnd(html, disclaimerHtml(d.text)) : html + disclaimerHtml(d.text);
     if (text) text += disclaimerText(d.text);
   }
