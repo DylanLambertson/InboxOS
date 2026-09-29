@@ -209,6 +209,7 @@ adminSystemRoutes.get("/email-preview/:name", async (c) => {
     twoFactor: () => templates.twoFactor(brand, { name: me.name, enabled: true, appUrl: app, ctx }),
     newSignIn: () =>
       templates.newSignIn(brand, { name: me.name, reasons: ["country", "device"], device: "Chrome on Windows", country: "DE", appUrl: app, ctx: { ip: ctx.ip ?? "203.0.113.7", userAgent: null } }),
+    passkeyAdded: () => templates.passkeyAdded(brand, { name: me.name, passkey: "iPhone", host: new URL(app).hostname, appUrl: app, ctx }),
     welcome: () => templates.welcome(brand, { name: "Jordan Lee", email: `jordan@${brand.primaryDomain}`, appUrl: app, mailboxes: [`jordan@${brand.primaryDomain}`, `support@${brand.primaryDomain}`] }),
     verifyPersonalEmail: () => templates.verifyPersonalEmail(brand, { name: me.name, url: sample, account: me.email }),
     personalEmailAdded: () => templates.personalEmailAdded(brand, { name: me.name, masked: "jo***@gmail.com", appUrl: app, ctx }),

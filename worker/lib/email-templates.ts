@@ -148,6 +148,24 @@ export const templates = {
     };
   },
 
+  /** A passkey was added: it can sign in to the account on its own. */
+  passkeyAdded(b: Brand, p: { name?: string; passkey: string; host: string; appUrl: string; ctx?: RequestContext }): EmailContent {
+    return {
+      subject: "A passkey was added to your account",
+      preheader: `"${clip(p.passkey, 60)}" can now sign in to ${b.productName}.`,
+      eyebrow: "Security alert",
+      tone: "alert",
+      heading: "New passkey added",
+      greeting: hi(p.name),
+      paragraphs: [
+        `A passkey named <strong style="color:#18181b">${e(clip(p.passkey, 60))}</strong> was just added to your account. It can sign you in on <strong style="color:#18181b">${e(p.host)}</strong> with Face ID, Touch ID, a fingerprint, a PIN or a security key.`,
+      ],
+      cta: { label: "Review your passkeys", url: `${p.appUrl.replace(/\/$/, "")}/settings/security` },
+      details: contextRows(p.ctx),
+      note: `<strong>Wasn't you?</strong> Remove the passkey and change your password right away${b.supportEmail ? `, and let <a href="mailto:${e(b.supportEmail)}" style="color:#52525b">${e(b.supportEmail)}</a> know` : ""}.`,
+    };
+  },
+
   /** Sent after an invite is claimed. */
   welcome(b: Brand, p: { name?: string; email: string; appUrl: string; mailboxes: string[] }): EmailContent {
     return {

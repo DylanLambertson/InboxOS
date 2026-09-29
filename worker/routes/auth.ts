@@ -5,6 +5,7 @@ import type { AppEnv } from "../env";
 import { audit, clientIp, requestContext } from "../lib/audit";
 import { hashPassword, passwordProblem, verifyPassword } from "../lib/password";
 import { rateLimit } from "../lib/ratelimit";
+import { needsPasskeySignIn } from "../lib/passkeys";
 import { createSession, destroySession, readSession } from "../lib/session";
 import { getBrand, getPolicy } from "../lib/settings";
 import { templates } from "../lib/email-templates";
@@ -16,6 +17,7 @@ import { IP_BLOCKED_MESSAGE } from "../lib/ip-allowlist";
 import { newId, now, parseJson, sha256hex } from "../lib/util";
 import { parseBody, zEmail } from "../lib/validate";
 import { googleRoutes } from "./auth-google";
+import { rpFor } from "./passkeys";
 
 export const authRoutes = new Hono<AppEnv>();
 
@@ -25,10 +27,12 @@ const LOCK_MINUTES = 15;
 
 /** Public info the sign-in screen needs. */
 authRoutes.get("/options", async (c) => {
-  const policy = await getPolicy(c.env.DB);
+  const [policy, rp] = await Promise.all([getPolicy(c.env.DB), rpFor(c)]);
   return c.json({
     password: policy.passwordLoginEnabled,
     google: policy.googleSsoEnabled && !!c.env.GOOGLE_CLIENT_ID && !!c.env.GOOGLE_CLIENT_SECRET,
+    // Passkeys work whatever the password/Google settings, on any app host.
+    passkeys: !!rp,
   });
 });
 
@@ -77,6 +81,10 @@ authRoutes.post("/login", async (c) => {
   }
   await c.env.DB.prepare("UPDATE users SET failed_logins = 0, locked_until = NULL WHERE id = ?").bind(user.id).run();
 
+  if (needsPasskeySignIn(policy.require2fa, !!user.totp_enabled, user.passkey_count ?? 0)) {
+    await audit(c, { action: "auth.login_failed", targetType: "user", targetId: user.id, meta: { email, reason: "passkey_required" }, actor: null });
+    throw new HTTPException(403, { message: "Your organization requires two-factor sign-in. Use \"Sign in with a passkey\" on the address where you added it." });
+  }
   if (user.totp_enabled) {
     await createSession(c, user.id, { mfaPending: true });
     return c.json({ mfaRequired: true });

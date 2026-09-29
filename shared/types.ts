@@ -80,6 +80,8 @@ export interface Me {
   phone: string;
   preferences: Preferences;
   mustEnroll2fa: boolean;
+  /** Passkeys registered (on any host). */
+  passkeyCount: number;
   /** A verified personal (non-company) address for the unread-mail digest, or null. */
   personalEmail: string | null;
   digest: { enabled: boolean; hours: DigestHours; lastAt: string | null; nextAt: string | null };

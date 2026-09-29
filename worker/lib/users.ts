@@ -34,6 +34,8 @@ export interface UserRow {
   scim_external_id?: string | null;
   created_at: string;
   updated_at: string;
+  /** Present when loaded through getUser / getUserByEmail. */
+  passkey_count?: number;
 }
 
 export function toMe(u: UserRow, policy: OrgPolicy): Me {
@@ -50,7 +52,9 @@ export function toMe(u: UserRow, policy: OrgPolicy): Me {
     jobTitle: u.job_title ?? "",
     phone: u.phone ?? "",
     preferences: { ...DEFAULT_PREFERENCES, ...parseJson<Partial<Preferences>>(u.preferences, {}) },
-    mustEnroll2fa: policy.require2fa && !u.totp_enabled,
+    // A passkey (always with user verification) counts as two-factor.
+    mustEnroll2fa: policy.require2fa && !u.totp_enabled && !u.passkey_count,
+    passkeyCount: u.passkey_count ?? 0,
     personalEmail: u.personal_email ?? null,
     digest: { enabled: !!u.digest_enabled, hours: ((DIGEST_HOURS as readonly number[]).includes(u.digest_hours) ? u.digest_hours : 5) as DigestHours, lastAt: u.digest_last_at ?? null, nextAt: u.digest_next_at ?? null },
     digestsAllowed: policy.digestDetail !== "off",
@@ -61,9 +65,10 @@ export function toMe(u: UserRow, policy: OrgPolicy): Me {
 export const withRole = <T extends { role: string; is_manager?: number | null }>(r: T | null): (T & { role: Role }) | null =>
   r ? { ...r, role: effectiveRole(r) } : null;
 
-export const getUser = async (db: D1Database, id: string) => withRole(await db.prepare("SELECT * FROM users WHERE id = ?").bind(id).first<UserRow>());
+const USER_SELECT = "SELECT u.*, (SELECT COUNT(*) FROM passkeys p WHERE p.user_id = u.id) AS passkey_count FROM users u";
+export const getUser = async (db: D1Database, id: string) => withRole(await db.prepare(`${USER_SELECT} WHERE u.id = ?`).bind(id).first<UserRow>());
 export const getUserByEmail = async (db: D1Database, email: string) =>
-  withRole(await db.prepare("SELECT * FROM users WHERE email = ?").bind(email.trim().toLowerCase()).first<UserRow>());
+  withRole(await db.prepare(`${USER_SELECT} WHERE u.email = ?`).bind(email.trim().toLowerCase()).first<UserRow>());
 
 /**
  * What disabling an account also does, shared by the admin console and SCIM: sign out

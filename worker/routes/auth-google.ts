@@ -3,6 +3,7 @@ import { getCookie, setCookie, deleteCookie } from "hono/cookie";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
 import { appOrigin } from "../lib/domains";
+import { needsPasskeySignIn } from "../lib/passkeys";
 import { createSession, readSession } from "../lib/session";
 import { getBrand, getPolicy } from "../lib/settings";
 import { ipRefused, recordSignIn } from "../lib/sign-ins";
@@ -157,6 +158,10 @@ googleRoutes.get("/callback", async (c) => {
     .bind(claims.sub, claims.name ?? "", now(), user.id)
     .run();
 
+  if (policy.require2fa && !user.totp_enabled) {
+    const pk = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM passkeys WHERE user_id = ?").bind(user.id).first<{ n: number }>();
+    if (needsPasskeySignIn(true, false, pk?.n ?? 0)) return fail("passkey_required");
+  }
   if (user.totp_enabled) {
     await createSession(c, user.id, { mfaPending: true });
     return c.redirect(`/login?step=2fa&next=${encodeURIComponent(data.next)}`);

@@ -18,11 +18,13 @@ export const adminUserRoutes = new Hono<AppEnv>();
 
 interface UserListRow extends UserRow {
   mailbox_count: number;
+  passkey_count: number;
 }
 
 adminUserRoutes.get("/", async (c) => {
   const { results } = await c.env.DB.prepare(
-    `SELECT u.*, (SELECT COUNT(*) FROM mailbox_members mm WHERE mm.user_id = u.id) AS mailbox_count
+    `SELECT u.*, (SELECT COUNT(*) FROM mailbox_members mm WHERE mm.user_id = u.id) AS mailbox_count,
+       (SELECT COUNT(*) FROM passkeys p WHERE p.user_id = u.id) AS passkey_count
      FROM users u ORDER BY u.status = 'disabled', u.name COLLATE NOCASE, u.email`,
   ).all<UserListRow>();
   return c.json(
@@ -36,6 +38,7 @@ adminUserRoutes.get("/", async (c) => {
       totpEnabled: !!u.totp_enabled,
       googleLinked: !!u.google_sub,
       hasPassword: !!u.password_hash,
+      passkeyCount: u.passkey_count,
       mailboxCount: u.mailbox_count,
       lastLoginAt: u.last_login_at,
       lockedUntil: u.locked_until && u.locked_until > now() ? u.locked_until : null,
@@ -205,6 +208,17 @@ adminUserRoutes.post("/:id/reset-2fa", async (c) => {
   ]);
   await audit(c, { action: "user.2fa_reset", targetType: "user", targetId: target.id, meta: { email: target.email } });
   return c.json({ ok: true });
+});
+
+/** Lost or stolen device: remove every passkey and end their sessions (the device may still be signed in). */
+adminUserRoutes.post("/:id/remove-passkeys", async (c) => {
+  const target = await loadTarget(c.env.DB, c.get("user"), c.req.param("id"));
+  const [removed] = await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM passkeys WHERE user_id = ?").bind(target.id),
+    c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id),
+  ]);
+  await audit(c, { action: "user.passkeys_removed", targetType: "user", targetId: target.id, meta: { email: target.email, count: removed.meta.changes } });
+  return c.json({ ok: true, removed: removed.meta.changes });
 });
 
 adminUserRoutes.post("/:id/sign-out", async (c) => {

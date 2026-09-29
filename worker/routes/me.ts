@@ -136,7 +136,8 @@ meRoutes.post("/2fa/disable", async (c) => {
   const u = c.get("user");
   const [user, policy] = await Promise.all([getUser(c.env.DB, u.id), getPolicy(c.env.DB)]);
   if (!user?.totp_enabled || !user.totp_secret) throw new HTTPException(400, { message: "Two-factor is not on." });
-  if (policy.require2fa) throw new HTTPException(403, { message: "Your organization requires two-factor authentication." });
+  // A passkey also satisfies the requirement, so the authenticator app can go.
+  if (policy.require2fa && !user.passkey_count) throw new HTTPException(403, { message: "Your organization requires two-factor authentication." });
   if (!(await verifyTotp(user.totp_secret, code))) throw new HTTPException(400, { message: "That code didn't match." });
   await c.env.DB.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery_codes = NULL, updated_at = ? WHERE id = ?")
     .bind(now(), u.id)
