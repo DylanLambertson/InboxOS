@@ -25,9 +25,12 @@ export function isPasskeyCancel(err: unknown): boolean {
  * email field's suggestions (conditional UI) instead of opening the browser's sheet.
  * Resolves false when this browser can't do autofill.
  */
-export async function signInWithPasskey(autofill = false): Promise<boolean> {
+export async function signInWithPasskey(autofill = false, isLive: () => boolean = () => true): Promise<boolean> {
   if (autofill && !(await browserSupportsWebAuthnAutofill())) return false;
+  // A run that was cancelled while awaiting must not start a ceremony: it would abort the live one.
+  if (!isLive()) return false;
   const optionsJSON = await api.post<PublicKeyCredentialRequestOptionsJSON>("/api/auth/passkey/options");
+  if (!isLive()) return false;
   const response = await startAuthentication({ optionsJSON, useBrowserAutofill: autofill });
   await api.post("/api/auth/passkey/verify", response as unknown as Record<string, unknown>);
   return true;

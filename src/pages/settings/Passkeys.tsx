@@ -32,17 +32,17 @@ type Reauth = { password?: string; code?: string };
 
 /** Password or 2FA code re-check, shown when the session isn't fresh enough to change passkeys. */
 function ReauthFields({ list, value, onChange }: { list: PasskeyList; value: Reauth; onChange: (v: Reauth) => void }) {
-  if (list.reauth.password) {
-    return (
-      <Field label="Your password" hint="To confirm it's you.">
-        <Input type="password" value={value.password ?? ""} onChange={(e) => onChange({ password: e.target.value })} autoComplete="current-password" />
-      </Field>
-    );
-  }
   if (list.reauth.totp) {
     return (
       <Field label="Two-factor code" hint="From your authenticator app, to confirm it's you.">
         <Input value={value.code ?? ""} onChange={(e) => onChange({ code: e.target.value })} inputMode="numeric" autoComplete="one-time-code" placeholder="123456" className="font-mono tracking-widest" />
+      </Field>
+    );
+  }
+  if (list.reauth.password) {
+    return (
+      <Field label="Your password" hint="To confirm it's you.">
+        <Input type="password" value={value.password ?? ""} onChange={(e) => onChange({ password: e.target.value })} autoComplete="current-password" />
       </Field>
     );
   }
@@ -189,7 +189,7 @@ export function PasskeysSection() {
         open={!!removing}
         onClose={() => setRemoving(null)}
         title={`Remove “${removing?.name ?? ""}”?`}
-        description="You won't be able to sign in with this passkey any more. Also delete it from your device or password manager."
+        description="You won't be able to sign in with this passkey any more, and your other devices will be signed out. Also delete it from your device or password manager."
         width={420}
         footer={
           <>

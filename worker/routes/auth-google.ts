@@ -151,6 +151,10 @@ googleRoutes.get("/callback", async (c) => {
   if (user.status === "disabled") return refuse("account_disabled");
   if (!domainOk && user.role !== "owner") return refuse("google_domain");
   if (user.google_sub && user.google_sub !== claims.sub) return refuse("google_mismatch");
+  if (policy.require2fa && !user.totp_enabled) {
+    const pk = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM passkeys WHERE user_id = ?").bind(user.id).first<{ n: number }>();
+    if (needsPasskeySignIn(true, false, pk?.n ?? 0)) return refuse("passkey_required");
+  }
 
   await c.env.DB.prepare(
     "UPDATE users SET google_sub = ?, status = 'active', name = CASE WHEN name = '' THEN ? ELSE name END, updated_at = ? WHERE id = ?",
@@ -158,10 +162,6 @@ googleRoutes.get("/callback", async (c) => {
     .bind(claims.sub, claims.name ?? "", now(), user.id)
     .run();
 
-  if (policy.require2fa && !user.totp_enabled) {
-    const pk = await c.env.DB.prepare("SELECT COUNT(*) AS n FROM passkeys WHERE user_id = ?").bind(user.id).first<{ n: number }>();
-    if (needsPasskeySignIn(true, false, pk?.n ?? 0)) return fail("passkey_required");
-  }
   if (user.totp_enabled) {
     await createSession(c, user.id, { mfaPending: true });
     return c.redirect(`/login?step=2fa&next=${encodeURIComponent(data.next)}`);

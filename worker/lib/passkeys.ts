@@ -46,8 +46,8 @@ export function relyingParty(requestUrl: string, hosts: string[]): RelyingParty 
     return null;
   }
   const host = u.hostname.toLowerCase();
-  // Browsers treat http://localhost as a secure context, so local development works without TLS.
-  if (host === "localhost") return { rpId: "localhost", origin: u.origin };
+  // Local development (APP_URL on localhost): browsers treat http://localhost as a secure context.
+  if (host === "localhost") return hosts.includes("localhost") ? { rpId: "localhost", origin: u.origin } : null;
   if (u.protocol !== "https:" || !hosts.includes(host)) return null;
   return { rpId: host, origin: u.origin };
 }

@@ -48,9 +48,11 @@ describe("relying party per host", () => {
     }
   });
 
-  it("works on localhost for development, port included in the origin", () => {
-    expect(relyingParty("http://localhost:5173/api/auth/passkey/options", HOSTS)).toEqual({ rpId: "localhost", origin: "http://localhost:5173" });
-    expect(relyingParty("http://127.0.0.1:5173/x", HOSTS)).toBeNull();
+  it("works on localhost only when APP_URL is localhost, port included in the origin", () => {
+    const dev = passkeyHosts("http://localhost:5173", ["example.org"]);
+    expect(relyingParty("http://localhost:5173/api/auth/passkey/options", dev)).toEqual({ rpId: "localhost", origin: "http://localhost:5173" });
+    expect(relyingParty("http://localhost:5173/x", HOSTS)).toBeNull();
+    expect(relyingParty("http://127.0.0.1:5173/x", dev)).toBeNull();
   });
 });
 

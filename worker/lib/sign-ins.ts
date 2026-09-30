@@ -10,7 +10,7 @@ import { sendSystemEmail } from "./system-mail";
 import { newId, now } from "./util";
 
 export type SignInOutcome = "success" | "failed" | "locked" | "2fa_failed" | "blocked";
-export type SignInMethod = "password" | "password+2fa" | "google" | "session";
+export type SignInMethod = "password" | "password+2fa" | "google" | "passkey" | "session";
 
 /** How far back a country or device still counts as "seen before". */
 export const KNOWN_WINDOW_DAYS = 90;

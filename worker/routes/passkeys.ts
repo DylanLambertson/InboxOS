@@ -36,7 +36,9 @@ import {
 } from "../lib/passkeys";
 import { rateLimit } from "../lib/ratelimit";
 import { createSession } from "../lib/session";
-import { getBrand } from "../lib/settings";
+import { ipRefused, recordSignIn } from "../lib/sign-ins";
+import { IP_BLOCKED_MESSAGE } from "../lib/ip-allowlist";
+import { getBrand, getPolicy } from "../lib/settings";
 import { sendSystemEmail } from "../lib/system-mail";
 import { verifyTotp } from "../lib/totp";
 import { getUser } from "../lib/users";
@@ -65,7 +67,8 @@ export async function rpFor(c: Context<AppEnv>): Promise<RelyingParty | null> {
 }
 
 const secure = (c: Context<AppEnv>) => c.env.APP_URL.startsWith("https://");
-const challengeCookie = (c: Context<AppEnv>) => (secure(c) ? "__Host-webauthn" : "webauthn");
+// One cookie per ceremony so the login page's autofill can't clobber a passkey being added in another tab.
+const challengeCookie = (c: Context<AppEnv>, kind: ChallengeKind) => `${secure(c) ? "__Host-" : ""}webauthn-${kind}`;
 
 /** Store a challenge server-side and bind it to this browser with an HttpOnly cookie. */
 async function saveChallenge(c: Context<AppEnv>, kind: ChallengeKind, challenge: string, rpId: string, userId: string | null) {
@@ -81,13 +84,14 @@ async function saveChallenge(c: Context<AppEnv>, kind: ChallengeKind, challenge:
       challengeExpiry(Date.now()),
     ),
   ]);
-  setCookie(c, challengeCookie(c), token, { httpOnly: true, secure: secure(c), sameSite: "Strict", path: "/", maxAge: 300 });
+  setCookie(c, challengeCookie(c, kind), token, { httpOnly: true, secure: secure(c), sameSite: "Strict", path: "/", maxAge: 300 });
 }
 
 /** Read and delete the challenge in one statement, so it can only ever be used once. */
 async function takeChallenge(c: Context<AppEnv>, want: { kind: ChallengeKind; rpId: string; userId?: string }) {
-  const token = getCookie(c, challengeCookie(c));
-  deleteCookie(c, challengeCookie(c), { path: "/", secure: secure(c) });
+  const name = challengeCookie(c, want.kind);
+  const token = getCookie(c, name);
+  deleteCookie(c, name, { path: "/", secure: secure(c) });
   const take = (id: string) => c.env.DB.prepare("DELETE FROM webauthn_challenges WHERE id = ? RETURNING *").bind(id).first<ChallengeRow>();
   return consumeChallenge(take, token ? await sha256hex(token) : null, want, now());
 }
@@ -131,7 +135,8 @@ const zReauth = z.object({ password: z.string().max(256).optional(), code: z.str
 
 export const passkeyAuthRoutes = new Hono<AppEnv>();
 
-const SIGN_IN_FAILED = "That passkey didn't work. Try again, or sign in another way.";
+// One message for every failure, so responses don't reveal which credentials exist.
+const SIGN_IN_FAILED = "That passkey didn't work. Passkeys only work on the address where they were added — try again, or sign in another way.";
 
 passkeyAuthRoutes.post("/options", async (c) => {
   const ip = clientIp(c) ?? "unknown";
@@ -164,12 +169,7 @@ passkeyAuthRoutes.post("/verify", async (c) => {
   };
 
   const pk = await c.env.DB.prepare("SELECT * FROM passkeys WHERE credential_id = ? AND rp_id = ?").bind(body.id, rp.rpId).first<PasskeyRow>();
-  if (!pk) {
-    await audit(c, { action: "auth.passkey_failed", meta: { reason: "unknown_credential", rpId: rp.rpId }, actor: null });
-    throw new HTTPException(401, {
-      message: `That passkey isn't registered on ${rp.rpId}. Passkeys only work on the address where they were added.`,
-    });
-  }
+  if (!pk) throw await fail("unknown_credential");
   // The authenticator echoes the user handle we registered; it must belong to the same account.
   if (body.response.userHandle && body.response.userHandle !== userHandleFor(pk.user_id)) throw await fail("user_handle_mismatch", pk);
 
@@ -195,7 +195,17 @@ passkeyAuthRoutes.post("/verify", async (c) => {
   const user = await getUser(c.env.DB, pk.user_id);
   if (!user || user.status !== "active") {
     await fail("inactive", pk);
+    if (user) await recordSignIn(c, { outcome: "failed", method: "passkey", user, reason: "account_disabled" });
     throw new HTTPException(403, { message: "Your account has been disabled. Contact an administrator." });
+  }
+  // The IP allowlist applies to every way in, passkeys included.
+  if (await ipRefused(c, await getPolicy(c.env.DB), { method: "passkey", user })) {
+    throw new HTTPException(403, { message: IP_BLOCKED_MESSAGE });
+  }
+  // Same lockout as password sign-in, so an admin-visible lock means the account is really closed for a while.
+  if (user.locked_until && user.locked_until > now()) {
+    await recordSignIn(c, { outcome: "locked", method: "passkey", user });
+    throw new HTTPException(423, { message: "Account temporarily locked after too many failed attempts. Try again later." });
   }
   // Compare-and-set so two simultaneous uses of a counting authenticator can't both pass.
   const t = now();
@@ -207,6 +217,7 @@ passkeyAuthRoutes.post("/verify", async (c) => {
   // A passkey with user verification is two factors in one (device + biometric/PIN): no TOTP step.
   await createSession(c, user.id);
   await c.env.DB.prepare("UPDATE users SET last_login_at = ? WHERE id = ?").bind(t, user.id).run();
+  await recordSignIn(c, { outcome: "success", method: "passkey", user });
   await audit(c, {
     action: "auth.login",
     targetType: "user",
@@ -241,16 +252,17 @@ async function requireRecentAuth(c: Context<AppEnv>, body: z.infer<typeof zReaut
   }
   const user = await getUser(c.env.DB, u.id);
   let ok = false;
-  if (body.password && user?.password_hash) ok = await verifyPassword(body.password, user.password_hash);
-  else if (body.code && user?.totp_enabled && user.totp_secret) {
-    const code = body.code.replace(/\s/g, "");
+  // With an authenticator app on, the code is required: password + cookie alone mustn't mint a new second factor.
+  if (user?.totp_enabled && user.totp_secret) {
+    const code = (body.code ?? "").replace(/\s/g, "");
     // Same replay guard as sign-in: one use per code.
-    ok = (await verifyTotp(user.totp_secret, code)) && (await rateLimit(c.env.DB, `totp-used:${user.id}:${code}`, 1, 120));
-  }
+    ok = code.length >= 6 && (await verifyTotp(user.totp_secret, code)) && (await rateLimit(c.env.DB, `totp-used:${user.id}:${code}`, 1, 120));
+  } else if (body.password && user?.password_hash) ok = await verifyPassword(body.password, user.password_hash);
   if (!ok) {
     await audit(c, { action: "user.reauth_failed", targetType: "user", targetId: u.id });
-    throw new HTTPException(400, { message: body.password ? "That password is incorrect." : "That code didn't work." });
+    throw new HTTPException(400, { message: user?.totp_enabled ? "That two-factor code didn't work." : "That password is incorrect." });
   }
+  await audit(c, { action: "user.reauth", targetType: "user", targetId: u.id, meta: { method: user?.totp_enabled ? "totp" : "password" } });
 }
 
 passkeyMeRoutes.get("/", async (c) => {
@@ -374,8 +386,16 @@ passkeyMeRoutes.delete("/:id", async (c) => {
     .bind(c.req.param("id"), u.id)
     .first<Pick<PasskeyRow, "id" | "name" | "rp_id">>();
   if (!pk) throw new HTTPException(404, { message: "Passkey not found" });
+  const [user, policy] = await Promise.all([getUser(c.env.DB, u.id), getPolicy(c.env.DB)]);
+  if (policy.require2fa && !user?.totp_enabled && (user?.passkey_count ?? 0) <= 1) {
+    throw new HTTPException(403, { message: "Your organization requires two-factor authentication. Add another passkey or set up an authenticator app first." });
+  }
   await requireRecentAuth(c, body);
-  await c.env.DB.prepare("DELETE FROM passkeys WHERE id = ? AND user_id = ?").bind(pk.id, u.id).run();
+  await c.env.DB.batch([
+    c.env.DB.prepare("DELETE FROM passkeys WHERE id = ? AND user_id = ?").bind(pk.id, u.id),
+    // A lost device may still be signed in: keep only this session.
+    c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ? AND id != ?").bind(u.id, u.sessionId),
+  ]);
   await audit(c, { action: "user.passkey_removed", targetType: "user", targetId: u.id, meta: { passkeyId: pk.id, name: pk.name, rpId: pk.rp_id } });
   return c.json({ ok: true });
 });
