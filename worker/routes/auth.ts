@@ -12,7 +12,7 @@ import { templates } from "../lib/email-templates";
 import { ipRefused, recordSignIn } from "../lib/sign-ins";
 import { sendSystemEmail } from "../lib/system-mail";
 import { verifyTotp } from "../lib/totp";
-import { getUser, getUserByEmail } from "../lib/users";
+import { getUser, getUserForSignIn } from "../lib/users";
 import { IP_BLOCKED_MESSAGE } from "../lib/ip-allowlist";
 import { newId, now, parseJson, sha256hex } from "../lib/util";
 import { parseBody, zEmail } from "../lib/validate";
@@ -48,7 +48,8 @@ authRoutes.post("/login", async (c) => {
     throw new HTTPException(429, { message: "Too many attempts. Please wait a few minutes and try again." });
   }
   const policy = await getPolicy(c.env.DB);
-  const user = await getUserByEmail(c.env.DB, email);
+  // Their sign-in email, or the work address of a personal mailbox they own.
+  const user = await getUserForSignIn(c.env.DB, email);
   // Before the password check, so a blocked network can't test passwords. Without a known
   // active account only an "everyone" allowlist applies, so this can't reveal who exists.
   const known = user && user.status === "active" && user.password_hash ? user : null;
@@ -215,7 +216,7 @@ authRoutes.post("/forgot", async (c) => {
   if (!(await rateLimit(c.env.DB, `forgot:${ip}`, 5, 900))) {
     throw new HTTPException(429, { message: "Too many requests. Try again later." });
   }
-  const user = await getUserByEmail(c.env.DB, email);
+  const user = await getUserForSignIn(c.env.DB, email);
   // Always respond the same way, and as fast, so the endpoint can't be used to discover accounts:
   // the token and email are handled after the response.
   if (user && user.status === "active") {
@@ -274,7 +275,8 @@ authRoutes.post("/reset", async (c) => {
       ),
     );
   }
-  return c.json({ ok: true });
+  // Whoever holds the emailed link may see which address the account signs in with.
+  return c.json({ ok: true, email: user?.email ?? null });
 });
 
 authRoutes.route("/google", googleRoutes);

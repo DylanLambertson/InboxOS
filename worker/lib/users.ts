@@ -81,6 +81,33 @@ export const offboardStatements = (db: D1Database, userId: string): D1PreparedSt
   db.prepare("DELETE FROM push_subscriptions WHERE user_id = ?").bind(userId),
 ];
 
+/** The one account a personal mailbox belongs to, or null when there isn't exactly one owner. */
+export function soleOwner(ownerIds: readonly string[]): string | null {
+  const unique = [...new Set(ownerIds)];
+  return unique.length === 1 ? unique[0]! : null;
+}
+
+/**
+ * The account to sign in for an email someone typed. People usually know their work
+ * address (alan@company) rather than the personal email their account was created with,
+ * so besides the sign-in email itself this accepts the address, or an alias, of a personal
+ * mailbox they own. Shared mailboxes never count, and an exact sign-in email always wins.
+ */
+export async function getUserForSignIn(db: D1Database, email: string) {
+  const direct = await getUserByEmail(db, email);
+  if (direct) return direct;
+  const { results } = await db
+    .prepare(
+      `SELECT mm.user_id FROM mailboxes m JOIN mailbox_members mm ON mm.mailbox_id = m.id AND mm.role = 'owner'
+       WHERE m.type = 'personal' AND m.is_system = 0 AND m.is_active = 1
+         AND (m.address = ?1 OR m.id IN (SELECT mailbox_id FROM mailbox_aliases WHERE address = ?1))`,
+    )
+    .bind(email.trim().toLowerCase())
+    .all<{ user_id: string }>();
+  const id = soleOwner(results.map((r) => r.user_id));
+  return id ? getUser(db, id) : null;
+}
+
 /** Insert a user row; returns the new id. */
 export async function insertUser(
   db: D1Database,

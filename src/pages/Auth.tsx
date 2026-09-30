@@ -438,12 +438,18 @@ export function InvitePage() {
 export function ResetPage() {
   const { token = "" } = useParams();
   const [done, setDone] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
   return (
     <AuthLayout title="Choose a new password" subtitle={done ? undefined : "You'll be signed out of all other devices."}>
       {done ? (
         <div className="text-center">
           <KeyRound className="mx-auto mb-3 size-8 text-success" />
           <p className="text-[13px] text-fg-muted">Your password has been updated.</p>
+          {email && (
+            <p className="mt-2 text-[13px] text-fg-muted">
+              Sign in with <b className="text-fg">{email}</b>, or your work email address.
+            </p>
+          )}
           <Link to="/login" className="mt-4 inline-block">
             <Button variant="primary">Sign in</Button>
           </Link>
@@ -452,7 +458,8 @@ export function ResetPage() {
         <PasswordForm
           submitLabel="Update password"
           onSubmit={async ({ password }) => {
-            await api.post("/api/auth/reset", { token, password });
+            const r = await api.post<{ email: string | null }>("/api/auth/reset", { token, password });
+            setEmail(r.email);
             setDone(true);
           }}
         />
