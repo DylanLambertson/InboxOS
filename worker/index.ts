@@ -10,7 +10,9 @@ import { adminScimRoutes } from "./routes/admin-scim";
 import { adminComplianceRoutes } from "./routes/admin-compliance";
 import { adminEdiscoveryRoutes } from "./routes/admin-ediscovery";
 import { adminSuppressionRoutes } from "./routes/admin-suppressions";
+import { adminHealthRoutes } from "./routes/admin-health";
 import { adminMailboxRoutes } from "./routes/admin-mailboxes";
+import { adminSearchRoutes } from "./routes/admin-search";
 import { adminSecurityRoutes } from "./routes/admin-security";
 import { adminSystemRoutes } from "./routes/admin-system";
 import { adminTrafficRoutes } from "./routes/admin-traffic";
@@ -156,6 +158,8 @@ admin.route("/compliance/ediscovery", adminEdiscoveryRoutes);
 admin.route("/compliance", adminComplianceRoutes);
 admin.route("/outbound", adminOutboundRoutes);
 admin.route("/settings/workspace", adminWorkspaceRoutes);
+admin.route("/health", adminHealthRoutes);
+admin.route("/search", adminSearchRoutes);
 admin.route("/", adminSystemRoutes);
 api.route("/admin", admin);
 

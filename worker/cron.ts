@@ -1,5 +1,6 @@
 import type { Env } from "./env";
 import { runDigests } from "./lib/digest";
+import { recordCronRun } from "./lib/heartbeat";
 import { purgeMessages } from "./lib/messages";
 import { dispatchScheduled } from "./lib/send";
 import { heldMailboxIds, heldParam, notHeldSql } from "./lib/legal-hold";
@@ -9,6 +10,8 @@ import { now } from "./lib/util";
 
 /** Runs every minute: scheduled sends. Once an hour (minute 0): housekeeping. */
 export async function runCron(env: Env, scheduledTime: number): Promise<void> {
+  // Heartbeat for Admin → Health; never let it stop the real work.
+  await recordCronRun(env.DB).catch((err) => console.error("cron: heartbeat failed", err));
   const sent = await dispatchScheduled(env);
   if (sent) console.log(`cron: sent ${sent} scheduled message(s)`);
   const woke = await wakeSnoozed(env);
