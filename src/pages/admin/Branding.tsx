@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { ExternalLink, Inbox, KeyRound, MailCheck, PartyPopper, RotateCcw, ShieldCheck, Upload, UserPlus } from "lucide-react";
 import { toast } from "sonner";
-import { DEFAULT_BRAND, radiusValue, type Brand } from "@shared/brand";
+import { DEFAULT_BRAND, type Brand } from "@shared/brand";
+import { radiusValue, type ThemeTokens } from "@shared/theme";
 import { api, errorMessage } from "@/lib/api";
 import { regenerateAppIcons } from "@/lib/app-icons";
 import { applyBrand, readableOn, useBrand } from "@/lib/brand";
@@ -10,7 +11,7 @@ import { Button, Field, Input, PageHeader, Section, Select, Textarea } from "@/c
 import { useConfirm } from "@/components/ui/overlay";
 
 const FONT_PRESETS: { label: string; google: string; stack: string }[] = [
-  { label: "Inter", google: "Inter", stack: DEFAULT_BRAND.fontFamily },
+  { label: "Inter", google: "Inter", stack: DEFAULT_BRAND.theme.fontFamily },
   { label: "Geist", google: "Geist", stack: '"Geist", ui-sans-serif, system-ui, sans-serif' },
   { label: "Manrope", google: "Manrope", stack: '"Manrope", ui-sans-serif, system-ui, sans-serif' },
   { label: "DM Sans", google: "DM Sans", stack: '"DM Sans", ui-sans-serif, system-ui, sans-serif' },
@@ -21,26 +22,26 @@ const FONT_PRESETS: { label: string; google: string; stack: string }[] = [
 const ACCENTS = ["#4f46e5", "#2563eb", "#0891b2", "#059669", "#65a30d", "#d97706", "#e11d48", "#9333ea", "#18181b"];
 
 function Preview({ b }: { b: Brand }) {
-  const fg = readableOn(b.accentColor);
-  const r = radiusValue(b.radius);
+  const fg = readableOn(b.theme.accent);
+  const r = radiusValue(b.theme.radius);
   return (
-    <div className="overflow-hidden rounded-ui-lg border border-line bg-subtle" style={{ fontFamily: b.fontFamily }}>
+    <div className="overflow-hidden rounded-ui-lg border border-line bg-subtle" style={{ fontFamily: b.theme.fontFamily }}>
       <div className="flex h-56">
         <div className="w-40 border-r border-line bg-subtle p-3">
           <div className="mb-3 flex items-center gap-2">
             {b.logoUrl ? (
               <img src={b.logoUrl} alt="" className="size-6 object-contain" style={{ borderRadius: r }} />
             ) : (
-              <span className="flex size-6 items-center justify-center text-[10px] font-bold" style={{ background: b.accentColor, color: fg, borderRadius: r }}>
+              <span className="flex size-6 items-center justify-center text-[10px] font-bold" style={{ background: b.theme.accent, color: fg, borderRadius: r }}>
                 {b.monogram}
               </span>
             )}
             <span className="truncate text-xs font-semibold">{b.productName}</span>
           </div>
-          <div className="mb-3 py-1.5 text-center text-[11px] font-medium" style={{ background: b.accentColor, color: fg, borderRadius: r }}>
+          <div className="mb-3 py-1.5 text-center text-[11px] font-medium" style={{ background: b.theme.accent, color: fg, borderRadius: r }}>
             Compose
           </div>
-          <div className="flex items-center gap-1.5 px-1.5 py-1 text-[11px] font-medium" style={{ background: `color-mix(in oklab, ${b.accentColor} 12%, transparent)`, color: b.accentColor, borderRadius: r }}>
+          <div className="flex items-center gap-1.5 px-1.5 py-1 text-[11px] font-medium" style={{ background: `color-mix(in oklab, ${b.theme.accent} 12%, transparent)`, color: b.theme.accent, borderRadius: r }}>
             <Inbox className="size-3" /> Inbox
           </div>
           {["Starred", "Sent", "Drafts"].map((x) => (
@@ -55,7 +56,7 @@ function Preview({ b }: { b: Brand }) {
                 <div className="h-2 w-1/3 rounded bg-line-strong" />
                 <div className="h-2 w-2/3 rounded bg-muted" />
               </div>
-              {i === 0 && <span className="mt-1 size-1.5 rounded-full" style={{ background: b.accentColor }} />}
+              {i === 0 && <span className="mt-1 size-1.5 rounded-full" style={{ background: b.theme.accent }} />}
             </div>
           ))}
         </div>
@@ -85,6 +86,7 @@ export function AdminBranding() {
   useEffect(() => () => applyBrand(current), [current]);
 
   const set = <K extends keyof Brand>(k: K, v: Brand[K]) => setB((x) => ({ ...x, [k]: v }));
+  const setTheme = (patch: Partial<ThemeTokens>) => setB((x) => ({ ...x, theme: { ...x.theme, ...patch } }));
 
   const save = async (next = b) => {
     setBusy(true);
@@ -114,7 +116,7 @@ export function AdminBranding() {
     }
   };
 
-  const fontPreset = FONT_PRESETS.find((f) => f.stack === b.fontFamily)?.label ?? "custom";
+  const fontPreset = FONT_PRESETS.find((f) => f.stack === b.theme.fontFamily)?.label ?? "custom";
 
   return (
     <div className="space-y-6">
@@ -181,7 +183,7 @@ export function AdminBranding() {
               {b.logoUrl ? (
                 <img src={b.logoUrl} alt="Logo" className="size-14 rounded-ui border border-line object-contain p-1" />
               ) : (
-                <span className="flex size-14 items-center justify-center rounded-ui text-lg font-bold" style={{ background: b.accentColor, color: readableOn(b.accentColor) }}>
+                <span className="flex size-14 items-center justify-center rounded-ui text-lg font-bold" style={{ background: b.theme.accent, color: readableOn(b.theme.accent) }}>
                   {b.monogram}
                 </span>
               )}
@@ -207,20 +209,20 @@ export function AdminBranding() {
                     <button
                       key={c}
                       aria-label={c}
-                      onClick={() => set("accentColor", c)}
-                      className={`size-7 rounded-full ring-offset-2 ring-offset-surface ${b.accentColor === c ? "ring-2 ring-fg" : ""}`}
+                      onClick={() => setTheme({ accent: c })}
+                      className={`size-7 rounded-full ring-offset-2 ring-offset-surface ${b.theme.accent === c ? "ring-2 ring-fg" : ""}`}
                       style={{ background: c }}
                     />
                   ))}
                   <label className="relative flex h-8 items-center gap-2 rounded-ui border border-line px-2 text-[13px]">
-                    <input type="color" value={b.accentColor} onChange={(e) => set("accentColor", e.target.value)} className="size-5 cursor-pointer border-0 bg-transparent p-0" />
-                    <input value={b.accentColor} onChange={(e) => /^#[0-9a-f]{0,6}$/i.test(e.target.value) && set("accentColor", e.target.value)} className="w-20 bg-transparent font-mono text-xs outline-none" />
+                    <input type="color" value={b.theme.accent} onChange={(e) => setTheme({ accent: e.target.value })} className="size-5 cursor-pointer border-0 bg-transparent p-0" />
+                    <input value={b.theme.accent} onChange={(e) => /^#[0-9a-f]{0,6}$/i.test(e.target.value) && setTheme({ accent: e.target.value })} className="w-20 bg-transparent font-mono text-xs outline-none" />
                   </label>
                 </div>
               </Field>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Corner radius">
-                  <Select value={b.radius} onChange={(e) => set("radius", e.target.value as Brand["radius"])}>
+                  <Select value={b.theme.radius} onChange={(e) => setTheme({ radius: e.target.value as ThemeTokens["radius"] })}>
                     <option value="none">Square</option>
                     <option value="sm">Subtle</option>
                     <option value="md">Rounded</option>
@@ -232,7 +234,7 @@ export function AdminBranding() {
                     value={fontPreset}
                     onChange={(e) => {
                       const f = FONT_PRESETS.find((x) => x.label === e.target.value);
-                      if (f) setB((x) => ({ ...x, fontFamily: f.stack, googleFont: f.google }));
+                      if (f) setTheme({ fontFamily: f.stack, googleFont: f.google });
                     }}
                   >
                     {FONT_PRESETS.map((f) => (

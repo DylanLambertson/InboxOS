@@ -43,7 +43,7 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
       <div className="flex min-w-0 flex-1 flex-col">
         {/* Compact brand strip (mobile) */}
         <div className="relative overflow-hidden bg-[#0a0a0b] px-6 py-8 text-white lg:hidden">
-          <div className="io-glow io-glow-a" style={{ background: brand.accentColor }} />
+          <div className="io-glow io-glow-a" style={{ background: brand.theme.accent }} />
           <div className="io-dots absolute inset-0" />
           <div className="relative flex items-center gap-2.5">
             {brand.logoUrl ? (

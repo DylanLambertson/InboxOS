@@ -108,17 +108,19 @@ const input = (patch: Partial<OutboundInput> = {}): OutboundInput => ({
   quoteHtml: "",
   rawHtml: false,
   fromApi: false,
-  recipients: [{ email: "client@example.com" }],
+  recipients: [{ email: "client@customer.test" }],
   filenames: [],
   ...patch,
 });
+
+const BRAND = { ...DEFAULT_BRAND, primaryDomain: "example.com", additionalDomains: ["example.org"] };
 
 async function run(policy: Partial<OutboundPolicy>, patch: Partial<OutboundInput> = {}) {
   const p = withOutboundDefaults(policy);
   const { db, audits } = fakeDb(p);
   // Reset the module cache so each case sees its own policy.
   await saveOutboundPolicy(db, p, "u1");
-  return { result: await applyOutboundPolicy(db, DEFAULT_BRAND, input(patch)), audits };
+  return { result: await applyOutboundPolicy(db, BRAND, input(patch)), audits };
 }
 
 describe("applyOutboundPolicy", () => {

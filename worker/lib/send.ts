@@ -180,7 +180,7 @@ export async function deliverMessage(env: Env, messageId: string): Promise<Messa
         ...(bcc.length ? { bcc: bcc.map(formatAddress) } : {}),
         ...(replyTo.length ? { reply_to: replyTo.map(formatAddress) } : {}),
         subject: msg.subject || "(no subject)",
-        html: meta.api?.rawHtml ? html : wrapHtml(html, brand.fontFamily),
+        html: meta.api?.rawHtml ? html : wrapHtml(html, brand.theme.fontFamily),
         text,
         headers,
         ...(attachments.length ? { attachments } : {}),

@@ -9,11 +9,12 @@ import { resend } from "../lib/resend";
 import { likeEscape } from "../lib/search";
 import { quotaUsage } from "../lib/send";
 import { syncDomainAliases } from "../lib/domains";
+import { sanitizeTheme } from "@shared/theme";
 import { loadSettings, saveSetting } from "../lib/settings";
 import { allowlistLockoutProblem, isValidCidr } from "../lib/ip-allowlist";
 import { allowlistIp } from "../lib/sign-ins";
 import { clampInt, now } from "../lib/util";
-import { parseBody, zColor, zEmail, zId } from "../lib/validate";
+import { parseBody, zEmail, zId } from "../lib/validate";
 
 export const adminSystemRoutes = new Hono<AppEnv>();
 
@@ -94,10 +95,8 @@ const zBrand = z.object({
     .max(400_000)
     .refine((v) => v === "" || v.startsWith("https://") || v.startsWith("/api/brand/logo") || /^data:image\/(png|jpeg|svg\+xml|webp|gif);base64,/.test(v), "Logo must be an https URL or an uploaded image"),
   monogram: z.string().trim().min(1).max(3),
-  accentColor: zColor,
-  radius: z.enum(["none", "sm", "md", "lg"]),
-  fontFamily: z.string().trim().min(1).max(300),
-  googleFont: z.string().trim().max(60).regex(/^[A-Za-z0-9 ]*$/, "Letters, numbers and spaces only"),
+  // Partial token updates are merged over the current theme and sanitized (see shared/theme.ts).
+  theme: z.record(z.string(), z.unknown()),
   loginHeadline: z.string().trim().max(120),
   loginTagline: z.string().trim().max(240),
   supportEmail: z.union([zEmail, z.literal("")]),
@@ -127,7 +126,7 @@ const zPolicy = z.object({
 adminSystemRoutes.put("/settings/brand", async (c) => {
   const body = await parseBody(c, zBrand.partial());
   const { brand } = await loadSettings(c.env.DB);
-  const next = { ...brand, ...body };
+  const next = { ...brand, ...body, theme: body.theme ? sanitizeTheme(body.theme, brand.theme) : brand.theme };
   await saveSetting(c.env.DB, "brand", next, c.get("user").id);
   // A newly added domain gives every existing mailbox its address there.
   if (body.primaryDomain !== undefined || body.additionalDomains !== undefined) await syncDomainAliases(c.env.DB);

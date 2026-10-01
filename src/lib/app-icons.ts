@@ -29,7 +29,7 @@ async function draw(brand: Brand, logo: HTMLImageElement | null, size: number, i
   const canvas = document.createElement("canvas");
   canvas.width = canvas.height = size;
   const ctx = canvas.getContext("2d")!;
-  ctx.fillStyle = brand.accentColor;
+  ctx.fillStyle = brand.theme.accent;
   ctx.fillRect(0, 0, size, size);
   const box = size * (1 - inset * 2);
   if (logo) {
@@ -39,7 +39,7 @@ async function draw(brand: Brand, logo: HTMLImageElement | null, size: number, i
     const h = logo.naturalHeight * scale;
     ctx.drawImage(logo, (size - w) / 2, (size - h) / 2, w, h);
   } else {
-    ctx.fillStyle = readableOn(brand.accentColor);
+    ctx.fillStyle = readableOn(brand.theme.accent);
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     const letters = brand.monogram.slice(0, 3);

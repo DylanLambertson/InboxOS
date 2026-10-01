@@ -2,21 +2,44 @@
   "name": "inboxos",
   "private": true,
   "version": "1.0.0",
-  "description": "Self-hosted team email on Cloudflare Workers, D1 and R2",
-  "author": "Dylan Lambertson <me@dylanlambertson.dev>",
+  "description": "InboxOS: a self-hosted team email client on Cloudflare Workers, D1 and R2, with shared inboxes, a setup wizard, theming and a full admin console.",
+  "keywords": [
+    "email",
+    "inbox",
+    "shared-inbox",
+    "cloudflare-workers",
+    "d1",
+    "r2",
+    "resend",
+    "self-hosted",
+    "react",
+    "hono"
+  ],
+  "homepage": "https://github.com/DylanLambertson/InboxOS#readme",
+  "bugs": {
+    "url": "https://github.com/DylanLambertson/InboxOS/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DylanLambertson/InboxOS.git"
+  },
   "license": "AGPL-3.0-only",
+  "author": "Dylan Lambertson <me@dylanlambertson.dev> (https://github.com/DylanLambertson)",
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "vite dev",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc -b",
     "test": "vitest run",
-    "db:migrate:local": "wrangler d1 migrations apply MAIL_DB --local",
-    "db:migrate:remote": "wrangler d1 migrations apply MAIL_DB --remote",
+    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "db:migrate:remote": "wrangler d1 migrations apply DB --remote",
     "bootstrap:local": "node scripts/bootstrap.mjs --local",
     "bootstrap:remote": "node scripts/bootstrap.mjs --remote",
-    "deploy": "npm run build && wrangler d1 migrations apply MAIL_DB --remote && wrangler deploy",
+    "deploy": "npm run build && wrangler d1 migrations apply DB --remote && wrangler deploy",
     "cf-typegen": "wrangler types worker/worker-configuration.d.ts"
   },
   "dependencies": {

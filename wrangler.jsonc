@@ -1,5 +1,5 @@
 {
-	// Cloudflare Worker config. See the README for setup.
+	// Cloudflare Worker config. See "Deploy" in README.md.
 	"$schema": "node_modules/wrangler/config-schema.json",
 	"name": "inboxos",
 	"main": "worker/index.ts",
@@ -19,23 +19,18 @@
 			"/manifest.webmanifest"
 		]
 	},
-  "observability": {
-    "logs": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "invocation_logs": true,
-      "persist": true
-    },
-    "traces": {
-      "enabled": true,
-      "head_sampling_rate": 1,
-      "persist": true
-    }
-  },
+	"observability": {
+		"logs": {
+			"enabled": true,
+			"head_sampling_rate": 1,
+			"invocation_logs": true
+		}
+	},
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "MAIL_DB",
+			"database_name": "inboxos",
+			// Paste the id printed by `npx wrangler d1 create inboxos`.
 			"database_id": "00000000-0000-0000-0000-000000000000",
 			"migrations_dir": "migrations"
 		}
@@ -44,28 +39,27 @@
 		{
 			"binding": "FILES",
 			"bucket_name": "inboxos-files"
-		},
+		}
 	],
-	// Same app on both mail domains. Sessions are per host, so people sign in on whichever they use.
-	"routes": [
-		{ "pattern": "mail.example.com", "custom_domain": true },
-		{ "pattern": "mail.example.org", "custom_domain": true }
-	],
-	// Every minute: dispatch scheduled sends. Daily cleanup runs inside the same handler.
+	// Serve the app on your own hostname. Uncomment and set it to the address you'll use.
+	// Add one entry per hostname (e.g. mail.example.com and mail.example.org).
+	// "routes": [
+	// 	{ "pattern": "mail.example.com", "custom_domain": true }
+	// ],
+	// Every minute: dispatch scheduled sends, deliver webhooks. Daily cleanup runs inside the same handler.
 	"triggers": {
 		"crons": [
 			"* * * * *"
 		]
 	},
 	"vars": {
-		// Public URL of the app (used for OAuth redirects and invite links).
-		"APP_URL": "https://mail.example.com",
-		// Where to POST a signed notice when mail arrives (another service's receiver).
-		// Leave unset to disable outbound notifications. Pair with NOTIFY_WEBHOOK_SECRET.
-		"NOTIFY_WEBHOOK_URL": "https://team.example.com/api/webhooks/mail"
+		// Public URL of the app (used for OAuth redirects, invite links and webhooks).
+		"APP_URL": "http://localhost:5173"
 	}
-	// Secrets (set with `wrangler secret put <NAME>`):
-	//   RESEND_API_KEY, RESEND_WEBHOOK_SECRET, SESSION_SECRET,
-	//   GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET (optional, enables Google sign-in),
-	//   NOTIFY_WEBHOOK_SECRET (HMAC key shared with the receiving service)
+	// Secrets (set with `npx wrangler secret put <NAME>`):
+	//   SESSION_SECRET            required: any long random string (signs links, encrypts stored keys)
+	//   RESEND_API_KEY            optional: can be entered in the setup wizard instead
+	//   RESEND_WEBHOOK_SECRET     optional: captured automatically by the setup wizard
+	//   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET   optional: enables Google sign-in
+	//   VAPID_PRIVATE_JWK         optional: enables push notifications
 }

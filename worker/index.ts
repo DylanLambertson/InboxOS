@@ -35,6 +35,7 @@ import { adminOutboundRoutes, outboundRoutes } from "./routes/outbound";
 import { templateRoutes } from "./routes/templates";
 import { unsubscribeRoutes } from "./routes/unsubscribe";
 import { webhookRoutes } from "./routes/webhooks";
+import { adminWorkspaceRoutes, workspaceRoutes } from "./routes/workspace";
 
 const app = new Hono<AppEnv>();
 
@@ -95,13 +96,13 @@ app.get("/manifest.webmanifest", async (c) => {
       id: "/",
       name: brand.productName,
       short_name: brand.productName.length > 12 ? brand.monogram : brand.productName,
-      description: `${brand.companyName} team email`,
+      description: brand.companyName ? `${brand.companyName} email` : "Email",
       start_url: "/?source=pwa",
       scope: "/",
       display: "standalone",
       orientation: "any",
       background_color: "#0e0e10",
-      theme_color: brand.accentColor,
+      theme_color: brand.theme.accent,
       icons: [icon("icon-192", 192), icon("icon-512", 512), icon("maskable-512", 512, "maskable")],
     },
     200,
@@ -140,6 +141,7 @@ api.route("/contacts", contactRoutes);
 api.route("/conversations", conversationRoutes);
 api.route("/templates", templateRoutes);
 api.route("/outbound", outboundRoutes);
+api.route("/workspace", workspaceRoutes);
 
 const admin = new Hono<AppEnv>();
 admin.use("*", requireConsole);
@@ -153,6 +155,7 @@ admin.route("/security", adminSecurityRoutes);
 admin.route("/compliance/ediscovery", adminEdiscoveryRoutes);
 admin.route("/compliance", adminComplianceRoutes);
 admin.route("/outbound", adminOutboundRoutes);
+admin.route("/settings/workspace", adminWorkspaceRoutes);
 admin.route("/", adminSystemRoutes);
 api.route("/admin", admin);
 

@@ -73,7 +73,7 @@ if (withMailbox) {
 }
 
 try {
-  execFileSync("npx", ["wrangler", "d1", "execute", "MAIL_DB", target, "--command", sql.join("\n")], { stdio: "inherit" });
+  execFileSync("npx", ["wrangler", "d1", "execute", "DB", target, "--command", sql.join("\n")], { stdio: "inherit" });
   console.log(`\n✓ Owner ${email} is ready${withMailbox ? ` with mailbox ${email}` : ""}. Sign in at your app URL.`);
 } catch {
   console.error("\nFailed. Did you run the migrations first? (npm run db:migrate:local / db:migrate:remote)");

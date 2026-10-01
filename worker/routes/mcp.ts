@@ -17,7 +17,7 @@ export const mcpRoutes = new Hono<AppEnv>();
 
 const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
-const INSTRUCTIONS = `InboxOS: the Acme team's email platform. You can manage contacts and send email from the team's mailboxes.
+const INSTRUCTIONS = `InboxOS: this team's self-hosted email platform. You can manage contacts and send email from the team's mailboxes.
 Outreach guidelines:
 - Before writing to someone, call get_contact to read their notes and any past conversation, and write an email specific to them. Never send one generic text to many people.
 - One recipient per email. send_email adds an unsubscribe link automatically for outreach; keep it.
@@ -28,7 +28,7 @@ Outreach guidelines:
 - To follow up or answer a reply, pass reply_to_message_id so it stays in the same conversation.`;
 
 const zMessageFields = {
-  from: z.string().optional().describe('Mailbox address to send from, optionally with a sender name: "Dylan at Acme <dylan@example.com>". Every mailbox also has its address on each mail domain (e.g. dylan@example.org), so pick the domain here. Optional when replying or when the key has one mailbox.'),
+  from: z.string().optional().describe('Mailbox address to send from, optionally with a sender name: "Sam at Acme <sam@example.com>". Every mailbox also has its address on each mail domain (e.g. sam@example.org), so pick the domain here. Optional when replying or when the key has one mailbox.'),
   to: zRecipients.optional().describe('Recipient: "Jo Rivera <jo@acme.com>". Optional when replying (defaults to the other person).'),
   subject: z.string().max(998).optional().describe("Subject. Optional when replying (defaults to Re: original)."),
   body: z.string().max(100_000).optional().describe("Plain-text body. Blank lines separate paragraphs; links become clickable."),

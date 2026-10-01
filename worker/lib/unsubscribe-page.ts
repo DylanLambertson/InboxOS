@@ -61,7 +61,7 @@ const WARN = `<svg class="art" viewBox="0 0 96 96" aria-hidden="true">
 </svg>`;
 
 export function renderUnsubscribePage(brand: Brand, view: UnsubscribeView): string {
-  const accent = safeColor(brand.accentColor);
+  const accent = safeColor(brand.theme.accent);
   const company = escapeHtml(brand.companyName);
   const e = (s: string) => escapeHtml(s);
   const logo = brand.logoUrl

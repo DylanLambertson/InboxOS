@@ -23,7 +23,7 @@ describe("unsubscribe page", () => {
   it("escapes everything that comes from outside", () => {
     const evil = '"><img src=x onerror=alert(1)>';
     const html = renderUnsubscribePage(
-      { ...brand, companyName: evil, logoUrl: 'javascript:alert(1)"', accentColor: "red;}</style><script>" },
+      { ...brand, companyName: evil, logoUrl: 'javascript:alert(1)"', theme: { ...brand.theme, accent: "red;}</style><script>" } },
       { kind: "confirm", email: evil, action: evil, stayUrl: evil },
     );
     expect(html).not.toContain("<img src=x");

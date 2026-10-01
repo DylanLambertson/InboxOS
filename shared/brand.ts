@@ -1,12 +1,12 @@
 /**
- * WHITE-LABEL DEFAULTS
+ * BRAND DEFAULTS
  *
- * Everything customer-facing about the brand lives here. These values are the
- * defaults; admins can override any of them at runtime from
- * Admin → Branding (stored in the `settings` table), so a rebrand normally
- * needs no code change at all. To ship a different default brand, edit this
- * file and redeploy.
+ * Everything people see about the brand lives here. These are the values a fresh
+ * install starts with; the setup wizard and Admin → Branding override them at
+ * runtime (stored in the `settings` table), so a rebrand never needs a code change.
  */
+import { DEFAULT_THEME, type ThemeTokens } from "./theme";
+
 export interface Brand {
   /** Company that owns the deployment, e.g. "Acme". */
   companyName: string;
@@ -24,14 +24,8 @@ export interface Brand {
   logoUrl: string;
   /** 1–3 letters shown when no logo is set. */
   monogram: string;
-  /** Brand accent color (hex). Buttons, focus rings, unread markers. */
-  accentColor: string;
-  /** Corner radius scale: "none" | "sm" | "md" | "lg". */
-  radius: "none" | "sm" | "md" | "lg";
-  /** CSS font-family stack for the UI. */
-  fontFamily: string;
-  /** Optional Google Fonts family name to load, e.g. "Inter". Empty = none. */
-  googleFont: string;
+  /** Every visual token: accent, radius, density, fonts, palettes. See shared/theme.ts. */
+  theme: ThemeTokens;
   /** Headline on the sign-in page. */
   loginHeadline: string;
   /** Sub-headline on the sign-in page. */
@@ -45,22 +39,18 @@ export interface Brand {
 }
 
 export const DEFAULT_BRAND: Brand = {
-  companyName: "Acme",
+  companyName: "",
   productName: "InboxOS",
-  primaryDomain: "example.com",
-  additionalDomains: ["example.org"],
+  primaryDomain: "",
+  additionalDomains: [],
   logoUrl: "",
-  monogram: "LM",
-  accentColor: "#4f46e5",
-  radius: "md",
-  fontFamily:
-    '"Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-  googleFont: "Inter",
+  monogram: "IO",
+  theme: DEFAULT_THEME,
   loginHeadline: "Welcome back",
-  loginTagline: "Sign in to your team inbox.",
-  supportEmail: "support@example.com",
-  footerText: "© Acme",
-  defaultFromName: "Acme",
+  loginTagline: "Sign in to your inbox.",
+  supportEmail: "",
+  footerText: "",
+  defaultFromName: "",
 };
 
 /** Organization policies, editable from Admin → Settings. */
@@ -113,8 +103,8 @@ export const DEFAULT_POLICY: OrgPolicy = {
   trashRetentionDays: 30,
   logRetentionDays: 180,
   require2fa: false,
-  googleSsoEnabled: true,
-  googleAllowedDomains: ["example.com"],
+  googleSsoEnabled: false,
+  googleAllowedDomains: [],
   googleAutoProvision: false,
   passwordLoginEnabled: true,
   catchAllMailboxId: null,
@@ -132,7 +122,3 @@ export function mailDomains(brand: Pick<Brand, "primaryDomain" | "additionalDoma
   return [...new Set([brand.primaryDomain, ...(brand.additionalDomains ?? [])].map((d) => d.trim().toLowerCase()).filter(Boolean))];
 }
 
-/** Convert radius keyword to a CSS length. */
-export function radiusValue(r: Brand["radius"]): string {
-  return { none: "0px", sm: "6px", md: "10px", lg: "14px" }[r] ?? "10px";
-}

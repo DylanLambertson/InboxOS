@@ -100,8 +100,8 @@ export function AuthHero() {
   return (
     <div className="io-hero relative flex h-full flex-col overflow-hidden bg-[#0a0a0b] text-white">
       {/* drifting brand-colored glows */}
-      <div className="io-glow io-glow-a" style={{ background: brand.accentColor }} />
-      <div className="io-glow io-glow-b" style={{ background: brand.accentColor }} />
+      <div className="io-glow io-glow-a" style={{ background: brand.theme.accent }} />
+      <div className="io-glow io-glow-b" style={{ background: brand.theme.accent }} />
       <div className="io-dots absolute inset-0" />
 
       <div className="relative z-10 flex items-center gap-2.5 p-8 lg:p-10">
@@ -137,7 +137,7 @@ export function AuthHero() {
         <h2 className="text-3xl leading-tight font-semibold tracking-tight lg:text-[40px]">
           Every email,
           <br />
-          <span key={word} className="io-word inline-block" style={{ color: `color-mix(in oklab, ${brand.accentColor} 55%, white)` }}>
+          <span key={word} className="io-word inline-block" style={{ color: `color-mix(in oklab, ${brand.theme.accent} 55%, white)` }}>
             {ROTATING[word]}
           </span>
         </h2>
