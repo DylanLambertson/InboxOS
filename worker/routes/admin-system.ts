@@ -7,7 +7,7 @@ import { renderEmail } from "../lib/email-layout";
 import { templates, type TemplateName } from "../lib/email-templates";
 import { resend } from "../lib/resend";
 import { likeEscape } from "../lib/search";
-import { quotaUsage } from "../lib/send";
+import { getOverview } from "../lib/overview";
 import { syncDomainAliases } from "../lib/domains";
 import { sanitizeTheme } from "@shared/theme";
 import { loadSettings, saveSetting } from "../lib/settings";
@@ -20,53 +20,7 @@ export const adminSystemRoutes = new Hono<AppEnv>();
 
 // ---- Overview -------------------------------------------------------------
 
-adminSystemRoutes.get("/overview", async (c) => {
-  const db = c.env.DB;
-  const since = new Date(Date.now() - 13 * 86_400_000);
-  since.setUTCHours(0, 0, 0, 0);
-  const [usage, counts, { results: series }, { results: recentProblems }] = await Promise.all([
-    quotaUsage(c.env),
-    db
-      .prepare(
-        `SELECT
-           (SELECT COUNT(*) FROM users WHERE status = 'active') AS users,
-           (SELECT COUNT(*) FROM users WHERE status = 'invited') AS invited,
-           (SELECT COUNT(*) FROM mailboxes WHERE is_active = 1 AND is_system = 0) AS mailboxes,
-           (SELECT COUNT(*) FROM messages WHERE mailbox_id = 'system-unrouted') AS unrouted,
-           (SELECT COUNT(*) FROM messages) AS messages,
-           (SELECT COALESCE(SUM(size), 0) FROM messages) AS bytes,
-           (SELECT COUNT(*) FROM messages WHERE status = 'scheduled') AS scheduled`,
-      )
-      .first<Record<string, number>>(),
-    db
-      .prepare(
-        `SELECT substr(created_at, 1, 10) AS day, type, COUNT(*) AS n FROM email_events
-         WHERE created_at >= ? GROUP BY day, type ORDER BY day`,
-      )
-      .bind(since.toISOString())
-      .all<{ day: string; type: string; n: number }>(),
-    db
-      .prepare(
-        `SELECT e.id, e.type, e.detail, e.recipient, e.created_at, m.subject, m.id AS message_id
-         FROM email_events e LEFT JOIN messages m ON m.id = e.message_id
-         WHERE e.type IN ('bounced','complained','failed','delivery_delayed','suppressed','received.unrouted')
-         ORDER BY e.created_at DESC LIMIT 8`,
-      )
-      .all(),
-  ]);
-  return c.json({
-    usage,
-    counts,
-    series,
-    recentProblems,
-    provider: {
-      apiKey: !!c.env.RESEND_API_KEY,
-      webhookSecret: !!c.env.RESEND_WEBHOOK_SECRET,
-      google: !!c.env.GOOGLE_CLIENT_ID && !!c.env.GOOGLE_CLIENT_SECRET,
-      webhookUrl: `${c.env.APP_URL.replace(/\/$/, "")}/webhooks/resend`,
-    },
-  });
-});
+adminSystemRoutes.get("/overview", async (c) => c.json(await getOverview(c.env, c.req.query("refresh") === "1")));
 
 adminSystemRoutes.get("/domains", async (c) => {
   try {
