@@ -1,5 +1,6 @@
 export { AdminLayout } from "./AdminLayout";
 export { AdminOverview } from "./Overview";
+export { AdminHealth } from "./Health";
 export { AdminTraffic } from "./Traffic";
 export { AdminUsers } from "./Users";
 export { AdminMailboxes } from "./Mailboxes";
