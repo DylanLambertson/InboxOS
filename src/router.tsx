@@ -1,19 +1,15 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppShell } from "./components/layout/AppShell";
-import { InvitePage, LoginPage, ResetPage } from "./pages/Auth";
-import { VerifyEmailPage } from "./pages/VerifyEmail";
 import { MailPage } from "./pages/Mail";
+import { pages as p, routeLazy as page } from "./lib/route-chunks";
 
-// Settings and Admin load on demand to keep the mail client's first load small.
-const settings = () => import("./pages/settings");
-const admin = () => import("./pages/admin");
-const lazy = <M,>(load: () => Promise<M>, pick: (m: M) => React.ComponentType) => async () => ({ Component: pick(await load()) });
-
+// Only the mail client is in the first load. Sign-in, Settings and every Admin page
+// are separate chunks (see lib/route-chunks.ts), prefetched on hover from the navigation.
 export const router = createBrowserRouter([
-  { path: "/login", element: <LoginPage /> },
-  { path: "/invite/:token", element: <InvitePage /> },
-  { path: "/reset/:token", element: <ResetPage /> },
-  { path: "/verify-email/:token", element: <VerifyEmailPage /> },
+  { path: "/login", lazy: page(p.login, "LoginPage") },
+  { path: "/invite/:token", lazy: page(p.login, "InvitePage") },
+  { path: "/reset/:token", lazy: page(p.login, "ResetPage") },
+  { path: "/verify-email/:token", lazy: page(p.verifyEmail, "VerifyEmailPage") },
   {
     element: <AppShell />,
     children: [
@@ -21,34 +17,35 @@ export const router = createBrowserRouter([
       { path: "mail/:mailboxId/:view/:messageId?", element: <MailPage /> },
       {
         path: "settings",
-        lazy: lazy(settings, (m) => m.SettingsLayout),
+        lazy: page(p.settingsLayout, "SettingsLayout"),
         children: [
           { index: true, element: <Navigate to="profile" replace /> },
-          { path: "profile", lazy: lazy(settings, (m) => m.ProfileSettings) },
-          { path: "mailboxes", lazy: lazy(settings, (m) => m.MailboxSettings) },
-          { path: "security", lazy: lazy(settings, (m) => m.SecuritySettings) },
-          { path: "templates", lazy: lazy(settings, (m) => m.TemplatesSettings) },
-          { path: "contacts", lazy: lazy(settings, (m) => m.ContactsSettings) },
+          { path: "profile", lazy: page(p.settingsProfile, "ProfileSettings") },
+          { path: "mailboxes", lazy: page(p.settingsMailboxes, "MailboxSettings") },
+          { path: "security", lazy: page(p.settingsSecurity, "SecuritySettings") },
+          { path: "templates", lazy: page(p.settingsTemplates, "TemplatesSettings") },
+          { path: "contacts", lazy: page(p.settingsContacts, "ContactsSettings") },
         ],
       },
       {
         path: "admin",
-        lazy: lazy(admin, (m) => m.AdminLayout),
+        lazy: page(p.adminLayout, "AdminLayout"),
         children: [
-          { index: true, lazy: lazy(admin, (m) => m.AdminOverview) },
-          { path: "traffic", lazy: lazy(admin, (m) => m.AdminTraffic) },
-          { path: "users", lazy: lazy(admin, (m) => m.AdminUsers) },
-          { path: "mailboxes", lazy: lazy(admin, (m) => m.AdminMailboxes) },
-          { path: "branding", lazy: lazy(admin, (m) => m.AdminBranding) },
-          { path: "settings", lazy: lazy(admin, (m) => m.AdminPolicy) },
-          { path: "api", lazy: lazy(admin, (m) => m.AdminApiKeys) },
-          { path: "provisioning", lazy: lazy(admin, (m) => m.AdminProvisioning) },
-          { path: "unsubscribes", lazy: lazy(admin, (m) => m.AdminUnsubscribes) },
-          { path: "security/:tab?", lazy: lazy(admin, (m) => m.AdminSecurity) },
-          { path: "compliance", lazy: lazy(admin, (m) => m.AdminCompliance) },
-          { path: "outbound", lazy: lazy(admin, (m) => m.AdminOutboundPolicy) },
-          { path: "logs/:kind?", lazy: lazy(admin, (m) => m.AdminLogs) },
-          { path: "setup", lazy: lazy(admin, (m) => m.AdminSetup) },
+          { index: true, lazy: page(p.adminOverview, "AdminOverview") },
+          { path: "health", lazy: page(p.adminHealth, "AdminHealth") },
+          { path: "traffic", lazy: page(p.adminTraffic, "AdminTraffic") },
+          { path: "users", lazy: page(p.adminUsers, "AdminUsers") },
+          { path: "mailboxes", lazy: page(p.adminMailboxes, "AdminMailboxes") },
+          { path: "branding", lazy: page(p.adminBranding, "AdminBranding") },
+          { path: "settings", lazy: page(p.adminPolicy, "AdminPolicy") },
+          { path: "api", lazy: page(p.adminApiKeys, "AdminApiKeys") },
+          { path: "provisioning", lazy: page(p.adminProvisioning, "AdminProvisioning") },
+          { path: "unsubscribes", lazy: page(p.adminUnsubscribes, "AdminUnsubscribes") },
+          { path: "security/:tab?", lazy: page(p.adminSecurity, "AdminSecurity") },
+          { path: "compliance", lazy: page(p.adminCompliance, "AdminCompliance") },
+          { path: "outbound", lazy: page(p.adminOutbound, "AdminOutboundPolicy") },
+          { path: "logs/:kind?", lazy: page(p.adminLogs, "AdminLogs") },
+          { path: "setup", lazy: page(p.adminSetup, "AdminSetup") },
         ],
       },
     ],

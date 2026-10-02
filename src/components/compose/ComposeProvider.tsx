@@ -1,10 +1,23 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useMe } from "@/lib/queries";
-import { ComposeWindow } from "./ComposeWindow";
 import type { ComposeRequest } from "./useDraft";
+
+// The rich-text editor is the heaviest part of the app: keep it out of the first load and
+// fetch it once the browser is idle, so the first Compose still opens instantly.
+const loadComposeWindow = () => import("./ComposeWindow");
+const ComposeWindow = lazy(() => loadComposeWindow().then((m) => ({ default: m.ComposeWindow })));
+function prefetchComposeWhenIdle(): () => void {
+  const w = window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number; cancelIdleCallback?: (id: number) => void };
+  if (w.requestIdleCallback) {
+    const id = w.requestIdleCallback(() => void loadComposeWindow(), { timeout: 5000 });
+    return () => w.cancelIdleCallback?.(id);
+  }
+  const id = window.setTimeout(() => void loadComposeWindow(), 2500);
+  return () => window.clearTimeout(id);
+}
 
 interface OpenComposer {
   key: string;
@@ -28,6 +41,7 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
   const { data: me } = useMe();
   const qc = useQueryClient();
   const pendingSends = useRef(0);
+  useEffect(() => prefetchComposeWhenIdle(), []);
 
   const open = useCallback((req: ComposeRequest) => {
     setWindows((ws) => {
@@ -109,6 +123,7 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={value}>
       {children}
       <div className="pointer-events-none fixed right-0 bottom-0 z-[60] flex items-end gap-3 pr-4 max-sm:inset-0 max-sm:pr-0">
+        <Suspense fallback={null}>
         {windows.map((w) => (
           <ComposeWindow
             key={w.key}
@@ -123,6 +138,7 @@ export function ComposeProvider({ children }: { children: ReactNode }) {
             }}
           />
         ))}
+        </Suspense>
       </div>
     </Ctx.Provider>
   );
