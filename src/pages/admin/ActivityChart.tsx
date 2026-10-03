@@ -1,10 +1,24 @@
 import { useMemo, useState } from "react";
 
-interface Point {
+export interface Point {
   day: string;
   sent: number;
   system: number;
   received: number;
+  bounced: number;
+}
+
+/** One point per UTC day for the last `days` days, from the overview's per-day event counts. */
+export function dailyPoints(rows: { day: string; type: string; n: number }[], days = 14): Point[] {
+  const out: Point[] = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
+    const key = d.toISOString().slice(0, 10);
+    const of = (t: string) => rows.reduce((s, r) => (r.day === key && r.type === t ? s + r.n : s), 0);
+    out.push({ day: key, sent: of("accepted"), system: of("system"), received: of("received") + of("received.unrouted"), bounced: of("bounced") });
+  }
+  return out;
 }
 
 const SERIES = [
@@ -18,17 +32,7 @@ export function ActivityChart({ rows }: { rows: { day: string; type: string; n: 
   const [hover, setHover] = useState<number | null>(null);
   const [asTable, setAsTable] = useState(false);
 
-  const data = useMemo<Point[]>(() => {
-    const days: Point[] = [];
-    const today = new Date();
-    for (let i = 13; i >= 0; i--) {
-      const d = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate() - i));
-      const key = d.toISOString().slice(0, 10);
-      const of = (t: string) => rows.filter((r) => r.day === key && r.type === t).reduce((s, r) => s + r.n, 0);
-      days.push({ day: key, sent: of("accepted"), system: of("system"), received: of("received") + of("received.unrouted") });
-    }
-    return days;
-  }, [rows]);
+  const data = useMemo(() => dailyPoints(rows), [rows]);
 
   const max = Math.max(4, ...data.flatMap((d) => [d.sent, d.system, d.received]));
   const niceMax = Math.ceil(max / 4) * 4;

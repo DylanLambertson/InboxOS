@@ -1,144 +1,165 @@
+import { useMemo } from "react";
 import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, CheckCircle2, CircleDashed, ArrowRight } from "lucide-react";
-import { api } from "@/lib/api";
+import { AlertTriangle, CheckCircle2, RefreshCw } from "lucide-react";
+import type { OverviewData } from "@shared/admin";
+import { api, ApiError } from "@/lib/api";
 import { fileSize, relativeTime } from "@/lib/format";
-import { Card, LoadError, PageHeader, Section, Spinner, cx } from "@/components/ui/primitives";
+import { Button, Card, LoadError, PageHeader, Section } from "@/components/ui/primitives";
 import { EVENT_LABELS } from "@/components/mail/StatusBadge";
 import { useCanManage } from "@/lib/queries";
-import { ActivityChart } from "./ActivityChart";
+import { ActivityChart, dailyPoints } from "./ActivityChart";
+import { HealthCard, KpiTile, Meter, SetupCard, type SetupStatus } from "./dashboard-parts";
+import { useHealth } from "./health-data";
 
-export interface OverviewData {
-  usage: { today: number; month: number; systemToday: number; systemMonth: number; dailyLimit: number; monthlyLimit: number };
-  counts: { users: number; invited: number; mailboxes: number; messages: number; bytes: number; scheduled: number };
-  series: { day: string; type: string; n: number }[];
-  recentProblems: { id: string; type: string; detail: string | null; recipient: string | null; created_at: string; subject: string | null }[];
-  provider: { apiKey: boolean; webhookSecret: boolean; google: boolean; webhookUrl: string };
+export type { OverviewData };
+
+const OVERVIEW_KEY = ["admin-overview"] as const;
+
+/** The setup wizard's progress, when this install has one (older servers answer 404). */
+function useSetupStatus(enabled: boolean) {
+  return useQuery({
+    queryKey: ["setup-status"],
+    queryFn: async () => {
+      try {
+        return await api.get<SetupStatus>("/api/setup/status");
+      } catch (e) {
+        if (e instanceof ApiError && (e.status === 404 || e.status === 403)) return null;
+        throw e;
+      }
+    },
+    enabled,
+    staleTime: 60_000,
+    retry: false,
+  });
 }
 
-function Meter({ label, used, limit, note }: { label: string; used: number; limit: number; note?: string }) {
-  const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
-  const tone = pct >= 90 ? "bg-danger" : pct >= 70 ? "bg-warning" : "bg-accent";
-  return (
-    <Card className="p-5">
-      <p className="text-xs font-medium text-fg-muted">{label}</p>
-      <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">
-        {used.toLocaleString()}
-        <span className="text-sm font-normal text-fg-muted"> / {limit ? limit.toLocaleString() : "∞"}</span>
-      </p>
-      {limit > 0 && (
-        <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted" role="meter" aria-valuenow={used} aria-valuemax={limit} aria-label={label}>
-          <div className={cx("h-full rounded-full", tone)} style={{ width: `${pct}%` }} />
-        </div>
-      )}
-      {limit > 0 && pct >= 90 ? (
-        <p className="mt-2 flex items-center gap-1 text-xs text-danger"><AlertTriangle className="size-3" /> Near the limit</p>
-      ) : (
-        note && <p className="mt-2 text-xs text-fg-muted">{note}</p>
-      )}
-    </Card>
-  );
-}
-
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
-  return (
-    <Card className="p-5">
-      <p className="text-xs font-medium text-fg-muted">{label}</p>
-      <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{value}</p>
-      {hint && <p className="mt-1 text-xs text-fg-muted">{hint}</p>}
-    </Card>
-  );
+function Skeleton({ className }: { className?: string }) {
+  return <div className={`animate-pulse rounded-ui-lg border border-line bg-muted/60 ${className ?? ""}`} />;
 }
 
 export function AdminOverview() {
   const editable = useCanManage();
-  const { data, isLoading, error, refetch } = useQuery({ queryKey: ["admin-overview"], queryFn: () => api.get<OverviewData>("admin/overview"), refetchInterval: 60_000 });
-  if (error && !data) return <LoadError error={error} onRetry={() => refetch()} />;
-  if (isLoading || !data) return <Spinner />;
-  const checks = [
-    { ok: data.provider.apiKey, label: "Resend API key", hint: "Needed to send and fetch received mail." },
-    { ok: data.provider.webhookSecret, label: "Webhook signing secret", hint: "Needed to receive mail and delivery events." },
-    { ok: data.provider.google, label: "Google sign-in", hint: "Optional." , optional: true },
-  ];
-  const ready = checks.filter((c) => !c.optional).every((c) => c.ok);
+  // Three independent requests, all in flight at once: no waterfall.
+  const overview = useQuery({ queryKey: OVERVIEW_KEY, queryFn: () => api.get<OverviewData>("admin/overview"), refetchInterval: 60_000, staleTime: 20_000 });
+  const health = useHealth();
+  const setup = useSetupStatus(editable);
+  const data = overview.data;
+  const points = useMemo(() => (data ? dailyPoints(data.series) : []), [data]);
+  const refreshing = overview.isFetching && !overview.isLoading;
+
+  if (overview.error && !data) return <LoadError error={overview.error} onRetry={() => overview.refetch()} />;
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Overview" description="Sending volume, quotas and system health." />
+      <PageHeader
+        title="Dashboard"
+        description={data ? `Activity, quotas and health · updated ${relativeTime(data.generatedAt)}` : "Activity, quotas and health"}
+        actions={
+          <Button variant="ghost" size="sm" onClick={() => overview.refetch()} loading={refreshing} icon={<RefreshCw className="size-3.5" />}>
+            Refresh
+          </Button>
+        }
+      />
 
-      {!ready && editable && (
-        <Link to="/admin/setup" className="flex items-center gap-3 rounded-ui-lg border border-warning/30 bg-warning-soft px-4 py-3 text-[13px] text-warning">
-          <AlertTriangle className="size-4 shrink-0" />
-          <span className="flex-1">Setup isn't finished — mail can't be sent or received until the provider is connected.</span>
-          <ArrowRight className="size-4" />
-        </Link>
-      )}
+      {setup.data && !setup.data.completed && Object.keys(setup.data.steps ?? {}).length > 0 && <SetupCard status={setup.data} />}
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Meter
-          label="Sent today (UTC)"
-          used={data.usage.today}
-          limit={data.usage.dailyLimit}
-          note={`Includes ${data.usage.systemToday} system email${data.usage.systemToday === 1 ? "" : "s"}`}
-        />
-        <Meter
-          label="Sent this month"
-          used={data.usage.month}
-          limit={data.usage.monthlyLimit}
-          note={`Includes ${data.usage.systemMonth} system email${data.usage.systemMonth === 1 ? "" : "s"}`}
-        />
-        <Stat label="Active users" value={String(data.counts.users)} hint={data.counts.invited ? `${data.counts.invited} invite${data.counts.invited > 1 ? "s" : ""} pending` : undefined} />
-        <Stat label="Storage" value={fileSize(data.counts.bytes)} hint={`${data.counts.messages.toLocaleString()} messages · ${data.counts.mailboxes} mailboxes`} />
-      </div>
-
-      <Section title="Activity" description="Everything sent and received over the last 14 days, including system emails like invites, password resets and security alerts.">
-        <ActivityChart rows={data.series} />
-      </Section>
-
-      <div className="grid gap-6 lg:grid-cols-2">
-        <Section title="Connection status">
-          <ul className="space-y-3">
-            {checks.map((c) => (
-              <li key={c.label} className="flex items-start gap-3">
-                {c.ok ? <CheckCircle2 className="mt-0.5 size-4 text-success" /> : <CircleDashed className={cx("mt-0.5 size-4", c.optional ? "text-fg-faint" : "text-warning")} />}
-                <div>
-                  <p className="text-[13px] font-medium">
-                    {c.label} <span className="font-normal text-fg-muted">— {c.ok ? "connected" : "not configured"}</span>
-                  </p>
-                  <p className="text-xs text-fg-muted">{c.hint}</p>
-                </div>
-              </li>
+      {!data ? (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-[118px]" />
             ))}
-          </ul>
-        </Section>
-        <Section
-          title="Recent delivery problems"
-          actions={
-            <Link to="/admin/logs/delivery" className="text-xs text-fg-muted hover:text-fg">
-              View log →
-            </Link>
-          }
-        >
-          {data.recentProblems.length === 0 ? (
-            <p className="flex items-center gap-2 text-[13px] text-fg-muted">
-              <CheckCircle2 className="size-4 text-success" /> No bounces, complaints or failures recently.
-            </p>
-          ) : (
-            <ul className="divide-y divide-line">
-              {data.recentProblems.map((p) => (
-                <li key={p.id} className="py-2 first:pt-0 last:pb-0">
-                  <p className="flex items-center gap-2 text-[13px]">
-                    <AlertTriangle className="size-3.5 shrink-0 text-danger" />
-                    <span className="font-medium">{EVENT_LABELS[p.type] ?? p.type}</span>
-                    <span className="ml-auto shrink-0 text-xs text-fg-muted">{relativeTime(p.created_at)}</span>
-                  </p>
-                  <p className="truncate pl-5.5 text-xs text-fg-muted">{[p.recipient, p.subject, p.detail].filter(Boolean).join(" · ")}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </Section>
-      </div>
+          </div>
+          <Skeleton className="h-72" />
+        </>
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <KpiTile label={`Sent · last ${data.kpiDays} days`} kpi={data.kpis.sent} days={data.kpiDays} spark={points.map((p) => p.sent)} color="var(--series-1)" />
+            <KpiTile label={`Received · last ${data.kpiDays} days`} kpi={data.kpis.received} days={data.kpiDays} spark={points.map((p) => p.received)} color="var(--series-2)" />
+            <KpiTile
+              label={`Bounces · last ${data.kpiDays} days`}
+              kpi={data.kpis.bounces}
+              days={data.kpiDays}
+              spark={points.map((p) => p.bounced)}
+              color="var(--danger)"
+              goodWhenDown
+              hint={data.kpis.complaints.current ? `${data.kpis.complaints.current} spam complaint${data.kpis.complaints.current === 1 ? "" : "s"}` : undefined}
+            />
+            <KpiTile
+              label={`Active people · last ${data.kpiDays} days`}
+              kpi={data.kpis.activeUsers}
+              days={data.kpiDays}
+              color="var(--series-3)"
+              hint={`${data.counts.users} active account${data.counts.users === 1 ? "" : "s"}${data.counts.invited ? ` · ${data.counts.invited} invited` : ""}`}
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            <Meter label="Sent today (UTC)" used={data.usage.today} limit={data.usage.dailyLimit} note={`Includes ${data.usage.systemToday} system email${data.usage.systemToday === 1 ? "" : "s"}`} />
+            <Meter label="Sent this month" used={data.usage.month} limit={data.usage.monthlyLimit} note={`Includes ${data.usage.systemMonth} system email${data.usage.systemMonth === 1 ? "" : "s"}`} />
+            <Card className="p-5">
+              <p className="text-xs font-medium text-fg-muted">Storage</p>
+              <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{fileSize(data.counts.bytes)}</p>
+              <p className="mt-1 text-xs text-fg-muted">{data.counts.messages.toLocaleString()} messages</p>
+            </Card>
+            <Card className="p-5">
+              <p className="text-xs font-medium text-fg-muted">Mailboxes</p>
+              <p className="mt-1.5 text-2xl font-semibold tracking-tight tabular-nums">{data.counts.mailboxes}</p>
+              <p className="mt-1 text-xs text-fg-muted">
+                {data.counts.scheduled ? `${data.counts.scheduled} message${data.counts.scheduled === 1 ? "" : "s"} scheduled` : "Nothing scheduled"}
+                {data.counts.unrouted ? (
+                  <>
+                    {" · "}
+                    <Link to="/admin/traffic" className="text-warning hover:underline">
+                      {data.counts.unrouted} unrouted
+                    </Link>
+                  </>
+                ) : null}
+              </p>
+            </Card>
+          </div>
+
+          <div className="grid gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <Section title="Activity" description="Sent and received over the last 14 days, including system emails like invites and password resets.">
+                <ActivityChart rows={data.series} />
+              </Section>
+            </div>
+            <HealthCard report={health.data} loading={health.isLoading} />
+          </div>
+
+          <Section
+            title="Recent problems"
+            description="Bounces, complaints, failures and mail nobody owns."
+            actions={
+              <Link to="/admin/logs/delivery" className="shrink-0 text-xs text-fg-muted hover:text-fg">
+                Delivery log →
+              </Link>
+            }
+          >
+            {data.recentProblems.length === 0 ? (
+              <p className="flex items-center gap-2 text-[13px] text-fg-muted">
+                <CheckCircle2 className="size-4 text-success" /> No bounces, complaints or failures recently.
+              </p>
+            ) : (
+              <ul className="divide-y divide-line">
+                {data.recentProblems.map((p) => (
+                  <li key={p.id} className="py-2 first:pt-0 last:pb-0">
+                    <p className="flex items-center gap-2 text-[13px]">
+                      <AlertTriangle className={p.type === "received.unrouted" || p.type === "delivery_delayed" ? "size-3.5 shrink-0 text-warning" : "size-3.5 shrink-0 text-danger"} />
+                      <span className="font-medium">{EVENT_LABELS[p.type] ?? p.type}</span>
+                      <span className="ml-auto shrink-0 text-xs text-fg-muted">{relativeTime(p.created_at)}</span>
+                    </p>
+                    <p className="truncate pl-5.5 text-xs text-fg-muted">{[p.recipient, p.subject, p.detail].filter(Boolean).join(" · ")}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Section>
+        </>
+      )}
     </div>
   );
 }
