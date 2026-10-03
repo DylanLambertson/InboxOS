@@ -69,5 +69,6 @@ export const SHORTCUT_HELP: [string, string][] = [
   ["G then T", "Go to Sent"],
   ["G then D", "Go to Drafts"],
   ["⌘/Ctrl + Enter", "Send (in compose)"],
+  ["⌘/Ctrl + K", "Go to anything (command palette)"],
   ["?", "Show shortcuts"],
 ];

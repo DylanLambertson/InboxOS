@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
-import { Menu as MenuIcon, PenSquare, ShieldAlert } from "lucide-react";
+import { Menu as MenuIcon, PenSquare, Search, ShieldAlert } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
 import { applyTheme, useBrand } from "@/lib/brand";
 import { useInboxNotifications } from "@/lib/notifications";
@@ -10,6 +10,7 @@ import { SHORTCUT_HELP, useShortcuts } from "@/lib/shortcuts";
 import { ComposeProvider, useCompose } from "../compose/ComposeProvider";
 import { IconButton, Kbd, Spinner } from "../ui/primitives";
 import { Modal } from "../ui/overlay";
+import { PaletteHost } from "../palette/PaletteHost";
 import { InstallPrompt } from "./InstallPrompt";
 import { Logo } from "./Logo";
 import { Sidebar } from "./Sidebar";
@@ -100,6 +101,9 @@ export function AppShell() {
               <MenuIcon className="size-5" />
             </IconButton>
             <Logo size={24} />
+            <IconButton label="Search" className="ml-auto" onClick={() => window.dispatchEvent(new CustomEvent("io:palette"))}>
+              <Search className="size-5" />
+            </IconButton>
           </div>
           <InstallPrompt />
           {me.mustEnroll2fa && (
@@ -113,6 +117,7 @@ export function AppShell() {
         </main>
         <MobileComposeButton />
       </div>
+      <PaletteHost />
       <Modal open={help} onClose={() => setHelp(false)} title="Keyboard shortcuts" width={520}>
         <div className="grid grid-cols-1 gap-x-8 gap-y-2 sm:grid-cols-2">
           {SHORTCUT_HELP.map(([k, d]) => (
