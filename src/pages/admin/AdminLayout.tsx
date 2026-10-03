@@ -1,36 +1,50 @@
 import { Navigate, useLocation } from "react-router";
-import { Activity, Bot, Eye, Inbox, MailX, LayoutDashboard, Palette, Radar, Rocket, Scale, ScrollText, ShieldCheck, Signature, SlidersHorizontal, UserCog, Users } from "lucide-react";
+import { Eye } from "lucide-react";
+import { healthIssueCount } from "@shared/health";
+import { DEFAULT_WORKSPACE } from "@shared/workspace";
 import { useMe } from "@/lib/queries";
-import { SubNavLayout } from "@/components/layout/SubNav";
+import { useWorkspace } from "@/lib/workspace";
+import { featureForPath, isConfigPath, visibleAdminNav } from "@/lib/admin-nav";
+import { SubNavLayout, type SubNavGroup } from "@/components/layout/SubNav";
+import { useHealth } from "./health-data";
 
 export function AdminLayout() {
   const { data: me } = useMe();
   const { pathname } = useLocation();
-  if (me && me.role !== "owner" && me.role !== "admin" && me.role !== "manager") return <Navigate to="/" replace />;
+  const workspace = useWorkspace();
+  const features = (workspace.data ?? DEFAULT_WORKSPACE).features;
+  const consoleRole = me?.role === "owner" || me?.role === "admin" || me?.role === "manager";
+  const { data: health } = useHealth(!!me && consoleRole);
+
+  if (me && !consoleRole) return <Navigate to="/" replace />;
   const manager = me?.role === "manager";
   // Managers have view-only access and don't see configuration pages.
-  if (manager && /^\/admin\/(branding|settings|setup|provisioning)/.test(pathname)) return <Navigate to="/admin" replace />;
-  const all = [
-        { to: "/admin", label: "Overview", icon: LayoutDashboard, end: true },
-        { to: "/admin/traffic", label: "All traffic", icon: Radar },
-        { to: "/admin/users", label: "Users", icon: Users },
-        { to: "/admin/mailboxes", label: "Mailboxes", icon: Inbox },
-        { to: "/admin/security", label: "Security", icon: ShieldCheck },
-        { to: "/admin/logs/delivery", label: "Delivery log", icon: Activity },
-        { to: "/admin/logs/audit", label: "Audit log", icon: ScrollText },
-        { to: "/admin/unsubscribes", label: "Unsubscribes", icon: MailX },
-        { to: "/admin/compliance", label: "Compliance", icon: Scale },
-        { to: "/admin/outbound", label: "Signatures & DLP", icon: Signature },
-        { to: "/admin/branding", label: "Branding", icon: Palette },
-        { to: "/admin/settings", label: "Settings & policy", icon: SlidersHorizontal },
-        { to: "/admin/api", label: "API & MCP", icon: Bot },
-        { to: "/admin/provisioning", label: "Provisioning", icon: UserCog },
-        { to: "/admin/setup", label: "Setup guide", icon: Rocket },
-  ];
+  if (manager && isConfigPath(pathname)) return <Navigate to="/admin" replace />;
+  // A switched-off feature's pages go away with it (once the real setting has loaded).
+  const feature = featureForPath(pathname);
+  if (feature && !workspace.isPlaceholderData && !features[feature]) return <Navigate to="/admin" replace />;
+
+  const issues = healthIssueCount(health);
+  const groups: SubNavGroup[] = visibleAdminNav(me?.role, features).map((g) => ({
+    id: g.id,
+    label: g.label,
+    items: g.items.map((i) => ({
+      to: i.to,
+      label: i.label,
+      icon: i.icon,
+      end: i.end,
+      badge:
+        i.to === "/admin/health" && issues
+          ? { count: issues, tone: health?.counts.fail ? "danger" : "warning", label: `${issues} issue${issues === 1 ? "" : "s"}` }
+          : undefined,
+    })),
+  }));
+
   return (
     <SubNavLayout
       title="Admin console"
-      items={manager ? all.filter((i) => !/branding|settings|setup|provisioning/.test(i.to)) : all}
+      groups={groups}
+      search
       footer={
         manager ? (
           <div className="mx-3 mb-3 flex items-start gap-2 rounded-ui border border-line bg-subtle p-3 text-xs text-fg-muted max-md:hidden">
