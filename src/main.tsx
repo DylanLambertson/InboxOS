@@ -5,6 +5,7 @@ import { RouterProvider } from "react-router";
 import { Toaster } from "sonner";
 import { BrandProvider } from "./lib/brand";
 import { registerServiceWorker } from "./lib/pwa";
+import { applyQueryDefaults } from "./lib/query-defaults";
 import { ConfirmProvider } from "./components/ui/overlay";
 import { router } from "./router";
 import "./index.css";
@@ -18,6 +19,7 @@ const queryClient = new QueryClient({
   },
 });
 
+applyQueryDefaults(queryClient);
 registerServiceWorker();
 
 createRoot(document.getElementById("root")!).render(
