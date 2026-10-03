@@ -1,20 +1,16 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DEFAULT_BRAND, type Brand } from "@shared/brand";
-import { densityScale, PALETTE_KEYS, radiusValue, resolvePalettes, type Palette, type ThemeTokens } from "@shared/theme";
+import { readableOn } from "@shared/contrast";
+import { densityScale, PALETTE_KEYS, radiusValue, resolvePalettes, type Density, type Palette, type ThemeTokens } from "@shared/theme";
+import type { DensityPreference, ThemePreference } from "@shared/types";
 import { api } from "./api";
+
+/** Pick black or white text for a given background color (shared with the contrast checks). */
+export { readableOn };
 
 const BrandContext = createContext<Brand>(DEFAULT_BRAND);
 export const useBrand = () => useContext(BrandContext);
-
-/** Pick black or white text for a given background color. */
-export function readableOn(hex: string): string {
-  const m = hex.replace("#", "").match(/^([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i);
-  if (!m) return "#ffffff";
-  const [r, g, b] = m.slice(1).map((x) => parseInt(x, 16) / 255).map((c) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4));
-  const lum = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return lum > 0.45 ? "#111111" : "#ffffff";
-}
 
 const kebab = (k: string) => k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 /** CSS variable names in src/index.css that don't follow the palette key directly. */
@@ -103,9 +99,35 @@ export function BrandProvider({ children }: { children: ReactNode }) {
   return <BrandContext.Provider value={brand}>{children}</BrandContext.Provider>;
 }
 
-/** Apply a person's color-mode choice; "system" falls back to the workspace default. */
-export function applyTheme(mode: "system" | "light" | "dark", workspaceDefault: ThemeTokens["defaultMode"] = "system") {
-  const effective = mode === "system" ? workspaceDefault : mode;
+/** The color mode in effect: "workspace" uses the admin's default, which may itself be "system". */
+export function effectiveMode(mode: ThemePreference, workspaceDefault: ThemeTokens["defaultMode"] = "system"): ThemeTokens["defaultMode"] {
+  return mode === "workspace" ? workspaceDefault : mode;
+}
+
+/** Apply a person's color-mode choice. "system" follows the device; "workspace" the admin's default. */
+export function applyTheme(mode: ThemePreference, workspaceDefault: ThemeTokens["defaultMode"] = "system") {
+  const effective = effectiveMode(mode, workspaceDefault);
   if (effective === "system") delete document.documentElement.dataset.theme;
   else document.documentElement.dataset.theme = effective;
+}
+
+/** The spacing in effect for a person: their own choice, or the workspace default. */
+export const effectiveDensity = (pref: DensityPreference | undefined, workspaceDefault: Density): Density =>
+  !pref || pref === "workspace" ? workspaceDefault : pref;
+
+/**
+ * Apply a person's density over the workspace one: sets --density (which the theme
+ * stylesheet otherwise takes from the workspace) and data-density for CSS that needs steps.
+ */
+export function applyDensity(pref: DensityPreference | undefined, workspaceDefault: Density) {
+  const d = effectiveDensity(pref, workspaceDefault);
+  const root = document.documentElement;
+  root.dataset.density = d;
+  if (!pref || pref === "workspace") root.style.removeProperty("--density");
+  else root.style.setProperty("--density", String(densityScale(d)));
+}
+
+/** A person's effective density, for components (e.g. compact message rows). */
+export function useDensity(pref: DensityPreference | undefined): Density {
+  return effectiveDensity(pref, useBrand().theme.density);
 }

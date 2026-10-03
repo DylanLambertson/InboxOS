@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Navigate, Outlet, useLocation, useNavigate } from "react-router";
 import { Menu as MenuIcon, PenSquare, Search, ShieldAlert } from "lucide-react";
 import { api, ApiError } from "@/lib/api";
-import { applyTheme, useBrand } from "@/lib/brand";
+import { applyDensity, applyTheme, useBrand } from "@/lib/brand";
 import { useInboxNotifications } from "@/lib/notifications";
 import { syncPush } from "@/lib/push";
 import { useMailboxes, useMe } from "@/lib/queries";
@@ -36,10 +36,13 @@ export function AppShell() {
     };
   }, [navigate, location]);
 
-  const defaultMode = useBrand().theme.defaultMode;
+  const { defaultMode, density: defaultDensity } = useBrand().theme;
   useEffect(() => {
     if (me) applyTheme(me.preferences.theme, defaultMode);
   }, [me, defaultMode]);
+  useEffect(() => {
+    if (me) applyDensity(me.preferences.density, defaultDensity);
+  }, [me, defaultDensity]);
   // Keep this device's push subscription registered to whoever is signed in.
   useEffect(() => {
     if (me?.id) syncPush();
