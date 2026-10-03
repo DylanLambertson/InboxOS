@@ -13,6 +13,8 @@ export interface Person {
   name: string;
   email: string;
   color: string;
+  /** Profile photo (see shared/profile.ts avatarUrl), or null/absent for initials. */
+  avatarUrl?: string | null;
 }
 
 export interface MailboxMember extends Person {

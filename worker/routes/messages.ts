@@ -126,7 +126,7 @@ messageRoutes.get("/", async (c) => {
 
   const labelSub = "(SELECT group_concat(label_id) FROM message_labels ml WHERE ml.message_id = f.id) AS label_ids";
   // Conversation status and assignee, as one JSON value so it works without joins (and column clashes) in both list shapes.
-  const convSub = `(SELECT json_object('status', cv.status, 'id', au.id, 'name', au.name, 'email', au.email, 'color', au.avatar_color)
+  const convSub = `(SELECT json_object('status', cv.status, 'id', au.id, 'name', au.name, 'email', au.email, 'color', au.avatar_color, 'avatar', au.avatar_key)
       FROM conversations cv LEFT JOIN users au ON au.id = cv.assignee_id
       WHERE cv.mailbox_id = f.mailbox_id AND cv.thread_id = f.thread_id) AS conv_json`;
   let sql: string;

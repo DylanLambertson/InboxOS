@@ -15,8 +15,10 @@ import {
   type MailboxMember,
   type Person,
 } from "@shared/collab";
+import { avatarUrl } from "@shared/profile";
 import type { MailboxRole } from "@shared/types";
 import type { AppEnv } from "../env";
+import { requireFeature, WRITES } from "../lib/features";
 import { mailboxRole, requireMailbox, requireMessage } from "../lib/access";
 import { audit } from "../lib/audit";
 import {
@@ -36,14 +38,16 @@ import { newId, now } from "../lib/util";
 import { parseBody, zId } from "../lib/validate";
 
 export const conversationRoutes = new Hono<AppEnv>();
+// Assigning, statuses, notes and presence need collaboration on; reading what exists stays possible.
+conversationRoutes.use("*", requireFeature("collaboration", { methods: [...WRITES, "DELETE"] }));
 
 /** Matches what the Assigned / Mentions lists hide, so badges count only what the lists show. */
 const VISIBLE_EXCLUDED = "('trash','spam','drafts','scheduled','snoozed')";
 const zThreadId = z.string().min(1).max(200);
 const zBody = z.string().trim().min(1, "Write something first").max(NOTE_MAX, `Notes can be up to ${NOTE_MAX} characters`);
 
-const person = (id: string | null, name: string | null, email: string | null, color: string | null): Person | null =>
-  id && email ? { id, name: name ?? "", email, color: color ?? "#64748b" } : null;
+const person = (id: string | null, name: string | null, email: string | null, color: string | null, avatarKey?: string | null): Person | null =>
+  id && email ? { id, name: name ?? "", email, color: color ?? "#64748b", avatarUrl: avatarUrl(id, avatarKey) } : null;
 
 /** Run after the response so a slow push service never delays the UI. */
 function later(c: Context<AppEnv>, p: Promise<unknown>) {
@@ -57,12 +61,12 @@ function later(c: Context<AppEnv>, p: Promise<unknown>) {
 async function members(db: D1Database, mailboxId: string): Promise<MailboxMember[]> {
   const { results } = await db
     .prepare(
-      `SELECT u.id, u.name, u.email, u.avatar_color, mm.role FROM mailbox_members mm JOIN users u ON u.id = mm.user_id
+      `SELECT u.id, u.name, u.email, u.avatar_color, u.avatar_key, mm.role FROM mailbox_members mm JOIN users u ON u.id = mm.user_id
        WHERE mm.mailbox_id = ? AND u.status <> 'disabled' ORDER BY u.name COLLATE NOCASE, u.email LIMIT 500`,
     )
     .bind(mailboxId)
-    .all<{ id: string; name: string; email: string; avatar_color: string; role: MailboxRole }>();
-  return results.map((r) => ({ id: r.id, name: r.name, email: r.email, color: r.avatar_color, role: r.role }));
+    .all<{ id: string; name: string; email: string; avatar_color: string; avatar_key: string | null; role: MailboxRole }>();
+  return results.map((r) => ({ id: r.id, name: r.name, email: r.email, color: r.avatar_color, avatarUrl: avatarUrl(r.id, r.avatar_key), role: r.role }));
 }
 
 /** Resolve the conversation in the URL after checking the caller's role in its mailbox. */
@@ -111,28 +115,28 @@ conversationRoutes.get("/t/:mailboxId/:threadId", async (c) => {
   const [conv, notes, events, replying] = await db.batch([
     db
       .prepare(
-        `SELECT cv.status, u.id, u.name, u.email, u.avatar_color FROM conversations cv LEFT JOIN users u ON u.id = cv.assignee_id
+        `SELECT cv.status, u.id, u.name, u.email, u.avatar_color, u.avatar_key FROM conversations cv LEFT JOIN users u ON u.id = cv.assignee_id
          WHERE cv.mailbox_id = ? AND cv.thread_id = ?`,
       )
       .bind(key.mailboxId, key.threadId),
     db
       .prepare(
-        `SELECT n.id, n.author_id, n.body, n.created_at, n.edited_at, u.name, u.email, u.avatar_color
+        `SELECT n.id, n.author_id, n.body, n.created_at, n.edited_at, u.name, u.email, u.avatar_color, u.avatar_key
          FROM conversation_notes n LEFT JOIN users u ON u.id = n.author_id
          WHERE n.mailbox_id = ? AND n.thread_id = ? ORDER BY n.created_at DESC LIMIT 500`,
       )
       .bind(key.mailboxId, key.threadId),
     db
       .prepare(
-        `SELECT e.id, e.type, e.value, e.created_at, a.id AS a_id, a.name AS a_name, a.email AS a_email, a.avatar_color AS a_color,
-           tu.id AS t_id, tu.name AS t_name, tu.email AS t_email, tu.avatar_color AS t_color
+        `SELECT e.id, e.type, e.value, e.created_at, a.id AS a_id, a.name AS a_name, a.email AS a_email, a.avatar_color AS a_color, a.avatar_key AS a_avatar,
+           tu.id AS t_id, tu.name AS t_name, tu.email AS t_email, tu.avatar_color AS t_color, tu.avatar_key AS t_avatar
          FROM conversation_events e LEFT JOIN users a ON a.id = e.actor_id LEFT JOIN users tu ON tu.id = e.target_user_id
          WHERE e.mailbox_id = ? AND e.thread_id = ? AND e.type <> 'note' ORDER BY e.created_at DESC LIMIT 200`,
       )
       .bind(key.mailboxId, key.threadId),
     db
       .prepare(
-        `SELECT u.id, u.name, u.email, u.avatar_color FROM conversation_presence p JOIN users u ON u.id = p.user_id
+        `SELECT u.id, u.name, u.email, u.avatar_color, u.avatar_key FROM conversation_presence p JOIN users u ON u.id = p.user_id
          WHERE p.mailbox_id = ? AND p.thread_id = ? AND p.user_id <> ? AND p.expires_at > ?`,
       )
       .bind(key.mailboxId, key.threadId, u.id, t),
@@ -141,17 +145,17 @@ conversationRoutes.get("/t/:mailboxId/:threadId", async (c) => {
       .prepare("UPDATE conversation_mentions SET seen_at = ? WHERE mailbox_id = ? AND thread_id = ? AND user_id = ? AND seen_at IS NULL")
       .bind(t, key.mailboxId, key.threadId, u.id),
   ]);
-  type U = { id: string | null; name: string | null; email: string | null; avatar_color: string | null };
+  type U = { id: string | null; name: string | null; email: string | null; avatar_color: string | null; avatar_key: string | null };
   const cv = conv.results[0] as (U & { status: ConversationStatus }) | undefined;
   const out: ConversationInfo = {
     mailboxId: key.mailboxId,
     threadId: key.threadId,
     status: cv?.status ?? "open",
-    assignee: cv ? person(cv.id, cv.name, cv.email, cv.avatar_color) : null,
+    assignee: cv ? person(cv.id, cv.name, cv.email, cv.avatar_color, cv.avatar_key) : null,
     notes: (notes.results.reverse() as (U & { id: string; author_id: string | null; body: string; created_at: string; edited_at: string | null })[]).map<ConversationNote>(
       (n) => ({
         id: n.id,
-        author: person(n.author_id, n.name, n.email, n.avatar_color),
+        author: person(n.author_id, n.name, n.email, n.avatar_color, n.avatar_key),
         body: n.body,
         createdAt: n.created_at,
         editedAt: n.edited_at,
@@ -169,10 +173,12 @@ conversationRoutes.get("/t/:mailboxId/:threadId", async (c) => {
         a_name: string | null;
         a_email: string | null;
         a_color: string | null;
+        a_avatar: string | null;
         t_id: string | null;
         t_name: string | null;
         t_email: string | null;
         t_color: string | null;
+        t_avatar: string | null;
       }[]
     )
       .reverse()
@@ -181,10 +187,10 @@ conversationRoutes.get("/t/:mailboxId/:threadId", async (c) => {
         type: e.type,
         value: e.value,
         createdAt: e.created_at,
-        actor: person(e.a_id, e.a_name, e.a_email, e.a_color),
-        target: person(e.t_id, e.t_name, e.t_email, e.t_color),
+        actor: person(e.a_id, e.a_name, e.a_email, e.a_color, e.a_avatar),
+        target: person(e.t_id, e.t_name, e.t_email, e.t_color, e.t_avatar),
       })),
-    replying: (replying.results as U[]).map((r) => person(r.id, r.name, r.email, r.avatar_color)).filter((p): p is Person => !!p),
+    replying: (replying.results as U[]).map((r) => person(r.id, r.name, r.email, r.avatar_color, r.avatar_key)).filter((p): p is Person => !!p),
     canWrite: canWriteConversation(role),
   };
   return c.json(out);

@@ -1,4 +1,5 @@
 import type { ConversationStatus } from "@shared/collab";
+import { avatarUrl } from "@shared/profile";
 import type { Address, AttachmentInfo, Folder, MessageListItem, MessageStatus } from "@shared/types";
 import { heldMailboxIds, partitionHeld } from "./legal-hold";
 import { newId, normalizeSubject, now, parseJson } from "./util";
@@ -114,10 +115,10 @@ export function toListItem(r: MessageRow): MessageListItem {
 }
 
 function conversationFields(json: string | null | undefined): Pick<MessageListItem, "convStatus" | "assignee"> {
-  const cv = parseJson<{ status?: ConversationStatus; id?: string | null; name?: string | null; email?: string | null; color?: string | null } | null>(json, null);
+  const cv = parseJson<{ status?: ConversationStatus; id?: string | null; name?: string | null; email?: string | null; color?: string | null; avatar?: string | null } | null>(json, null);
   return {
     convStatus: cv?.status ?? "open",
-    assignee: cv?.id && cv.email ? { id: cv.id, name: cv.name ?? "", email: cv.email, color: cv.color ?? "#64748b" } : null,
+    assignee: cv?.id && cv.email ? { id: cv.id, name: cv.name ?? "", email: cv.email, color: cv.color ?? "#64748b", avatarUrl: avatarUrl(cv.id, cv.avatar) } : null,
   };
 }
 

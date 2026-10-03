@@ -1,5 +1,6 @@
 /** Types shared by the Worker API and the web client. */
 import type { ConversationStatus, Person } from "./collab";
+import type { ProfileFields } from "./profile";
 
 /** Hidden system mailbox that holds mail sent to addresses with no mailbox (see Admin → All traffic). */
 export const UNROUTED_MAILBOX_ID = "system-unrouted";
@@ -34,9 +35,14 @@ export interface Address {
   name?: string;
 }
 
+/** Color mode: "workspace" follows the admin's default (Admin → Appearance), "system" follows the device. */
+export type ThemePreference = "workspace" | "system" | "light" | "dark";
+/** List spacing: "workspace" follows the admin's default. */
+export type DensityPreference = "workspace" | "compact" | "comfortable" | "spacious";
+
 export interface Preferences {
-  theme: "system" | "light" | "dark";
-  density: "comfortable" | "compact";
+  theme: ThemePreference;
+  density: DensityPreference;
   /** Seconds to wait before sending so the user can undo. 0 disables. */
   undoSendSeconds: number;
   /** Load remote images in received mail automatically. */
@@ -51,11 +57,15 @@ export interface Preferences {
   desktopNotifications: boolean;
   /** Push notifications show the sender and subject; off = just "New mail in <mailbox>". */
   pushShowDetails: boolean;
+  /** Format version of the stored preferences (see migratePreferences). */
+  v?: number;
 }
 
+export const PREFERENCES_VERSION = 2;
+
 export const DEFAULT_PREFERENCES: Preferences = {
-  theme: "system",
-  density: "comfortable",
+  theme: "workspace",
+  density: "workspace",
   undoSendSeconds: 5,
   loadRemoteImages: false,
   markReadOnOpen: true,
@@ -63,14 +73,38 @@ export const DEFAULT_PREFERENCES: Preferences = {
   conversationView: true,
   desktopNotifications: false,
   pushShowDetails: true,
+  v: PREFERENCES_VERSION,
 };
 
-export interface Me {
+const THEME_PREFS: readonly ThemePreference[] = ["workspace", "system", "light", "dark"];
+const DENSITY_PREFS: readonly DensityPreference[] = ["workspace", "compact", "comfortable", "spacious"];
+
+/**
+ * Stored preferences (any version) as a complete, current set. Before workspace defaults
+ * existed, "system" theme and "comfortable" density were simply the defaults everyone started
+ * with, so those become "workspace" once; anything chosen deliberately (light, dark, compact)
+ * is kept. Version 2 values are taken as they are, so "Match system" stays a real choice.
+ */
+export function migratePreferences(stored: unknown): Preferences {
+  const raw = (stored && typeof stored === "object" ? { ...stored } : {}) as Record<string, unknown>;
+  if (raw.v !== PREFERENCES_VERSION) {
+    if (raw.theme === "system") raw.theme = "workspace";
+    if (raw.density === "comfortable") raw.density = "workspace";
+  }
+  const out = { ...DEFAULT_PREFERENCES, ...(raw as Partial<Preferences>), v: PREFERENCES_VERSION };
+  if (!THEME_PREFS.includes(out.theme)) out.theme = DEFAULT_PREFERENCES.theme;
+  if (!DENSITY_PREFS.includes(out.density)) out.density = DEFAULT_PREFERENCES.density;
+  return out;
+}
+
+export interface Me extends ProfileFields {
   id: string;
   email: string;
   name: string;
   role: Role;
   avatarColor: string;
+  /** Uploaded profile photo, or null to show initials on avatarColor. */
+  avatarUrl: string | null;
   totpEnabled: boolean;
   hasPassword: boolean;
   googleLinked: boolean;

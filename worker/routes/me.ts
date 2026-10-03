@@ -3,7 +3,7 @@ import type { Brand } from "@shared/brand";
 import type { EmailContent } from "../lib/email-layout";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import { DEFAULT_PREFERENCES, type Preferences } from "@shared/types";
+import { migratePreferences, PREFERENCES_VERSION, type Preferences } from "@shared/types";
 import type { AppEnv } from "../env";
 import { audit, requestContext } from "../lib/audit";
 import { templates } from "../lib/email-templates";
@@ -15,6 +15,7 @@ import { generateTotpSecret, totpUri, verifyTotp } from "../lib/totp";
 import { getUser, toMe } from "../lib/users";
 import { now, parseJson, sha256hex } from "../lib/util";
 import { parseBody } from "../lib/validate";
+import { PROFILE_COLUMNS, zProfilePatch, type ProfilePatch } from "../lib/profile";
 
 export const meRoutes = new Hono<AppEnv>();
 
@@ -32,8 +33,8 @@ meRoutes.get("/", async (c) => {
 
 const zPrefs = z
   .object({
-    theme: z.enum(["system", "light", "dark"]),
-    density: z.enum(["comfortable", "compact"]),
+    theme: z.enum(["workspace", "system", "light", "dark"]),
+    density: z.enum(["workspace", "compact", "comfortable", "spacious"]),
     undoSendSeconds: z.number().int().min(0).max(30),
     loadRemoteImages: z.boolean(),
     markReadOnOpen: z.boolean(),
@@ -45,33 +46,23 @@ const zPrefs = z
   .partial();
 
 meRoutes.patch("/", async (c) => {
-  const body = await parseBody(
-    c,
-    z.object({
-      name: z.string().trim().min(1).max(120).optional(),
-      signatureHtml: z.string().max(20_000).optional(),
-      jobTitle: z.string().trim().max(120).optional(),
-      phone: z.string().trim().max(40).regex(/^[0-9+().\-\s/x]*$/i, "Use digits, spaces and + ( ) - only").optional(),
-      preferences: zPrefs.optional(),
-    }),
-  );
+  const body = await parseBody(c, zProfilePatch.extend({ signatureHtml: z.string().max(20_000).optional(), preferences: zPrefs.optional() }));
   const uid = c.get("user").id;
   const user = await getUser(c.env.DB, uid);
   if (!user) throw new HTTPException(404);
   if (body.signatureHtml !== undefined && (await signatureMode(c.env.DB)) === "enforce") {
     throw new HTTPException(403, { message: "Your organization sets everyone's signature. Ask an admin to change it." });
   }
-  const prefs: Preferences = { ...DEFAULT_PREFERENCES, ...parseJson<Partial<Preferences>>(user.preferences, {}), ...body.preferences };
-  await c.env.DB.prepare("UPDATE users SET name = ?, signature_html = ?, job_title = ?, phone = ?, preferences = ?, updated_at = ? WHERE id = ?")
-    .bind(
-      body.name ?? user.name,
-      body.signatureHtml ?? user.signature_html,
-      body.jobTitle ?? user.job_title ?? "",
-      body.phone ?? user.phone ?? "",
-      JSON.stringify(prefs),
-      now(),
-      uid,
-    )
+  const prefs: Preferences = { ...migratePreferences(parseJson<unknown>(user.preferences, {})), ...body.preferences, v: PREFERENCES_VERSION };
+  const sets: string[] = ["signature_html = ?", "preferences = ?", "updated_at = ?"];
+  const args: unknown[] = [body.signatureHtml ?? user.signature_html, JSON.stringify(prefs), now()];
+  for (const [field, column] of Object.entries(PROFILE_COLUMNS) as [keyof ProfilePatch, string][]) {
+    if (body[field] === undefined) continue;
+    sets.push(`${column} = ?`);
+    args.push(body[field]);
+  }
+  await c.env.DB.prepare(`UPDATE users SET ${sets.join(", ")} WHERE id = ?`)
+    .bind(...args, uid)
     .run();
   const updated = await getUser(c.env.DB, uid);
   return c.json(toMe(updated!, await getPolicy(c.env.DB)));

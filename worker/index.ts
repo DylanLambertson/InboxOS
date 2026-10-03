@@ -30,6 +30,7 @@ import { mcpRoutes } from "./routes/mcp";
 import { pushRoutes } from "./routes/push";
 import { scimRoutes } from "./routes/scim";
 import { passkeyAuthRoutes, passkeyMeRoutes } from "./routes/passkeys";
+import { meAvatarRoutes, peopleRoutes, userRoutes } from "./routes/people";
 import { meRoutes } from "./routes/me";
 import { messageActionRoutes } from "./routes/message-actions";
 import { messageRoutes } from "./routes/messages";
@@ -144,6 +145,9 @@ api.route("/conversations", conversationRoutes);
 api.route("/templates", templateRoutes);
 api.route("/outbound", outboundRoutes);
 api.route("/workspace", workspaceRoutes);
+api.route("/me/avatar", meAvatarRoutes);
+api.route("/users", userRoutes);
+api.route("/people", peopleRoutes);
 
 const admin = new Hono<AppEnv>();
 admin.use("*", requireConsole);

@@ -1,5 +1,6 @@
-import { DEFAULT_PREFERENCES, DIGEST_HOURS, type DigestHours, type Me, type Preferences, type Role, type UserStatus } from "@shared/types";
+import { DIGEST_HOURS, migratePreferences, type DigestHours, type Me, type Role, type UserStatus } from "@shared/types";
 import type { OrgPolicy } from "@shared/brand";
+import { avatarUrl, type ProfileFields } from "@shared/profile";
 import { syncDomainAliases } from "./domains";
 import { effectiveRole, storedRole } from "./roles";
 import { newId, now, parseJson, randomColor } from "./util";
@@ -21,6 +22,14 @@ export interface UserRow {
   signature_html: string;
   job_title?: string | null;
   phone?: string | null;
+  /** Profile (migration 0020). Optional so rows from older code paths still type-check. */
+  avatar_key?: string | null;
+  bio?: string | null;
+  pronouns?: string | null;
+  department?: string | null;
+  location?: string | null;
+  timezone?: string | null;
+  website?: string | null;
   preferences: string;
   failed_logins: number;
   locked_until: string | null;
@@ -38,6 +47,18 @@ export interface UserRow {
   passkey_count?: number;
 }
 
+/** The profile columns of a users row, with empty strings for anything unset. */
+export function profileFields(u: Pick<UserRow, "bio" | "pronouns" | "department" | "location" | "timezone" | "website">): ProfileFields {
+  return {
+    bio: u.bio ?? "",
+    pronouns: u.pronouns ?? "",
+    department: u.department ?? "",
+    location: u.location ?? "",
+    timezone: u.timezone ?? "",
+    website: u.website ?? "",
+  };
+}
+
 export function toMe(u: UserRow, policy: OrgPolicy): Me {
   return {
     id: u.id,
@@ -45,13 +66,15 @@ export function toMe(u: UserRow, policy: OrgPolicy): Me {
     name: u.name,
     role: u.role,
     avatarColor: u.avatar_color,
+    avatarUrl: avatarUrl(u.id, u.avatar_key),
+    ...profileFields(u),
     totpEnabled: !!u.totp_enabled,
     hasPassword: !!u.password_hash,
     googleLinked: !!u.google_sub,
     signatureHtml: u.signature_html,
     jobTitle: u.job_title ?? "",
     phone: u.phone ?? "",
-    preferences: { ...DEFAULT_PREFERENCES, ...parseJson<Partial<Preferences>>(u.preferences, {}) },
+    preferences: migratePreferences(parseJson<unknown>(u.preferences, {})),
     // A passkey (always with user verification) counts as two-factor.
     mustEnroll2fa: policy.require2fa && !u.totp_enabled && !u.passkey_count,
     passkeyCount: u.passkey_count ?? 0,
