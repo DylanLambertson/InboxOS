@@ -1,6 +1,5 @@
 import { forwardRef, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
 import { Loader2 } from "lucide-react";
-import { colorFor, initials } from "@/lib/format";
 
 export const cx = (...c: (string | false | null | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -155,19 +154,8 @@ export function Checkbox({ checked, indeterminate, onChange, label, className }:
   );
 }
 
-export function Avatar({ name, email, color, size = 32, src }: { name?: string; email: string; color?: string; size?: number; src?: string }) {
-  const label = name || email;
-  if (src) return <img src={src} alt="" className="shrink-0 rounded-full object-cover" style={{ width: size, height: size }} />;
-  return (
-    <span
-      aria-hidden
-      className="inline-flex shrink-0 items-center justify-center rounded-full font-semibold text-white select-none"
-      style={{ width: size, height: size, background: color ?? colorFor(email), fontSize: Math.max(10, size * 0.38) }}
-    >
-      {initials(label)}
-    </span>
-  );
-}
+/** Re-exported so existing imports keep working; see ./Avatar for photo support. */
+export { Avatar } from "./Avatar";
 
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 const tones: Record<Tone, string> = {

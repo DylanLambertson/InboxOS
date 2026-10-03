@@ -30,7 +30,7 @@ export function assigneeMenuItems(opts: {
       items.push({
         label: m.id === meId ? `${personName(m)} (you)` : personName(m),
         hint: m.role === "viewer" ? `${m.email} · read-only` : m.email,
-        icon: <Avatar name={m.name} email={m.email} color={m.color} size={16} />,
+        icon: <Avatar name={m.name} email={m.email} color={m.color} src={m.avatarUrl} size={16} />,
         checked: m.id === currentId,
         onSelect: () => onPick(m.id),
       });
@@ -108,7 +108,7 @@ function AssigneeLabel({ assignee, meId }: { assignee: Person | null; meId: stri
   }
   return (
     <>
-      <Avatar name={assignee.name} email={assignee.email} color={assignee.color} size={18} />
+      <Avatar name={assignee.name} email={assignee.email} color={assignee.color} src={assignee.avatarUrl} size={18} />
       {assignee.id === meId ? "You" : personName(assignee)}
     </>
   );
@@ -123,7 +123,7 @@ export function ReplyingBanner({ people }: { people: Person[] }) {
     <div role="status" className="mx-5 mb-3 flex items-center gap-2 rounded-ui border border-warning/30 bg-warning-soft px-3 py-2 text-[13px] text-fg">
       <span className="flex -space-x-1.5">
         {people.slice(0, 3).map((p) => (
-          <Avatar key={p.id} name={p.name} email={p.email} color={p.color} size={20} />
+          <Avatar key={p.id} name={p.name} email={p.email} color={p.color} src={p.avatarUrl} size={20} />
         ))}
       </span>
       <span className="flex-1">{text}</span>

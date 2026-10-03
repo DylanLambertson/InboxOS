@@ -51,7 +51,7 @@ export function NoteCard({ note, members, meId, mailboxId, threadId }: { note: C
   return (
     <div className="group border-b border-line bg-warning-soft/60 px-5 py-3 sm:pl-[70px] relative">
       <div className="absolute top-3 left-5 max-sm:hidden">
-        <Avatar name={author?.name} email={author?.email ?? "deleted@user"} color={author?.color} size={32} />
+        <Avatar name={author?.name} email={author?.email ?? "deleted@user"} color={author?.color} src={author?.avatarUrl} size={32} />
       </div>
       <div className="flex items-center gap-2 text-xs">
         <span className="font-semibold text-fg">{author ? personName(author) : "Former member"}</span>
@@ -237,7 +237,7 @@ function NoteEditor({
               onMouseEnter={() => setActive(i)}
               className={cx("flex w-full items-center gap-2 rounded-ui-sm px-2 py-1.5 text-left text-[13px]", i === active && "bg-muted")}
             >
-              <Avatar name={m.name} email={m.email} color={m.color} size={20} />
+              <Avatar name={m.name} email={m.email} color={m.color} src={m.avatarUrl} size={20} />
               <span className="min-w-0 flex-1 truncate">{personName(m)}</span>
               <span className="max-w-32 truncate text-xs text-fg-faint">@{handle}</span>
             </button>
