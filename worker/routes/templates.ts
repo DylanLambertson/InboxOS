@@ -3,12 +3,14 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Template } from "@shared/types";
 import type { AppEnv } from "../env";
+import { requireFeature, WRITES } from "../lib/features";
 import { audit } from "../lib/audit";
 import { isAdmin } from "../lib/session";
 import { newId, now } from "../lib/util";
 import { parseBody } from "../lib/validate";
 
 export const templateRoutes = new Hono<AppEnv>();
+templateRoutes.use("*", requireFeature("templates", { methods: WRITES }));
 
 interface TemplateRow {
   id: string;

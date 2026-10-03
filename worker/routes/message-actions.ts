@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { MailboxRole } from "@shared/types";
 import type { AppEnv } from "../env";
+import { assertFeature } from "../lib/features";
 import { mailboxRole } from "../lib/access";
 import { audit } from "../lib/audit";
 import { purgeMessages } from "../lib/messages";
@@ -34,6 +35,7 @@ interface Row {
 
 messageActionRoutes.post("/bulk", async (c) => {
   const body = await parseBody(c, zAction);
+  if (body.action === "snooze") await assertFeature(c, "snooze");
   const u = c.get("user");
   const db = c.env.DB;
 

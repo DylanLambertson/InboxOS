@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Address } from "@shared/types";
 import type { AppEnv } from "../env";
+import { requireFeature } from "../lib/features";
 import { audit } from "../lib/audit";
 import { discoveryWhere, EXPORT_MAX_BYTES, EXPORT_MAX_MESSAGES, exportStream, whereSql, zCriteria } from "../lib/ediscovery";
 import type { AttachmentRow, MessageRow } from "../lib/messages";
@@ -18,6 +19,7 @@ import { buildDetail } from "./messages";
  * explicit owner-only capability and every search, view and export is audited.
  */
 export const adminEdiscoveryRoutes = new Hono<AppEnv>();
+adminEdiscoveryRoutes.use("*", requireFeature("compliance"));
 adminEdiscoveryRoutes.use("*", requireOwner);
 
 const PAGE = 50;

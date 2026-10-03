@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { FOLDERS } from "@shared/types";
 import type { AppEnv } from "../env";
+import { requireFeature } from "../lib/features";
 import { allowedMailboxes, deleteContact, getContact, getThread, listMessages, messageAction, saveContacts, searchContacts, sendingStatus, suppress } from "../lib/api-ops";
 import { apiSend } from "../lib/api-send";
 import { requireApiKey } from "../lib/apikeys";
@@ -14,6 +15,7 @@ import { zContactInput, zRecipients } from "./api-v1";
  * as a Bearer token, or to `${APP_URL}/mcp/<key>` for clients that can't send headers.
  */
 export const mcpRoutes = new Hono<AppEnv>();
+mcpRoutes.use("*", requireFeature("api"));
 
 const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 

@@ -1,6 +1,7 @@
 import { Hono, type Context } from "hono";
 import { HTTPException } from "hono/http-exception";
 import type { AppEnv } from "../env";
+import { requireFeature } from "../lib/features";
 import { audit } from "../lib/audit";
 import { getScimSettings, requireScimToken, type ScimSettings } from "../lib/scim-auth";
 import {
@@ -36,6 +37,7 @@ import { emailInvite, issueToken } from "./admin-users";
 
 /** SCIM 2.0 (RFC 7644) for Okta, Microsoft Entra ID and other identity providers. Mounted at /scim/v2. */
 export const scimRoutes = new Hono<AppEnv>();
+scimRoutes.use("*", requireFeature("provisioning"));
 
 type C = Context<AppEnv>;
 

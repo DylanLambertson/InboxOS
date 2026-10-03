@@ -1,6 +1,7 @@
 import { DEFAULT_PREFERENCES, type Preferences } from "@shared/types";
 import type { Env } from "../env";
 import type { ReceivedNotice } from "./notify";
+import { featureEnabled } from "./features";
 import { getBrand } from "./settings";
 import { b64url, b64decode, parseJson } from "./util";
 import { buildPushRequest } from "./webpush";
@@ -73,6 +74,7 @@ interface Target {
 export async function pushNewMail(env: Env, notices: ReceivedNotice[]): Promise<void> {
   if (!env.VAPID_PRIVATE_JWK || !notices.length) return;
   try {
+    if (!(await featureEnabled(env.DB, "push"))) return;
     const brand = await getBrand(env.DB);
     const contact = brand.supportEmail ? `mailto:${brand.supportEmail}` : `mailto:no-reply@${brand.primaryDomain}`;
     for (const n of notices) {

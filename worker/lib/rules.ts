@@ -1,6 +1,7 @@
 import { UNROUTED_MAILBOX_ID, type Address } from "@shared/types";
 import type { MailRule, RuleAction, RuleCondition } from "@shared/mail-rules";
 import { evaluateRules, fieldsUsed, type RuleMessage, type RuleOutcome, type StepBudget } from "./rules-engine";
+import { featureEnabled } from "./features";
 import { now, parseJson } from "./util";
 
 /** Database side of mail rules: loading, applying outcomes, and bulk runs. */
@@ -120,6 +121,8 @@ export async function applyRulesOnIngest(
 ): Promise<{ folder: string; read: boolean; statements: D1PreparedStatement[] }> {
   // Only mail headed for the inbox is filtered; blocked senders and unrouted mail stay put.
   if (args.folder !== "inbox" || args.mailboxId === UNROUTED_MAILBOX_ID) return { folder: args.folder, read: false, statements: [] };
+  // Mail rules switched off in Admin > Features: rules are kept but don't run.
+  if (!(await featureEnabled(db, "mailRules"))) return { folder: args.folder, read: false, statements: [] };
   const rules = await loadRules(db, args.mailboxId, true);
   if (!rules.length) return { folder: args.folder, read: false, statements: [] };
   const msg: RuleMessage = { ...args.message };

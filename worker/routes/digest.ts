@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { DIGEST_HOURS } from "@shared/types";
 import type { AppEnv } from "../env";
+import { requireFeature, WRITES } from "../lib/features";
 import { audit, clientIp, requestContext } from "../lib/audit";
 import { addHours, isDigestHours, maskEmail, personalEmailProblem } from "../lib/digest";
 import { templates } from "../lib/email-templates";
@@ -28,6 +29,9 @@ import { parseBody, zEmail } from "../lib/validate";
  */
 export const digestSettingsRoutes = new Hono<AppEnv>();
 export const digestPublicRoutes = new Hono<AppEnv>();
+// Setting up a digest needs the feature; removing a personal address always works.
+digestSettingsRoutes.use("/personal-email", requireFeature("digest", { methods: ["POST"] }));
+digestSettingsRoutes.use("/digest", requireFeature("digest", { methods: WRITES }));
 
 const VERIFY_HOURS = 24;
 

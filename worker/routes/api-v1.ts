@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Address } from "@shared/types";
 import { FOLDERS } from "@shared/types";
 import type { AppEnv } from "../env";
+import { requireFeature } from "../lib/features";
 import { allowedMailboxes, deleteContact, getContact, getMessage, getThread, listMessages, MESSAGE_ACTIONS, messageAction, saveContacts, searchContacts, sendingStatus } from "../lib/api-ops";
 import { apiSend } from "../lib/api-send";
 import { mailboxAllowed, requireApiKey, requireScope } from "../lib/apikeys";
@@ -17,6 +18,7 @@ import { parseBody, zEmail, zId } from "../lib/validate";
  * Keys are issued in Admin → API & MCP.
  */
 export const apiV1Routes = new Hono<AppEnv>();
+apiV1Routes.use("*", requireFeature("api"));
 apiV1Routes.use("*", requireApiKey);
 
 /** Accepts "Name <a@b>", "a@b", a comma-separated string, or an array of either / {email, name}. */

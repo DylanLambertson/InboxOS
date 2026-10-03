@@ -3,6 +3,7 @@ import { DIGEST_HOURS, type DigestHours } from "@shared/types";
 import type { Env } from "../env";
 import { templates } from "./email-templates";
 import { quotaUsage } from "./send";
+import { featureEnabled } from "./features";
 import { getBrand, getPolicy } from "./settings";
 import { sendSystemEmail } from "./system-mail";
 import { digestOffUrl, unsubscribeHeaders } from "./unsubscribe";
@@ -100,6 +101,8 @@ interface Claimed {
 export async function runDigests(env: Env, at = new Date()): Promise<number> {
   const policy = await getPolicy(env.DB);
   if (policy.digestDetail === "off") return 0;
+  // Switched off in Admin > Features: people's digest settings are kept for when it's back on.
+  if (!(await featureEnabled(env.DB, "digest"))) return 0;
   // Digests never eat the team's sending: stop at 90% of the daily limit.
   const usage = await quotaUsage(env);
   if (policy.dailySendLimit > 0 && usage.today >= policy.dailySendLimit * 0.9) return 0;

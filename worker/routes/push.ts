@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { AppEnv } from "../env";
+import { requireFeature } from "../lib/features";
 import { audit } from "../lib/audit";
 import { isPushEndpoint, pushToUser, vapidPublicKey } from "../lib/push";
 import { rateLimit } from "../lib/ratelimit";
@@ -16,6 +17,8 @@ import { parseBody } from "../lib/validate";
  *   POST   /api/push/test       send a test notification to this person's devices
  */
 export const pushRoutes = new Hono<AppEnv>();
+// Registering a device or sending a test needs push on; removing a device always works.
+pushRoutes.use("*", requireFeature("push", { methods: ["POST"] }));
 
 const zKey = z.string().regex(/^[A-Za-z0-9_-]+=*$/).max(200);
 

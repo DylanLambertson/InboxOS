@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { AppEnv } from "../env";
+import { requireFeature, WRITES } from "../lib/features";
 import { audit } from "../lib/audit";
 import { generateScimToken, getScimSettings, saveScimSettings } from "../lib/scim-auth";
 import { newId, now } from "../lib/util";
@@ -9,6 +10,8 @@ import { parseBody } from "../lib/validate";
 
 /** Admin → Provisioning: the SCIM token, onboarding options and recent SCIM activity. */
 export const adminScimRoutes = new Hono<AppEnv>();
+// New tokens and settings need provisioning on; revoking a token always works.
+adminScimRoutes.use("*", requireFeature("provisioning", { methods: WRITES }));
 
 adminScimRoutes.get("/", async (c) => {
   const db = c.env.DB;

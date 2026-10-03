@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { UNROUTED_MAILBOX_ID, type Address } from "@shared/types";
 import type { AppEnv } from "../env";
+import { requireFeature } from "../lib/features";
 import { audit } from "../lib/audit";
 import { isHeld } from "../lib/legal-hold";
 import { purgeMessages, resolveThread, type AttachmentRow, type MessageRow } from "../lib/messages";
@@ -17,6 +18,7 @@ import { buildDetail } from "./messages";
  * including mail for addresses that have no mailbox. Opening a message is audited.
  */
 export const adminTrafficRoutes = new Hono<AppEnv>();
+adminTrafficRoutes.use("*", requireFeature("allTraffic"));
 
 const PROBLEM = "('bounced','complained','failed','delivery_delayed','suppressed')";
 

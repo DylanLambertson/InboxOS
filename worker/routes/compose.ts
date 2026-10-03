@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { Address } from "@shared/types";
 import type { AppEnv, Env } from "../env";
+import { assertFeature } from "../lib/features";
 import { requireMailbox, requireMessage } from "../lib/access";
 import { audit } from "../lib/audit";
 import { attachmentKey, bodyKey, ftsStatements, purgeMessages, toAttachmentInfo, type AttachmentRow, type ComposeMeta, type MessageRow } from "../lib/messages";
@@ -264,6 +265,7 @@ composeRoutes.post("/:id/send", async (c) => {
   if (!to) throw new HTTPException(400, { message: "Add at least one recipient." });
 
   if (body.scheduledAt) {
+    await assertFeature(c, "scheduledSend");
     const at = Date.parse(body.scheduledAt);
     if (at < Date.now() + 30_000) throw new HTTPException(400, { message: "Pick a time in the future." });
     if (at > Date.now() + 365 * 86_400_000) throw new HTTPException(400, { message: "You can schedule up to a year ahead." });

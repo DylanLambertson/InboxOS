@@ -13,6 +13,7 @@ import {
   type MailRuleInput,
 } from "@shared/mail-rules";
 import type { AppEnv } from "../env";
+import { requireFeature, WRITES } from "../lib/features";
 import { requireMailbox } from "../lib/access";
 import { audit } from "../lib/audit";
 import { loadRules, runRuleOnExisting, testRule, toRule, type RuleRow } from "../lib/rules";
@@ -21,6 +22,8 @@ import { parseBody, zId } from "../lib/validate";
 
 /** Mail rules (filters) per mailbox: /api/mailboxes/:id/rules. Viewers read, editors write. */
 export const mailRuleRoutes = new Hono<AppEnv>();
+// Existing rules stay stored (and listed) while the feature is off; they just stop running.
+mailRuleRoutes.use("/:id/rules/*", requireFeature("mailRules", { methods: WRITES }));
 
 const zCondition = z
   .object({

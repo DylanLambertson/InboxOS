@@ -10,6 +10,7 @@ import {
 } from "@shared/outbound";
 import type { Address } from "@shared/types";
 import { scanOutbound, summarizeFindings } from "./dlp";
+import { featureEnabled } from "./features";
 import { getBrand } from "./settings";
 import { escapeHtml, htmlToText, newId, now, parseJson } from "./util";
 
@@ -18,7 +19,24 @@ import { escapeHtml, htmlToText, newId, now, parseJson } from "./util";
 let cache: { at: number; policy: OutboundPolicy } | null = null;
 const TTL = 15_000;
 
+/**
+ * The policy in force. With Signatures & DLP switched off in Admin > Features nothing is
+ * enforced (no company signature, disclaimer or DLP checks); the saved policy is kept and
+ * applies again once the feature is back on.
+ */
 export async function getOutboundPolicy(db: D1Database): Promise<OutboundPolicy> {
+  if (!(await featureEnabled(db, "outboundPolicy"))) return OUTBOUND_OFF;
+  return getSavedOutboundPolicy(db);
+}
+
+const OUTBOUND_OFF: OutboundPolicy = (() => {
+  const p = withOutboundDefaults({});
+  const rules = Object.fromEntries(Object.entries(p.dlp.rules).map(([id, r]) => [id, { ...r, action: "off" }])) as OutboundPolicy["dlp"]["rules"];
+  return { signature: { ...p.signature, mode: "off" }, disclaimer: { ...p.disclaimer, enabled: false }, dlp: { ...p.dlp, rules } };
+})();
+
+/** The saved policy, whether or not the feature is on (for Admin > Signatures & DLP). */
+export async function getSavedOutboundPolicy(db: D1Database): Promise<OutboundPolicy> {
   if (cache && Date.now() - cache.at < TTL) return cache.policy;
   const row = await db.prepare("SELECT value FROM settings WHERE key = 'outbound'").first<{ value: string }>();
   const policy = withOutboundDefaults(parseJson<Partial<OutboundPolicy>>(row?.value, {}));

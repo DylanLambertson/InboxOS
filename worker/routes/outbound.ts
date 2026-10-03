@@ -3,6 +3,7 @@ import { z } from "zod";
 import { DLP_RULES, type DlpRuleId, type OutboundPolicy } from "@shared/outbound";
 import type { Address } from "@shared/types";
 import type { AppEnv } from "../env";
+import { requireFeature } from "../lib/features";
 import { requireMailbox, requireMessage } from "../lib/access";
 import { audit } from "../lib/audit";
 import { summarizeFindings } from "../lib/dlp";
@@ -75,6 +76,7 @@ const zOutbound = z.object({
 
 /** Admins edit; managers can view (requireConsole lets them GET only). */
 export const adminOutboundRoutes = new Hono<AppEnv>();
+adminOutboundRoutes.use("*", requireFeature("outboundPolicy"));
 
 adminOutboundRoutes.get("/", async (c) => {
   const [policy, { results: mailboxes }] = await Promise.all([

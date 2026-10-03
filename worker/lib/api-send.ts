@@ -6,6 +6,7 @@ import { allowedMailboxes } from "./api-ops";
 import { apiActor, mailboxAllowed, requireScope } from "./apikeys";
 import { audit } from "./audit";
 import { bodyKey, ftsStatements, purgeMessages, type ComposeMeta, type MessageRow } from "./messages";
+import { featureEnabled, featureOffMessage } from "./features";
 import { apiSignature, dlpBlocks, PolicyBlockedError } from "./outbound";
 import { prefixSubject } from "./quote";
 import { rateLimit } from "./ratelimit";
@@ -138,6 +139,8 @@ export async function apiSend(c: Context<AppEnv>, input: ApiSendInput): Promise<
   const everyone = [...to, ...cc, ...bcc];
   if (!everyone.length) throw new HTTPException(400, { message: "Add at least one recipient" });
   if (everyone.length > 50) throw new HTTPException(400, { message: "A message can have at most 50 recipients" });
+  if (input.outreach && !(await featureEnabled(db, "outreach"))) throw new HTTPException(403, { message: featureOffMessage("outreach") });
+  if (input.scheduledAt && !(await featureEnabled(db, "scheduledSend"))) throw new HTTPException(403, { message: featureOffMessage("scheduledSend") });
   if (input.outreach && (to.length !== 1 || cc.length || bcc.length)) {
     throw new HTTPException(400, { message: "Outreach goes to one person per email, so each unsubscribe link is theirs. Send separate emails." });
   }

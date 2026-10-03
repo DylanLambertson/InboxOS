@@ -2,6 +2,7 @@ import { Hono, type MiddlewareHandler } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { AppEnv } from "../env";
+import { requireFeature } from "../lib/features";
 import { audit } from "../lib/audit";
 import { heldMailboxIds } from "../lib/legal-hold";
 import { previewRetention, type RetentionScope } from "../lib/retention";
@@ -15,6 +16,7 @@ import { parseBody, zId } from "../lib/validate";
  * whether mail is destroyed.
  */
 export const adminComplianceRoutes = new Hono<AppEnv>();
+adminComplianceRoutes.use("*", requireFeature("compliance"));
 
 export const requireOwner: MiddlewareHandler<AppEnv> = async (c, next) => {
   if (c.get("user").role !== "owner") throw new HTTPException(403, { message: "Only owners can do this." });
