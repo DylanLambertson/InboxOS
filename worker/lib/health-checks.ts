@@ -293,7 +293,7 @@ export function securityChecks(s: HealthSnapshot): HealthCheck[] {
         ? "Everyone has a passkey or authenticator app."
         : x.require2fa
           ? `Required by policy: ${plural(missing, "person", "people")} will be asked to set it up at their next sign-in.`
-          : `${plural(missing, "person", "people")} sign in with just a password. Consider requiring two-factor.`,
+          : `${plural(missing, "person", "people")} ${missing === 1 ? "signs" : "sign"} in with just a password. Consider requiring two-factor.`,
     fix: missing && !x.require2fa ? { label: "Require 2FA", to: "/admin/settings" } : undefined,
   });
 
