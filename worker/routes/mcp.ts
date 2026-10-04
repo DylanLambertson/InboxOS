@@ -15,7 +15,6 @@ import { zContactInput, zRecipients } from "./api-v1";
  * as a Bearer token, or to `${APP_URL}/mcp/<key>` for clients that can't send headers.
  */
 export const mcpRoutes = new Hono<AppEnv>();
-mcpRoutes.use("*", requireFeature("api"));
 
 const PROTOCOL_VERSIONS = ["2025-11-25", "2025-06-18", "2025-03-26", "2024-11-05"];
 
@@ -229,7 +228,7 @@ async function endpoint(c: Context<AppEnv>) {
 const notAllowed = (c: Context<AppEnv>) => c.json(rpcError(null, -32000, "Method not allowed: use POST"), 405, { Allow: "POST" });
 
 for (const path of ["/", "/:key"]) {
-  mcpRoutes.post(path, requireApiKey, endpoint);
+  mcpRoutes.post(path, requireApiKey, requireFeature("api"), endpoint);
   mcpRoutes.get(path, notAllowed);
   mcpRoutes.delete(path, notAllowed);
 }

@@ -37,7 +37,6 @@ import { emailInvite, issueToken } from "./admin-users";
 
 /** SCIM 2.0 (RFC 7644) for Okta, Microsoft Entra ID and other identity providers. Mounted at /scim/v2. */
 export const scimRoutes = new Hono<AppEnv>();
-scimRoutes.use("*", requireFeature("provisioning"));
 
 type C = Context<AppEnv>;
 
@@ -67,6 +66,8 @@ scimRoutes.use("*", async (c, next) => {
   c.res.headers.set("X-Content-Type-Options", "nosniff");
 });
 scimRoutes.use("*", requireScimToken);
+// After the token check, so only valid callers learn provisioning is switched off.
+scimRoutes.use("*", requireFeature("provisioning"));
 
 async function readJson(c: C): Promise<unknown> {
   // Measure the body itself; Content-Length is absent on chunked requests.

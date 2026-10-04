@@ -87,6 +87,10 @@ function fakeDb(policy: OutboundPolicy) {
           if (sql.includes("FROM mailboxes")) return { address: "hello@example.com", display_name: "Hello" };
           return null;
         },
+        // Workspace settings (feature switches): none saved, so everything is on.
+        async all() {
+          return { results: [] };
+        },
         async run() {
           if (sql.includes("INSERT INTO audit_logs")) audits.push({ action: String(args[3]), meta: String(args[5]) });
           return { meta: { changes: 1 } };
