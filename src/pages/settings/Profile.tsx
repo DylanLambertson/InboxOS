@@ -1,20 +1,28 @@
 import { useEffect, useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import { useQueryClient } from "@tanstack/react-query";
+import { Users } from "lucide-react";
 import { toast } from "sonner";
 import type { Me, Preferences } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
+import { useBrand } from "@/lib/brand";
 import { useMe } from "@/lib/queries";
+import { useFeature } from "@/lib/workspace";
 import { RichTextField } from "@/components/compose/Editor";
 import { EnforcedSignature } from "@/components/compose/DlpDialog";
 import { useOrgSignature } from "@/lib/outbound";
-import { Avatar, Button, Field, Input, PageHeader, Section, Select, Spinner, Switch } from "@/components/ui/primitives";
+import { Button, PageHeader, Section, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { DigestSettings } from "./DigestSettings";
 import { PushSettings } from "./PushSettings";
+import { ProfileCard } from "./profile/ProfileCard";
+
+const MODE_LABEL = { system: "match system", light: "light", dark: "dark" } as const;
+const DENSITY_LABEL = { compact: "compact", comfortable: "comfortable", spacious: "spacious" } as const;
 
 function Row({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
   return (
-    <div className="flex items-center justify-between gap-6 py-3 first:pt-0 last:pb-0">
-      <div>
+    <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 py-3 first:pt-0 last:pb-0">
+      <div className="min-w-0 flex-1 basis-56">
         <p className="text-[13px] font-medium">{title}</p>
         {description && <p className="mt-0.5 text-xs text-fg-muted">{description}</p>}
       </div>
@@ -26,23 +34,18 @@ function Row({ title, description, children }: { title: string; description?: st
 export function ProfileSettings() {
   const { data: me } = useMe();
   const qc = useQueryClient();
-  const [name, setName] = useState("");
-  const [jobTitle, setJobTitle] = useState("");
-  const [phone, setPhone] = useState("");
+  const brand = useBrand();
+  const pushOn = useFeature("push");
+  const digestOn = useFeature("digest");
   const [signature, setSignature] = useState("");
   // Bumped to remount the editor when its content is replaced from outside.
   const [sigKey, setSigKey] = useState(0);
-  const [saving, setSaving] = useState(false);
   const { data: org } = useOrgSignature(undefined);
 
   useEffect(() => {
-    if (me) {
-      setName(me.name);
-      setJobTitle(me.jobTitle);
-      setPhone(me.phone);
-      setSignature(me.signatureHtml);
-    }
-  }, [me]);
+    if (me) setSignature(me.signatureHtml);
+    // Only when the saved signature changes, not on every preference update.
+  }, [me?.signatureHtml]); // eslint-disable-line react-hooks/exhaustive-deps
   // Suggest mode: start an empty signature from the company template.
   useEffect(() => {
     if (me && !me.signatureHtml && org?.mode === "suggest" && org.html) {
@@ -66,42 +69,17 @@ export function ProfileSettings() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Profile & preferences" description="How you appear to others and how the app behaves for you." />
+      <PageHeader
+        title="Profile & preferences"
+        description="How you appear to others and how the app behaves for you."
+        actions={
+          <Link to="/people" className="inline-flex h-8 items-center gap-1.5 rounded-ui px-3 text-[13px] font-medium text-fg-muted hover:bg-muted hover:text-fg">
+            <Users className="size-4" /> People directory
+          </Link>
+        }
+      />
 
-      <Section title="Profile">
-        <div className="flex items-start gap-5">
-          <Avatar name={me.name} email={me.email} color={me.avatarColor} size={56} />
-          <div className="grid flex-1 gap-4 sm:grid-cols-2">
-            <Field label="Name">
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </Field>
-            <Field label="Sign-in email" hint="Contact an admin to change this.">
-              <Input value={me.email} disabled />
-            </Field>
-            <Field label="Job title" hint="Used in your company signature.">
-              <Input value={jobTitle} onChange={(e) => setJobTitle(e.target.value)} maxLength={120} placeholder="e.g. Account Manager" />
-            </Field>
-            <Field label="Phone" hint="Used in your company signature.">
-              <Input value={phone} onChange={(e) => setPhone(e.target.value)} maxLength={40} type="tel" placeholder="+1 555 123 4567" />
-            </Field>
-          </div>
-        </div>
-        <div className="mt-4 flex justify-end">
-          <Button
-            variant="primary"
-            loading={saving}
-            disabled={!name.trim() || (name.trim() === me.name && jobTitle.trim() === me.jobTitle && phone.trim() === me.phone)}
-            onClick={async () => {
-              setSaving(true);
-              await patch({ name: name.trim(), jobTitle: jobTitle.trim(), phone: phone.trim() }, "Profile updated");
-              qc.invalidateQueries({ queryKey: ["org-signature"] });
-              setSaving(false);
-            }}
-          >
-            Save profile
-          </Button>
-        </div>
-      </Section>
+      <ProfileCard me={me} />
 
       {org?.mode === "enforce" ? (
         <Section title="Signature" description="Your organization sets everyone's signature. It's added to every message you send, filled in with your name, job title and phone above.">
@@ -127,21 +105,24 @@ export function ProfileSettings() {
 
       <Section title="Preferences">
         <div className="divide-y divide-line">
-          <Row title="Theme">
-            <Select value={me.preferences.theme} onChange={(e) => setPref("theme", e.target.value as Preferences["theme"])} className="w-36">
-              <option value="system">System</option>
+          <Row title="Color mode" description="The workspace default is set by your admins; Match system follows your device.">
+            <Select value={me.preferences.theme} onChange={(e) => setPref("theme", e.target.value as Preferences["theme"])} className="w-60">
+              <option value="workspace">Use workspace default ({MODE_LABEL[brand.theme.defaultMode]})</option>
+              <option value="system">Match system</option>
               <option value="light">Light</option>
               <option value="dark">Dark</option>
             </Select>
           </Row>
-          <Row title="Density" description="Compact shows more messages at once.">
-            <Select value={me.preferences.density} onChange={(e) => setPref("density", e.target.value as Preferences["density"])} className="w-36">
-              <option value="comfortable">Comfortable</option>
+          <Row title="Density" description="Compact shows more messages at once; spacious gives everything more room.">
+            <Select value={me.preferences.density} onChange={(e) => setPref("density", e.target.value as Preferences["density"])} className="w-60">
+              <option value="workspace">Workspace default ({DENSITY_LABEL[brand.theme.density]})</option>
               <option value="compact">Compact</option>
+              <option value="comfortable">Comfortable</option>
+              <option value="spacious">Spacious</option>
             </Select>
           </Row>
           <Row title="Undo send" description="Delay sending so you can change your mind.">
-            <Select value={me.preferences.undoSendSeconds} onChange={(e) => setPref("undoSendSeconds", Number(e.target.value))} className="w-36">
+            <Select value={me.preferences.undoSendSeconds} onChange={(e) => setPref("undoSendSeconds", Number(e.target.value))} className="w-60">
               {[0, 5, 10, 20, 30].map((s) => (
                 <option key={s} value={s}>
                   {s ? `${s} seconds` : "Off"}
@@ -150,7 +131,7 @@ export function ProfileSettings() {
             </Select>
           </Row>
           <Row title="Compose window" description="Open new messages docked or full screen.">
-            <Select value={me.preferences.composeMode} onChange={(e) => setPref("composeMode", e.target.value as Preferences["composeMode"])} className="w-36">
+            <Select value={me.preferences.composeMode} onChange={(e) => setPref("composeMode", e.target.value as Preferences["composeMode"])} className="w-60">
               <option value="docked">Docked</option>
               <option value="fullscreen">Full screen</option>
             </Select>
@@ -180,9 +161,9 @@ export function ProfileSettings() {
         </div>
       </Section>
 
-      <PushSettings me={me} setPref={setPref} />
+      {pushOn && <PushSettings me={me} setPref={setPref} />}
 
-      <DigestSettings me={me} />
+      {digestOn && <DigestSettings me={me} />}
     </div>
   );
 }

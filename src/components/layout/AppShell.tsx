@@ -5,6 +5,7 @@ import { api, ApiError } from "@/lib/api";
 import { applyDensity, applyTheme, useBrand } from "@/lib/brand";
 import { useInboxNotifications } from "@/lib/notifications";
 import { syncPush } from "@/lib/push";
+import { useFeature } from "@/lib/workspace";
 import { useMailboxes, useMe } from "@/lib/queries";
 import { SHORTCUT_HELP, useShortcuts } from "@/lib/shortcuts";
 import { ComposeProvider, useCompose } from "../compose/ComposeProvider";
@@ -43,10 +44,11 @@ export function AppShell() {
   useEffect(() => {
     if (me) applyDensity(me.preferences.density, defaultDensity);
   }, [me, defaultDensity]);
-  // Keep this device's push subscription registered to whoever is signed in.
+  // Keep this device's push subscription registered to whoever is signed in (while push is on).
+  const pushOn = useFeature("push");
   useEffect(() => {
-    if (me?.id) syncPush();
-  }, [me?.id]);
+    if (me?.id && pushOn) syncPush();
+  }, [me?.id, pushOn]);
   useEffect(() => setDrawer(false), [location.pathname]);
   useShortcuts({ "?": () => setHelp(true) }, []);
 
