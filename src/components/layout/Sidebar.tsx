@@ -28,12 +28,16 @@ import {
   UserRound,
   UserRoundX,
   Users,
+  Contact,
+  SwatchBook,
 } from "lucide-react";
-import type { MailboxSummary } from "@shared/types";
+import type { MailboxSummary, ThemePreference } from "@shared/types";
+import type { FeatureKey } from "@shared/workspace";
 import { api, errorMessage } from "@/lib/api";
 import { mailboxLabel } from "@/lib/format";
 import { useLabels, useMailboxes, useMe } from "@/lib/queries";
 import { useCollabCounts } from "@/lib/collab";
+import { useWorkspace } from "@/lib/workspace";
 import { toast } from "sonner";
 import { disablePush } from "@/lib/push";
 import { clearAppCache } from "@/lib/pwa";
@@ -48,8 +52,8 @@ export const FOLDER_NAV = [
   { view: "starred", label: "Starred", icon: Star },
   { view: "sent", label: "Sent", icon: Send },
   { view: "drafts", label: "Drafts", icon: File, count: "drafts" },
-  { view: "scheduled", label: "Scheduled", icon: Clock, count: "scheduled" },
-  { view: "snoozed", label: "Snoozed", icon: AlarmClock, count: "snoozed" },
+  { view: "scheduled", label: "Scheduled", icon: Clock, count: "scheduled", feature: "scheduledSend" },
+  { view: "snoozed", label: "Snoozed", icon: AlarmClock, count: "snoozed", feature: "snooze" },
   { view: "all", label: "All mail", icon: Mail },
   { view: "archive", label: "Archive", icon: Archive },
   { view: "spam", label: "Spam", icon: ShieldAlert, count: "spam" },
@@ -114,7 +118,7 @@ function NavItem({ to, icon: Icon, label, count, color, onNavigate }: { to: stri
       onClick={onNavigate}
       className={({ isActive }) =>
         cx(
-          "group flex h-8 items-center gap-2.5 rounded-ui-sm px-2.5 text-[13px] transition-colors",
+          "group flex h-[calc(2rem*var(--density,1))] items-center gap-2.5 rounded-ui-sm px-2.5 text-[13px] transition-colors",
           isActive ? "bg-accent-soft font-medium text-accent" : "text-fg-muted hover:bg-muted hover:text-fg",
         )
       }
@@ -138,14 +142,19 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
   const scopeId = unified ? "all" : current?.id;
   const unreadFor = (key: string) => (unified ? boxes.reduce((n, b) => n + (b.unread[key] ?? 0), 0) : current?.unread[key]);
   const { data: labels = [] } = useLabels(current?.id);
-  const { data: collabCounts } = useCollabCounts();
+  const features = useWorkspace().data?.features;
+  const on = (f: FeatureKey) => features?.[f] !== false;
+  const collab = on("collaboration");
+  const { data: collabCounts } = useCollabCounts(collab);
+  // A switched-off folder stays visible while it still holds mail, so nothing seems lost.
+  const folders = FOLDER_NAV.filter((f) => !("feature" in f) || on(f.feature) || !!unreadFor(f.count));
   const compose = useCompose();
   const navigate = useNavigate();
   const qc = useQueryClient();
   const [labelOpen, setLabelOpen] = useState(false);
   const isAdmin = me?.role === "owner" || me?.role === "admin" || me?.role === "manager";
 
-  const setTheme = async (theme: "system" | "light" | "dark") => {
+  const setTheme = async (theme: ThemePreference) => {
     try {
       const updated = await api.patch("me", { preferences: { theme } });
       qc.setQueryData(["me"], updated);
@@ -190,7 +199,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
               {unified ? "All inboxes" : current && mailboxLabel(current)}
             </div>
             <div className="space-y-0.5">
-              {FOLDER_NAV.map((f) => (
+              {folders.map((f) => (
                 <NavItem
                   key={f.view}
                   to={`/mail/${scopeId}/${f.view}`}
@@ -201,19 +210,23 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
                 />
               ))}
             </div>
-            <div className="mt-5 mb-1 px-2.5 text-[11px] font-semibold tracking-wide text-fg-faint uppercase">Team</div>
-            <div className="space-y-0.5">
-              {COLLAB_NAV.map((f) => (
-                <NavItem
-                  key={f.view}
-                  to={`/mail/${f.view === "unassigned" ? scopeId : "all"}/${f.view}`}
-                  icon={f.icon}
-                  label={f.label}
-                  count={f.view === "assigned" ? collabCounts?.assigned : f.view === "mentions" ? collabCounts?.mentions : undefined}
-                  onNavigate={onNavigate}
-                />
-              ))}
-            </div>
+            {collab && (
+              <>
+                <div className="mt-5 mb-1 px-2.5 text-[11px] font-semibold tracking-wide text-fg-faint uppercase">Team</div>
+                <div className="space-y-0.5">
+                  {COLLAB_NAV.map((f) => (
+                    <NavItem
+                      key={f.view}
+                      to={`/mail/${f.view === "unassigned" ? scopeId : "all"}/${f.view}`}
+                      icon={f.icon}
+                      label={f.label}
+                      count={f.view === "assigned" ? collabCounts?.assigned : f.view === "mentions" ? collabCounts?.mentions : undefined}
+                      onNavigate={onNavigate}
+                    />
+                  ))}
+                </div>
+              </>
+            )}
           </>
         )}
         {current && (
@@ -256,16 +269,22 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
           <Menu
             width={240}
             header={
-              <div className="border-b border-line px-2.5 pt-1.5 pb-2.5 mb-1">
-                <p className="truncate text-[13px] font-medium">{me.name || me.email}</p>
-                <p className="truncate text-xs text-fg-muted">{me.email}</p>
+              <div className="mb-1 flex items-center gap-2.5 border-b border-line px-2.5 pt-1.5 pb-2.5">
+                <Avatar name={me.name} email={me.email} color={me.avatarColor} src={me.avatarUrl} size={32} />
+                <div className="min-w-0">
+                  <p className="truncate text-[13px] font-medium">{me.name || me.email}</p>
+                  <p className="truncate text-xs text-fg-muted">{me.jobTitle || me.email}</p>
+                </div>
               </div>
             }
             items={[
+              { label: "Your profile", icon: <UserRound />, onSelect: () => (navigate("/settings/profile"), onNavigate?.()) },
+              { label: "People", icon: <Users />, onSelect: () => (navigate("/people"), onNavigate?.()) },
+              ...(on("contacts") ? [{ label: "Contacts", icon: <Contact />, onSelect: () => (navigate("/settings/contacts"), onNavigate?.()) }] : []),
               { label: "Settings", icon: <Settings />, onSelect: () => (navigate("/settings"), onNavigate?.()) },
-              { label: "Contacts", icon: <Users />, onSelect: () => (navigate("/settings/contacts"), onNavigate?.()) },
               { separator: true, label: "" },
-              { label: "System theme", icon: <Monitor />, checked: me.preferences.theme === "system", onSelect: () => setTheme("system") },
+              { label: "Workspace default", icon: <SwatchBook />, checked: me.preferences.theme === "workspace", onSelect: () => setTheme("workspace") },
+              { label: "Match system", icon: <Monitor />, checked: me.preferences.theme === "system", onSelect: () => setTheme("system") },
               { label: "Light", icon: <Sun />, checked: me.preferences.theme === "light", onSelect: () => setTheme("light") },
               { label: "Dark", icon: <Moon />, checked: me.preferences.theme === "dark", onSelect: () => setTheme("dark") },
               { separator: true, label: "" },
@@ -274,7 +293,7 @@ export function Sidebar({ onNavigate }: { onNavigate?: () => void }) {
             ]}
             trigger={(p) => (
               <button {...p} className="flex w-full items-center gap-2.5 rounded-ui-sm px-2 py-1.5 text-left hover:bg-muted">
-                <Avatar name={me.name} email={me.email} color={me.avatarColor} size={26} />
+                <Avatar name={me.name} email={me.email} color={me.avatarColor} src={me.avatarUrl} size={26} />
                 <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{me.name || me.email}</span>
               </button>
             )}

@@ -6,6 +6,8 @@ import type { Folder, MessageListItem, View } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { useLabels, useMailboxes, useMe, useMessageAction, useMessages, useInvalidateMail, type BulkInput } from "@/lib/queries";
 import { useBulkConversation, useMembers } from "@/lib/collab";
+import { useDensity } from "@/lib/brand";
+import { useWorkspace } from "@/lib/workspace";
 import { CONVERSATION_STATUSES, type ConversationStatus } from "@shared/collab";
 import { longDate, mailboxLabel } from "@/lib/format";
 import { useShortcuts } from "@/lib/shortcuts";
@@ -53,13 +55,16 @@ export function MailPage() {
   const labelId = isLabel ? rawView.slice(6) : null;
   const view = (isLabel ? "all" : rawView) as View;
   const threads = (me?.preferences.conversationView ?? true) && !["drafts", "scheduled"].includes(view);
-  const showStatusChips = !["drafts", "scheduled", "sent"].includes(view);
+  const features = useWorkspace().data?.features;
+  const collabOn = features?.collaboration !== false;
+  const snoozeOn = features?.snooze !== false;
+  const showStatusChips = collabOn && !["drafts", "scheduled", "sent"].includes(view);
   const listParams = mailbox ? { mailboxId: mailbox.id, view, label: labelId, q, threads, status: showStatusChips ? convStatus : null } : null;
   const list = useMessages(listParams);
   const items = useMemo(() => list.data?.pages.flatMap((p) => p.items) ?? [], [list.data]);
   const action = useMessageAction();
   const bulkConv = useBulkConversation();
-  const { data: members = [] } = useMembers(unified ? undefined : mailbox?.id);
+  const { data: members = [] } = useMembers(unified || !collabOn ? undefined : mailbox?.id);
   const compose = useCompose();
   const confirm = useConfirm();
   const invalidate = useInvalidateMail();
@@ -69,7 +74,7 @@ export function MailPage() {
   const listRef = useRef<HTMLDivElement>(null);
   const searchRef = useRef<HTMLInputElement>(null);
   const [searchText, setSearchText] = useState(q);
-  const compact = me?.preferences.density === "compact";
+  const compact = useDensity(me?.preferences.density) === "compact";
   const base = `/mail/${mailboxId}/${rawView}`;
   // Search and the status chip survive opening and closing messages.
   const keep = new URLSearchParams([...(q ? [["q", q]] : []), ...(convStatus ? [["status", convStatus]] : [])]).toString();
@@ -207,7 +212,7 @@ export function MailPage() {
       e: () => !readOnly && runBulk({ action: "move", folder: "archive" }, target()),
       "#": () => !readOnly && runBulk({ action: "move", folder: "trash" }, target()),
       "!": () => !readOnly && runBulk({ action: "move", folder: "spam" }, target()),
-      b: () => !readOnly && ["inbox", "archive", "all", "starred", "unread"].includes(view) && runBulk({ action: "snooze", until: at(1, 8).toISOString() }, target()),
+      b: () => !readOnly && snoozeOn && ["inbox", "archive", "all", "starred", "unread"].includes(view) && runBulk({ action: "snooze", until: at(1, 8).toISOString() }, target()),
       s: () => {
         const m = items.find((x) => x.id === target()[0]);
         if (m) onStar(m);

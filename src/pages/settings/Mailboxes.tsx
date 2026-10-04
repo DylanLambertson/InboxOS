@@ -10,6 +10,7 @@ import { RichTextField } from "@/components/compose/Editor";
 import { LabelDialog } from "@/components/mail/LabelDialog";
 import { AutoReplySettings, BlockedSenders } from "./MailboxRules";
 import { MailRulesSection } from "./MailRules";
+import { FeatureGate } from "@/components/ui/FeatureGate";
 import { Badge, Button, EmptyState, Field, IconButton, Input, PageHeader, Section } from "@/components/ui/primitives";
 import { useConfirm } from "@/components/ui/overlay";
 
@@ -122,7 +123,9 @@ function MailboxCard({ box }: { box: MailboxSummary }) {
           </div>
         </div>
 
-        <MailRulesSection box={box} />
+        <FeatureGate feature="mailRules" fallback={null}>
+          <MailRulesSection box={box} />
+        </FeatureGate>
         <AutoReplySettings box={box} />
         <BlockedSenders box={box} />
       </div>

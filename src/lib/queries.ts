@@ -123,7 +123,8 @@ export const useContacts = (q: string, enabled = true) =>
     placeholderData: (prev) => prev,
   });
 
-export const useTemplates = () => useQuery({ queryKey: ["templates"], queryFn: () => api.get<Template[]>("templates"), staleTime: 60_000 });
+export const useTemplates = (enabled = true) =>
+  useQuery({ queryKey: ["templates"], queryFn: () => api.get<Template[]>("templates"), staleTime: 60_000, enabled });
 
 export function useInvalidateMail() {
   const qc = useQueryClient();

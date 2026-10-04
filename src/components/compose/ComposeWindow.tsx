@@ -24,6 +24,7 @@ import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { useMailboxes, useMe, useTemplates } from "@/lib/queries";
 import { useReplyingPresence } from "@/lib/collab";
+import { useFeature } from "@/lib/workspace";
 import { useQueryClient } from "@tanstack/react-query";
 import { EmailFrame } from "../mail/EmailFrame";
 import { AttachmentChip } from "../mail/AttachmentChip";
@@ -69,7 +70,8 @@ function ComposeDraft({ req, minimized, defaultFullscreen, onToggleMinimize, onC
   const draft = useDraft(req, signature);
   const { state } = draft;
   // Teammates looking at this conversation see "<you> is replying…" while this is open.
-  useReplyingPresence(req.mode !== "forward" ? req.sourceId : undefined);
+  const collab = useFeature("collaboration");
+  useReplyingPresence(collab && req.mode !== "forward" ? req.sourceId : undefined);
 
   if (draft.loadError) {
     return (
@@ -100,7 +102,9 @@ function ComposeBody({
 }: Omit<Props, "req"> & { draft: ReturnType<typeof useDraft> }) {
   const state = draft.state!;
   const { data: boxes = [] } = useMailboxes();
-  const { data: templates = [] } = useTemplates();
+  const templatesOn = useFeature("templates");
+  const scheduleOn = useFeature("scheduledSend");
+  const { data: templates = [] } = useTemplates(templatesOn);
   const qc = useQueryClient();
   const confirm = useConfirm();
   const [fullscreen, setFullscreen] = useState(defaultFullscreen);
@@ -406,10 +410,10 @@ function ComposeBody({
 
         <div className="flex items-center gap-1 border-t border-line px-3 py-2">
           <div className="flex">
-            <Button variant="primary" className="rounded-r-none" loading={busy} icon={<Send className="size-4" />} onClick={() => send()}>
+            <Button variant="primary" className={cx(scheduleOn && "rounded-r-none")} loading={busy} icon={<Send className="size-4" />} onClick={() => send()}>
               Send
             </Button>
-            <Menu
+            {scheduleOn && <Menu
               align="start"
               items={[{ label: "Schedule send", icon: <Clock />, onSelect: () => setScheduleOpen(true) }]}
               trigger={(p) => (
@@ -417,7 +421,7 @@ function ComposeBody({
                   <ChevronDown className="size-4" />
                 </Button>
               )}
-            />
+            />}
           </div>
           <IconButton label="Formatting" active={showToolbar} onClick={() => setShowToolbar((s) => !s)}>
             <Type className="size-4" />
@@ -425,7 +429,7 @@ function ComposeBody({
           <IconButton label="Attach files" onClick={() => fileInput.current?.click()}>
             <Paperclip className="size-4" />
           </IconButton>
-          <Menu
+          {templatesOn && <Menu
             width={260}
             items={
               templates.length
@@ -445,14 +449,13 @@ function ComposeBody({
                 <FileText className="size-4" />
               </IconButton>
             )}
-          />
+          />}
           <Menu
             items={[
               { label: "High priority", icon: <Flag />, checked: state.priority === "high", onSelect: () => draft.update({ priority: state.priority === "high" ? "normal" : "high" }) },
               { label: "Low priority", icon: <Flag />, checked: state.priority === "low", onSelect: () => draft.update({ priority: state.priority === "low" ? "normal" : "low" }) },
               { label: "Request read receipt", icon: <Receipt />, checked: state.readReceipt, onSelect: () => draft.update({ readReceipt: !state.readReceipt }) },
-              { separator: true, label: "" },
-              { label: "Save as template", icon: <Save />, onSelect: saveAsTemplate },
+              ...(templatesOn ? [{ separator: true, label: "" }, { label: "Save as template", icon: <Save />, onSelect: saveAsTemplate }] : []),
             ]}
             trigger={(p) => (
               <IconButton label="More options" {...p}>

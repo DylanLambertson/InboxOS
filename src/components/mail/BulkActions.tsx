@@ -6,6 +6,7 @@ import { IconButton } from "../ui/primitives";
 import { Menu, useConfirm } from "../ui/overlay";
 import { ScheduleDialog, snoozePresets } from "../compose/ScheduleDialog";
 import type { BulkInput } from "@/lib/queries";
+import { useWorkspace } from "@/lib/workspace";
 import { assigneeMenuItems, STATUS_META } from "./CollabControls";
 
 /** Shared-inbox actions for a list selection: assign and set status. */
@@ -24,7 +25,7 @@ export function BulkActions({
   readOnly,
   run,
   size = "md",
-  collab,
+  collab: collabProp,
 }: {
   folder: Folder | "starred" | "all" | "unread" | "label";
   anyUnread: boolean;
@@ -36,8 +37,11 @@ export function BulkActions({
 }) {
   const confirm = useConfirm();
   const [pickSnooze, setPickSnooze] = useState(false);
+  const features = useWorkspace().data?.features;
+  // Assigning and statuses are hidden while collaboration is switched off (Admin > Features).
+  const collab = features?.collaboration === false ? undefined : collabProp;
   const icon = "size-4";
-  const canSnooze = !readOnly && ["inbox", "archive", "all", "starred", "label", "unread", "snoozed"].includes(folder);
+  const canSnooze = !readOnly && features?.snooze !== false && ["inbox", "archive", "all", "starred", "label", "unread", "snoozed"].includes(folder);
   const fmt = (d: Date) => d.toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" });
   const inTrash = folder === "trash";
   const inSpam = folder === "spam";

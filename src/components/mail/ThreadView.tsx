@@ -6,6 +6,7 @@ import { api, errorMessage } from "@/lib/api";
 import { longDate } from "@/lib/format";
 import { useInvalidateMail, useLabels, useMe, useMessageAction, useThread, type BulkInput } from "@/lib/queries";
 import { useConversation, useMembers } from "@/lib/collab";
+import { useFeature } from "@/lib/workspace";
 import { useCompose } from "../compose/ComposeProvider";
 import { Button, EmptyState, IconButton, Spinner } from "../ui/primitives";
 import { BulkActions } from "./BulkActions";
@@ -36,8 +37,11 @@ export function ThreadView({
   const mailbox = mailboxes.find((b) => b.id === thread?.[0]?.mailboxId);
   const { data: labels = [] } = useLabels(mailbox?.id);
   const readOnly = !mailbox || mailbox.role === "viewer";
-  const { data: conv } = useConversation(mailbox?.id, thread?.[0]?.threadId);
-  const { data: members = [] } = useMembers(mailbox?.id);
+  // Assignments, notes and activity only while collaboration is on (Admin > Features).
+  const collabOn = useFeature("collaboration");
+  const { data: convData } = useConversation(collabOn ? mailbox?.id : undefined, thread?.[0]?.threadId);
+  const conv = collabOn ? convData : undefined;
+  const { data: members = [] } = useMembers(collabOn ? mailbox?.id : undefined);
   // Messages, internal notes and activity, interleaved by time.
   const timeline = useMemo(() => {
     const items: ({ at: string; kind: "note"; id: string } | { at: string; kind: "event"; id: string })[] = [

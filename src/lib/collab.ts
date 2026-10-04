@@ -33,8 +33,9 @@ export const useMembers = (mailboxId: string | undefined) =>
     staleTime: 5 * 60_000,
   });
 
-export const useCollabCounts = () =>
-  useQuery({ queryKey: ["collab-counts"], queryFn: () => api.get<CollabCounts>("conversations/counts"), refetchInterval: POLL_MS });
+/** Sidebar badges; pass `enabled = false` while collaboration is switched off. */
+export const useCollabCounts = (enabled = true) =>
+  useQuery({ queryKey: ["collab-counts"], queryFn: () => api.get<CollabCounts>("conversations/counts"), refetchInterval: POLL_MS, enabled });
 
 function useRefresh() {
   const qc = useQueryClient();
