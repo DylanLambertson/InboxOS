@@ -15,7 +15,9 @@ export const useBrand = () => useContext(BrandContext);
 const kebab = (k: string) => k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 /** CSS variable names in src/index.css that don't follow the palette key directly. */
 const VAR_NAME: Partial<Record<keyof Palette, string>> = { text: "text", textMuted: "text-muted", textFaint: "text-faint" };
-const paletteVars = (p: Palette) => PALETTE_KEYS.map((k) => `--${VAR_NAME[k] ?? kebab(k)}:${p[k]};`).join("");
+/** The CSS variable a palette key is written to, e.g. textMuted → --text-muted. */
+export const paletteVarName = (k: keyof Palette) => `--${VAR_NAME[k] ?? kebab(k)}`;
+const paletteVars = (p: Palette) => PALETTE_KEYS.map((k) => `${paletteVarName(k)}:${p[k]};`).join("");
 
 /**
  * The CSS for a theme: palettes for both color modes (respecting an explicit
