@@ -1,7 +1,14 @@
 import { createBrowserRouter, Navigate } from "react-router";
 import { AppShell } from "./components/layout/AppShell";
 import { MailPage } from "./pages/Mail";
+import type { FeatureKey } from "@shared/workspace";
+import { withFeature } from "./components/ui/FeatureGate";
 import { pages as p, routeLazy as page } from "./lib/route-chunks";
+
+/** A page that shows a notice instead of its content while its feature is switched off. */
+const gated = <M, K extends keyof M>(feature: FeatureKey, load: () => Promise<M>, name: K) => async () => ({
+  Component: withFeature(feature, (await load())[name] as React.ComponentType),
+});
 
 // Only the mail client is in the first load. Sign-in, Settings and every Admin page
 // are separate chunks (see lib/route-chunks.ts), prefetched on hover from the navigation.
@@ -15,6 +22,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <MailPage /> },
       { path: "mail/:mailboxId/:view/:messageId?", element: <MailPage /> },
+      { path: "people", lazy: page(p.people, "PeoplePage") },
       {
         path: "settings",
         lazy: page(p.settingsLayout, "SettingsLayout"),
@@ -23,8 +31,8 @@ export const router = createBrowserRouter([
           { path: "profile", lazy: page(p.settingsProfile, "ProfileSettings") },
           { path: "mailboxes", lazy: page(p.settingsMailboxes, "MailboxSettings") },
           { path: "security", lazy: page(p.settingsSecurity, "SecuritySettings") },
-          { path: "templates", lazy: page(p.settingsTemplates, "TemplatesSettings") },
-          { path: "contacts", lazy: page(p.settingsContacts, "ContactsSettings") },
+          { path: "templates", lazy: gated("templates", p.settingsTemplates, "TemplatesSettings") },
+          { path: "contacts", lazy: gated("contacts", p.settingsContacts, "ContactsSettings") },
         ],
       },
       {
@@ -37,6 +45,8 @@ export const router = createBrowserRouter([
           { path: "users", lazy: page(p.adminUsers, "AdminUsers") },
           { path: "mailboxes", lazy: page(p.adminMailboxes, "AdminMailboxes") },
           { path: "branding", lazy: page(p.adminBranding, "AdminBranding") },
+          { path: "appearance", lazy: page(p.adminAppearance, "AdminAppearance") },
+          { path: "features", lazy: page(p.adminFeatures, "AdminFeatures") },
           { path: "settings", lazy: page(p.adminPolicy, "AdminPolicy") },
           { path: "api", lazy: page(p.adminApiKeys, "AdminApiKeys") },
           { path: "provisioning", lazy: page(p.adminProvisioning, "AdminProvisioning") },

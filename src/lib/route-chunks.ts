@@ -8,6 +8,7 @@ import type { ComponentType } from "react";
 export const pages = {
   login: () => import("../pages/Auth"),
   verifyEmail: () => import("../pages/VerifyEmail"),
+  people: () => import("../pages/People"),
 
   settingsLayout: () => import("../pages/settings/SettingsLayout"),
   settingsProfile: () => import("../pages/settings/Profile"),
@@ -23,6 +24,8 @@ export const pages = {
   adminUsers: () => import("../pages/admin/Users"),
   adminMailboxes: () => import("../pages/admin/Mailboxes"),
   adminBranding: () => import("../pages/admin/Branding"),
+  adminAppearance: () => import("../pages/admin/Appearance"),
+  adminFeatures: () => import("../pages/admin/Features"),
   adminPolicy: () => import("../pages/admin/Policy"),
   adminApiKeys: () => import("../pages/admin/ApiKeys"),
   adminProvisioning: () => import("../pages/admin/Provisioning"),
@@ -41,6 +44,7 @@ export function routeLazy<M, K extends keyof M>(load: () => Promise<M>, name: K)
 
 /** Path prefixes and the chunk that renders them; the longest match wins. */
 const BY_PATH: [string, () => Promise<unknown>][] = [
+  ["/people", pages.people],
   ["/settings/profile", pages.settingsProfile],
   ["/settings/mailboxes", pages.settingsMailboxes],
   ["/settings/security", pages.settingsSecurity],
@@ -52,6 +56,8 @@ const BY_PATH: [string, () => Promise<unknown>][] = [
   ["/admin/users", pages.adminUsers],
   ["/admin/mailboxes", pages.adminMailboxes],
   ["/admin/branding", pages.adminBranding],
+  ["/admin/appearance", pages.adminAppearance],
+  ["/admin/features", pages.adminFeatures],
   ["/admin/settings", pages.adminPolicy],
   ["/admin/api", pages.adminApiKeys],
   ["/admin/provisioning", pages.adminProvisioning],

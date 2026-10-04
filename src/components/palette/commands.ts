@@ -31,8 +31,10 @@ import {
   UserRound,
   UserRoundX,
   Users,
+  SwatchBook,
   type LucideIcon,
 } from "lucide-react";
+import type { ThemePreference } from "@shared/types";
 import { DEFAULT_WORKSPACE, type FeatureKey } from "@shared/workspace";
 import { api, errorMessage } from "@/lib/api";
 import { canManageRole, visibleAdminNav } from "@/lib/admin-nav";
@@ -109,7 +111,7 @@ export function usePaletteCommands(): Command[] {
     if (composeFrom) {
       out.push({ id: "act:compose", title: "Compose", subtitle: `From ${composeFrom.address}`, group: GROUPS.actions, icon: PenSquare, keywords: ["new email", "write", "message"], shortcut: "C", run: () => compose.open({ mailboxId: composeFrom.id }) });
     }
-    const setTheme = async (theme: "system" | "light" | "dark") => {
+    const setTheme = async (theme: ThemePreference) => {
       try {
         qc.setQueryData(["me"], await api.patch("me", { preferences: { theme } }));
       } catch (e) {
@@ -120,6 +122,9 @@ export function usePaletteCommands(): Command[] {
     out.push({ id: "act:theme", title: dark ? "Switch to light mode" : "Switch to dark mode", group: GROUPS.actions, icon: dark ? Sun : Moon, keywords: ["theme", "appearance", "toggle", "dark", "light"], run: () => void setTheme(dark ? "light" : "dark") });
     if (me.preferences.theme !== "system") {
       out.push({ id: "act:theme-system", title: "Match system theme", group: GROUPS.actions, icon: Monitor, keywords: ["theme", "auto", "appearance"], run: () => void setTheme("system") });
+    }
+    if (me.preferences.theme !== "workspace") {
+      out.push({ id: "act:theme-workspace", title: "Use the workspace color mode", group: GROUPS.actions, icon: SwatchBook, keywords: ["theme", "default", "appearance"], run: () => void setTheme("workspace") });
     }
     out.push({ id: "act:shortcuts", title: "Keyboard shortcuts", group: GROUPS.actions, icon: Keyboard, keywords: ["help", "keys", "hotkeys"], shortcut: "?", run: () => window.dispatchEvent(new CustomEvent("io:shortcuts")) });
     const consoleRole = me.role === "owner" || me.role === "admin" || me.role === "manager";
@@ -160,7 +165,8 @@ export function usePaletteCommands(): Command[] {
       out.push({ id: `box:${b.id}`, title: mailboxLabel(b), subtitle: b.address, group: GROUPS.mailboxes, icon: Inbox, keywords: [b.address], to, run: go(to) });
     }
 
-    // ---- Settings and admin pages
+    // ---- People, settings and admin pages
+    out.push({ id: "page:people", title: "People", subtitle: "Team directory", group: GROUPS.settings, icon: Users, keywords: ["team", "directory", "colleagues", "teammates", "who"], to: "/people", run: go("/people") });
     for (const s of SETTINGS) {
       if (!on(s.feature)) continue;
       out.push({ id: `settings:${s.to}`, title: s.label, subtitle: "Settings", group: GROUPS.settings, icon: s.icon, keywords: s.keywords, to: s.to, run: go(s.to) });

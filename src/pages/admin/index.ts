@@ -5,6 +5,8 @@ export { AdminTraffic } from "./Traffic";
 export { AdminUsers } from "./Users";
 export { AdminMailboxes } from "./Mailboxes";
 export { AdminBranding } from "./Branding";
+export { AdminAppearance } from "./Appearance";
+export { AdminFeatures } from "./Features";
 export { AdminPolicy } from "./Policy";
 export { AdminLogs } from "./Logs";
 export { AdminSetup } from "./Setup";
