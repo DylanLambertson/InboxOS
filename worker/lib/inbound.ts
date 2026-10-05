@@ -5,6 +5,7 @@ import { attachmentKey, bodyKey, contactStatements, ftsStatements, resolveThread
 import { isBlocked, type AutoReplyCandidate } from "./mail-rules";
 import type { ReceivedNotice } from "./notify";
 import { applyRulesOnIngest } from "./rules";
+import { getResendApiKey } from "./provider-config";
 import { resend, type ReceivedEmail } from "./resend";
 import { getPolicy } from "./settings";
 import { htmlToText, makeSnippet, newId, normalizeSubject, now, parseAddress, parseAddressList, sanitizeFilename } from "./util";
@@ -43,7 +44,7 @@ function header(h: Record<string, unknown> | null, name: string): string | null 
 
 async function downloadAttachments(env: Env, email: ReceivedEmail) {
   if (!email.attachments?.length) return [];
-  const { data } = await resend.listReceivedAttachments(env.RESEND_API_KEY, email.id);
+  const { data } = await resend.listReceivedAttachments(await getResendApiKey(env), email.id);
   const out: { meta: (typeof data)[number]; bytes: ArrayBuffer }[] = [];
   for (const a of data) {
     const res = await fetch(a.download_url);
@@ -60,7 +61,7 @@ export async function ingestReceived(
   env: Env,
   evt: ReceivedEvent,
 ): Promise<{ stored: number; unrouted: boolean; received: ReceivedNotice[]; autoReplies: AutoReplyCandidate[] }> {
-  const email = await resend.getReceived(env.RESEND_API_KEY, evt.email_id);
+  const email = await resend.getReceived(await getResendApiKey(env), evt.email_id);
   const h = email.headers ?? {};
   const recipients = [
     ...(evt.to ?? email.to ?? []),

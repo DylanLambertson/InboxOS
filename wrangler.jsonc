@@ -57,7 +57,9 @@
 		"APP_URL": "http://localhost:5173"
 	}
 	// Secrets (set with `npx wrangler secret put <NAME>`):
-	//   SESSION_SECRET            required: any long random string (signs links, encrypts stored keys)
+	//   SESSION_SECRET            required: any long random string (signs links, encrypts stored keys).
+	//                             The setup wizard asks for it to create the first owner, unless SETUP_TOKEN is set.
+	//   SETUP_TOKEN               optional: a separate key for creating the first owner in the setup wizard
 	//   RESEND_API_KEY            optional: can be entered in the setup wizard instead
 	//   RESEND_WEBHOOK_SECRET     optional: captured automatically by the setup wizard
 	//   GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET   optional: enables Google sign-in

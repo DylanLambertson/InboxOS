@@ -1,5 +1,6 @@
 import type { Env } from "../env";
 import { renderEmail, type EmailContent } from "./email-layout";
+import { getResendApiKey } from "./provider-config";
 import { resend } from "./resend";
 import { getBrand } from "./settings";
 import { newId, now } from "./util";
@@ -40,7 +41,7 @@ export async function sendSystemEmail(
   const brand = await getBrand(env.DB);
   const { html, text } = renderEmail(brand, env.APP_URL, content);
   try {
-    const res = await resend.send(env.RESEND_API_KEY, {
+    const res = await resend.send(await getResendApiKey(env), {
       from: `${brand.productName} <no-reply@${brand.primaryDomain}>`,
       to: [to],
       subject: content.subject,

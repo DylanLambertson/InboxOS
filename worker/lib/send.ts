@@ -2,6 +2,7 @@ import type { Address } from "@shared/types";
 import type { Env } from "../env";
 import { contactStatements, ftsStatements, type AttachmentRow, type ComposeMeta, type MessageRow } from "./messages";
 import { applyOutboundPolicy, PolicyBlockedError } from "./outbound";
+import { getResendApiKey } from "./provider-config";
 import { resend, ResendError, type ResendAttachment } from "./resend";
 import { getBrand, getPolicy } from "./settings";
 import { b64encode, domainOf, formatAddress, htmlToText, makeSnippet, newId, now, parseJson } from "./util";
@@ -172,7 +173,7 @@ export async function deliverMessage(env: Env, messageId: string): Promise<Messa
   const t = now();
   try {
     const res = await resend.send(
-      env.RESEND_API_KEY,
+      await getResendApiKey(env),
       {
         from: formatAddress({ email: fromAddress, name: meta.api?.fromName || mailbox.display_name || brand.defaultFromName }),
         to: to.map(formatAddress),

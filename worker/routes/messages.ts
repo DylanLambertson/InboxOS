@@ -6,6 +6,7 @@ import type { AppEnv } from "../env";
 import { requireMailbox, requireMessage, userMailboxIds } from "../lib/access";
 import { collabFilter, isCollabView } from "../lib/collab";
 import { toAttachmentInfo, toListItem, type AttachmentRow, type MessageRow } from "../lib/messages";
+import { getResendApiKey } from "../lib/provider-config";
 import { resend } from "../lib/resend";
 import { ftsExpression, likeEscape, parseQuery } from "../lib/search";
 import { clampInt, parseJson } from "../lib/util";
@@ -215,7 +216,7 @@ messageRoutes.get("/:id/original", async (c) => {
   if (m.direction !== "inbound" || !m.resend_id) {
     throw new HTTPException(404, { message: "The original source is only available for received messages." });
   }
-  const email = (await resend.getReceived(c.env.RESEND_API_KEY, m.resend_id)) as { raw?: { download_url?: string } };
+  const email = (await resend.getReceived(await getResendApiKey(c.env), m.resend_id)) as { raw?: { download_url?: string } };
   const url = email.raw?.download_url;
   if (!url) throw new HTTPException(404, { message: "Original source is no longer available from the provider." });
   const res = await fetch(url);

@@ -3,6 +3,7 @@ import type { AppEnv } from "../env";
 import { ingestReceived, recordDeliveryEvent } from "../lib/inbound";
 import { sendAutoReplies } from "../lib/mail-rules";
 import { notifyReceived } from "../lib/notify";
+import { getWebhookSecret } from "../lib/provider-config";
 import { pushNewMail } from "../lib/push";
 import { verifySvix } from "../lib/svix";
 import { now } from "../lib/util";
@@ -12,10 +13,11 @@ export const webhookRoutes = new Hono<AppEnv>();
 /**
  * Resend webhook receiver. Configure in Resend → Webhooks with URL
  * `${APP_URL}/webhooks/resend`, subscribe to all `email.*` events,
- * and store the signing secret as RESEND_WEBHOOK_SECRET.
+ * and keep the signing secret: the setup wizard registers the webhook and stores it,
+ * or set it as the RESEND_WEBHOOK_SECRET Worker secret.
  */
 webhookRoutes.post("/resend", async (c) => {
-  const secret = c.env.RESEND_WEBHOOK_SECRET;
+  const secret = await getWebhookSecret(c.env);
   if (!secret) return c.json({ error: "Webhook secret not configured" }, 503);
   const raw = await c.req.text();
   const id = c.req.header("svix-id") ?? null;

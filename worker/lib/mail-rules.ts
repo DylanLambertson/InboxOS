@@ -1,6 +1,7 @@
 import { mailDomains } from "@shared/brand";
 import type { Address } from "@shared/types";
 import type { Env } from "../env";
+import { getResendApiKey } from "./provider-config";
 import { resend } from "./resend";
 import { quotaUsage } from "./send";
 import { getBrand, getPolicy } from "./settings";
@@ -130,7 +131,7 @@ async function sendOne(env: Env, c: AutoReplyCandidate) {
   }
   try {
     const res = await resend.send(
-      env.RESEND_API_KEY,
+      await getResendApiKey(env),
       {
         from: formatAddress({ email: c.toAddress || mb.address, name: mb.display_name || brand.defaultFromName }),
         to: [sender],
