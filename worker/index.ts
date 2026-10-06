@@ -39,6 +39,9 @@ import { templateRoutes } from "./routes/templates";
 import { unsubscribeRoutes } from "./routes/unsubscribe";
 import { webhookRoutes } from "./routes/webhooks";
 import { adminWorkspaceRoutes, workspaceRoutes } from "./routes/workspace";
+import { setupRoutes } from "./routes/setup";
+import { adminSetupRoutes } from "./routes/admin-setup";
+import { adminDomainRoutes } from "./routes/admin-domains";
 
 const app = new Hono<AppEnv>();
 
@@ -116,6 +119,7 @@ app.get("/manifest.webmanifest", async (c) => {
 app.route("/api/auth", authRoutes);
 app.route("/api/auth/passkey", passkeyAuthRoutes);
 app.route("/api/digest", digestPublicRoutes);
+app.route("/api/setup", setupRoutes);
 app.route("/webhooks", webhookRoutes);
 app.route("/unsubscribe", unsubscribeRoutes);
 
@@ -164,6 +168,8 @@ admin.route("/outbound", adminOutboundRoutes);
 admin.route("/settings/workspace", adminWorkspaceRoutes);
 admin.route("/health", adminHealthRoutes);
 admin.route("/search", adminSearchRoutes);
+admin.route("/domains", adminDomainRoutes);
+admin.route("/setup", adminSetupRoutes);
 admin.route("/", adminSystemRoutes);
 api.route("/admin", admin);
 

@@ -5,7 +5,6 @@ import type { AppEnv } from "../env";
 import { audit, requestContext } from "../lib/audit";
 import { renderEmail } from "../lib/email-layout";
 import { templates, type TemplateName } from "../lib/email-templates";
-import { resend } from "../lib/resend";
 import { likeEscape } from "../lib/search";
 import { getOverview } from "../lib/overview";
 import { syncDomainAliases } from "../lib/domains";
@@ -21,16 +20,6 @@ export const adminSystemRoutes = new Hono<AppEnv>();
 // ---- Overview -------------------------------------------------------------
 
 adminSystemRoutes.get("/overview", async (c) => c.json(await getOverview(c.env, c.req.query("refresh") === "1")));
-
-adminSystemRoutes.get("/domains", async (c) => {
-  try {
-    const { data } = await resend.listDomains(c.env.RESEND_API_KEY);
-    return c.json(data);
-  } catch (err) {
-    // Sending-only API keys can't list domains; report instead of failing the page.
-    return c.json({ error: err instanceof Error ? err.message : "Unavailable" }, 200);
-  }
-});
 
 // ---- Settings -------------------------------------------------------------
 
