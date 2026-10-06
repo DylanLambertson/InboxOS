@@ -102,7 +102,8 @@ adminDomainRoutes.post("/", async (c) => {
     }
   }
   await audit(c, { action: "domains.added", targetType: "domain", targetId: body.name, meta: { primary: makePrimary, region: body.region ?? null, receiving: body.receiving, providerError } });
-  return c.json({ ...(await domainDetail(c.env, body.name)), providerError }, 201);
+  const detail = await domainDetail(c.env, body.name);
+  return c.json({ ...detail, providerError: providerError ?? detail.providerError }, 201);
 });
 
 adminDomainRoutes.get("/:name", async (c) => {

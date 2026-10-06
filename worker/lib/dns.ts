@@ -158,7 +158,8 @@ export function existingMailWarning(domain: string, mx: string[], receivingName:
   const existingMx = mx
     .map(parseMx)
     .filter((m): m is NonNullable<ReturnType<typeof parseMx>> => !!m && !isProviderInboundMx(m.host) && m.host !== "")
-    .map((m) => ({ ...m, provider: mailProviderFor(m.host) }));
+    .map((m) => ({ ...m, provider: mailProviderFor(m.host) }))
+    .sort((a, b) => a.priority - b.priority);
   if (!existingMx.length) return { existingMx, mxWarning: null };
   const who = existingMx.find((m) => m.provider)?.provider ?? "another mail service";
   const advice = receivingName === domain ? ` To keep both, use a subdomain such as inbox.${domain} for this app instead.` : "";

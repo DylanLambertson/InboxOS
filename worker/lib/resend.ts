@@ -255,7 +255,7 @@ export function explainKeyError(err: unknown): { problem: KeyProblem; message: s
       message: "This key can only send. The app also needs to read received mail and manage domains, so create a key with Full access.",
     };
   }
-  if (err.status === 401 || err.status === 403 || err.code === "invalid_api_key" || err.code === "missing_api_key") {
+  if (err.status === 401 || err.status === 403 || err.code === "invalid_api_key" || err.code === "missing_api_key" || /api key is invalid|invalid api key/i.test(err.message)) {
     return { problem: "invalid", message: "Resend didn't accept this key. Check that you copied all of it and that it hasn't been deleted." };
   }
   if (err.status === 429) return { problem: "network", message: "Resend is rate limiting requests. Wait a moment and try again." };
