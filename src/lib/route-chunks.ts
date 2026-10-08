@@ -9,6 +9,7 @@ export const pages = {
   login: () => import("../pages/Auth"),
   verifyEmail: () => import("../pages/VerifyEmail"),
   people: () => import("../pages/People"),
+  setup: () => import("../pages/setup"),
 
   settingsLayout: () => import("../pages/settings/SettingsLayout"),
   settingsProfile: () => import("../pages/settings/Profile"),
@@ -68,6 +69,7 @@ const BY_PATH: [string, () => Promise<unknown>][] = [
   ["/admin/logs", pages.adminLogs],
   ["/admin/setup", pages.adminSetup],
   ["/admin", pages.adminOverview],
+  ["/setup", pages.setup],
 ];
 
 const warmed = new Set<string>();

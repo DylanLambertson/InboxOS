@@ -17,6 +17,7 @@ export const router = createBrowserRouter([
   { path: "/invite/:token", lazy: page(p.login, "InvitePage") },
   { path: "/reset/:token", lazy: page(p.login, "ResetPage") },
   { path: "/verify-email/:token", lazy: page(p.verifyEmail, "VerifyEmailPage") },
+  { path: "/setup/:step?", lazy: page(p.setup, "SetupPage") },
   {
     element: <AppShell />,
     children: [
