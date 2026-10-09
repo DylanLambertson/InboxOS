@@ -2,6 +2,7 @@ import { Link } from "react-router";
 import { AlertTriangle, ArrowRight, CheckCircle2, Circle, Minus, TrendingDown, TrendingUp } from "lucide-react";
 import { kpiDelta, type Kpi } from "@shared/admin";
 import type { HealthReport } from "@shared/health";
+import { SETUP_STEPS, STEP_INFO, type PublicSetupStatus } from "@shared/setup";
 import { Card, cx } from "@/components/ui/primitives";
 import { healthHeadline, ScoreRing, StatusIcon, STATUS_META } from "./health-ui";
 
@@ -136,20 +137,12 @@ export function HealthCard({ report, loading }: { report?: HealthReport; loading
   );
 }
 
-export interface SetupStatus {
-  ownerExists: boolean;
-  completed: boolean;
-  steps: Record<string, boolean>;
-}
-
-const stepLabel = (key: string) => {
-  const words = key.replace(/([a-z0-9])([A-Z])/g, "$1 $2").replace(/[_-]+/g, " ").toLowerCase();
-  return words.charAt(0).toUpperCase() + words.slice(1);
-};
+/** GET /api/setup/status (see shared/setup.ts). */
+export type SetupStatus = PublicSetupStatus;
 
 /** "Finish setting up": progress through the setup steps, until they're all done. */
 export function SetupCard({ status }: { status: SetupStatus }) {
-  const steps = Object.entries(status.steps);
+  const steps = SETUP_STEPS.filter((s) => s !== "done" && s !== "owner").map((s) => [s, status.steps[s] === "done"] as const);
   const done = steps.filter(([, v]) => v).length;
   const pct = steps.length ? Math.round((done / steps.length) * 100) : 0;
   return (
@@ -172,7 +165,7 @@ export function SetupCard({ status }: { status: SetupStatus }) {
         {steps.map(([key, ok]) => (
           <li key={key} className={cx("flex items-center gap-2 text-[13px]", ok ? "text-fg-muted" : "text-fg")}>
             {ok ? <CheckCircle2 className="size-4 text-success" /> : <Circle className="size-4 text-fg-faint" />}
-            <span className={cx(ok && "line-through decoration-fg-faint")}>{stepLabel(key)}</span>
+            <span className={cx(ok && "line-through decoration-fg-faint")}>{STEP_INFO[key].label}</span>
           </li>
         ))}
       </ul>

@@ -5,6 +5,7 @@ import type { AppEnv, Env } from "../env";
 import { evaluateHealth, summarize, type HealthSnapshot, type ProviderKeyCheck } from "../lib/health-checks";
 import { lastCronRun } from "../lib/heartbeat";
 import { ipAllowed } from "../lib/ip-allowlist";
+import { getResendApiKey, getWebhookSecret } from "../lib/provider-config";
 import { resend, ResendError } from "../lib/resend";
 import { quotaUsage } from "../lib/send";
 import { loadSettings } from "../lib/settings";
@@ -12,13 +13,8 @@ import { allowlistIp } from "../lib/sign-ins";
 
 export const adminHealthRoutes = new Hono<AppEnv>();
 
-/**
- * The email provider's API key. The only place Health reads it, so a stored-key
- * resolver can replace the environment variable without touching the checks.
- */
-export async function providerApiKey(env: Env): Promise<string | undefined> {
-  return env.RESEND_API_KEY || undefined;
-}
+/** The email provider's API key: the Worker secret, or the key saved in the setup wizard. */
+export const providerApiKey = (env: Env): Promise<string | undefined> => getResendApiKey(env);
 
 const TIMEOUT_MS = 5_000;
 
@@ -55,7 +51,7 @@ async function snapshot(c: Context<AppEnv>): Promise<HealthSnapshot> {
   const t = Date.now();
   const iso = (ms: number) => new Date(ms).toISOString();
   const { brand, policy, workspace } = await loadSettings(db);
-  const key = await providerApiKey(env);
+  const [key, webhookSecret] = await Promise.all([providerApiKey(env), getWebhookSecret(env)]);
 
   const [keyCheck, usage, row, admins, catchAll, cronAt, r2, d1, latestMigration] = await Promise.all([
     key ? checkProviderKey(key) : Promise.resolve(null),
@@ -92,8 +88,8 @@ async function snapshot(c: Context<AppEnv>): Promise<HealthSnapshot> {
       : Promise.resolve(null),
     lastCronRun(db).catch(() => null),
     probe(() => env.FILES.list({ limit: 1 })),
-    // The newest migration we know of (0018) added users.job_title.
-    probe(() => db.prepare("SELECT job_title FROM users LIMIT 1").all()),
+    // A recent migration (0019) added the secrets table.
+    probe(() => db.prepare("SELECT name FROM secrets LIMIT 1").all()),
     db
       .prepare("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")
       .first<{ name: string }>()
@@ -106,7 +102,7 @@ async function snapshot(c: Context<AppEnv>): Promise<HealthSnapshot> {
   const allow = policy.ipAllowlist ?? [];
   return {
     now: t,
-    provider: { keyPresent: !!key, keyCheck, webhookSecret: !!env.RESEND_WEBHOOK_SECRET },
+    provider: { keyPresent: !!key, keyCheck, webhookSecret: !!webhookSecret },
     inbound: { lastWebhookAt: s("last_webhook"), lastInboundAt: s("last_inbound") },
     domains: { primary: brand.primaryDomain, all: mailDomains(brand) },
     cron: { lastRunAt: cronAt, stuckScheduled: n("stuck") },

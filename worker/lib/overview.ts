@@ -1,6 +1,7 @@
 /** Admin dashboard data: quotas, counts, KPIs with deltas, the 14-day chart and recent problems. */
 import type { OverviewData } from "@shared/admin";
 import type { Env } from "../env";
+import { getResendApiKey, getWebhookSecret } from "./provider-config";
 import { quotaUsage } from "./send";
 
 const KPI_DAYS = 7;
@@ -15,6 +16,7 @@ export async function buildOverview(env: Env): Promise<OverviewData> {
   const t = Date.now();
   const cur = new Date(t - KPI_DAYS * 86_400_000).toISOString();
   const prev = new Date(t - 2 * KPI_DAYS * 86_400_000).toISOString();
+  const [apiKey, webhookSecret] = await Promise.all([getResendApiKey(env), getWebhookSecret(env)]);
   const [usage, counts, { results: series }, { results: recentProblems }, { results: kpiRows }, active] = await Promise.all([
     quotaUsage(env),
     db
@@ -83,8 +85,8 @@ export async function buildOverview(env: Env): Promise<OverviewData> {
     series,
     recentProblems,
     provider: {
-      apiKey: !!env.RESEND_API_KEY,
-      webhookSecret: !!env.RESEND_WEBHOOK_SECRET,
+      apiKey: !!apiKey,
+      webhookSecret: !!webhookSecret,
       google: !!env.GOOGLE_CLIENT_ID && !!env.GOOGLE_CLIENT_SECRET,
       webhookUrl: `${env.APP_URL.replace(/\/$/, "")}/webhooks/resend`,
     },
