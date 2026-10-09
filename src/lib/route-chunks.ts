@@ -36,6 +36,7 @@ export const pages = {
   adminOutbound: () => import("../pages/admin/OutboundPolicy"),
   adminLogs: () => import("../pages/admin/Logs"),
   adminSetup: () => import("../pages/admin/Setup"),
+  adminDomains: () => import("../pages/admin/Domains"),
 } satisfies Record<string, () => Promise<unknown>>;
 
 /** A React Router `lazy` for one named export of a page module. */
@@ -68,6 +69,7 @@ const BY_PATH: [string, () => Promise<unknown>][] = [
   ["/admin/outbound", pages.adminOutbound],
   ["/admin/logs", pages.adminLogs],
   ["/admin/setup", pages.adminSetup],
+  ["/admin/domains", pages.adminDomains],
   ["/admin", pages.adminOverview],
   ["/setup", pages.setup],
 ];

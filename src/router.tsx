@@ -57,6 +57,7 @@ export const router = createBrowserRouter([
           { path: "outbound", lazy: page(p.adminOutbound, "AdminOutboundPolicy") },
           { path: "logs/:kind?", lazy: page(p.adminLogs, "AdminLogs") },
           { path: "setup", lazy: page(p.adminSetup, "AdminSetup") },
+          { path: "domains", lazy: page(p.adminDomains, "AdminDomains") },
         ],
       },
     ],
