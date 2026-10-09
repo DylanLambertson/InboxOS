@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, CheckCircle2, FingerprintPattern, KeyRound } from "lucide-react";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
+import { useSetupStatus } from "@/lib/setup";
 import { Logo } from "@/components/layout/Logo";
 import { AuthHero } from "@/components/auth/AuthHero";
 import { Button, Field, Input, Spinner } from "@/components/ui/primitives";
@@ -87,7 +88,8 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
  */
 function EmailField({ id, value, onChange, autoComplete, autoFocus }: { id?: string; value: string; onChange: (v: string) => void; autoComplete: string; autoFocus?: boolean }) {
   const brand = useBrand();
-  const full = value.includes("@");
+  // Without a domain yet (fresh install), it's a plain email field.
+  const full = value.includes("@") || !brand.primaryDomain;
   return (
     <div className="group flex h-10 w-full items-stretch overflow-hidden rounded-ui border border-line bg-surface transition-colors hover:border-line-strong focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft">
       <input
@@ -122,7 +124,7 @@ function EmailField({ id, value, onChange, autoComplete, autoFocus }: { id?: str
 /** Turn the field's value into a full address. */
 const fullEmail = (v: string, domain: string) => {
   const t = v.trim().toLowerCase();
-  return !t ? "" : t.includes("@") ? t : `${t}@${domain}`;
+  return !t ? "" : t.includes("@") || !domain ? t : `${t}@${domain}`;
 };
 
 function ErrorNote({ children }: { children: ReactNode }) {
@@ -183,6 +185,11 @@ export function LoginPage() {
     if (state?.signedIn) navigate(next, { replace: true });
     if (state?.mfaPending) setStep("2fa");
   }, [state, next, navigate]);
+  // A fresh install has nobody to sign in yet: start the setup wizard instead.
+  const { data: setup } = useSetupStatus();
+  useEffect(() => {
+    if (setup && !setup.ownerExists) navigate("/setup", { replace: true });
+  }, [setup, navigate]);
 
   const done = async () => {
     await qc.invalidateQueries();

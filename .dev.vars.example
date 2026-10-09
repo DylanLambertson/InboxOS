@@ -1,7 +1,10 @@
 # Copy to .dev.vars for local development (never commit .dev.vars)
 APP_URL=http://localhost:5173
 SESSION_SECRET=change-me-to-a-long-random-string
-RESEND_API_KEY=re_xxxxxxxxx
-RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxx
+# Optional: a separate key for creating the first owner in the setup wizard (otherwise SESSION_SECRET).
+# SETUP_TOKEN=
+# Optional: the setup wizard can store these in the app instead.
+# RESEND_API_KEY=re_xxxxxxxxx
+# RESEND_WEBHOOK_SECRET=whsec_xxxxxxxxx
 GOOGLE_CLIENT_ID=
 GOOGLE_CLIENT_SECRET=

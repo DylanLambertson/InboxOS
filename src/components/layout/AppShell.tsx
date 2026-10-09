@@ -13,6 +13,7 @@ import { IconButton, Kbd, Spinner } from "../ui/primitives";
 import { Modal } from "../ui/overlay";
 import { PaletteHost } from "../palette/PaletteHost";
 import { InstallPrompt } from "./InstallPrompt";
+import { SetupBanner } from "../setup/SetupBanner";
 import { Logo } from "./Logo";
 import { Sidebar } from "./Sidebar";
 
@@ -111,6 +112,7 @@ export function AppShell() {
             </IconButton>
           </div>
           <InstallPrompt />
+          <SetupBanner />
           {me.mustEnroll2fa && (
             <div className="flex items-center gap-2 border-b border-warning/30 bg-warning-soft px-4 py-2 text-[13px] text-warning">
               <ShieldAlert className="size-4" /> Your organization requires two-factor authentication. Add a passkey or set up an authenticator app below to continue.
