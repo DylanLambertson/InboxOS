@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 /**
- * Create the first owner account (and their personal mailbox).
+ * Recovery tool: create an owner account, or make an existing account an active
+ * owner with a new password (for example when you're locked out).
+ *
+ * On a fresh install you don't need this: open the app and the setup wizard
+ * (/setup) creates the first owner and walks through everything else.
  *
  *   npm run bootstrap:local  -- --email you@example.com --name "Your Name"
  *   npm run bootstrap:remote -- --email you@example.com --name "Your Name"
  *
- * You'll be prompted for a password. Pass --no-mailbox to skip creating a mailbox.
+ * You'll be prompted for a password. Pass --no-mailbox to skip creating a mailbox
+ * at that address (usually what you want when the email isn't on your domain).
  */
 import { execFileSync } from "node:child_process";
 import { pbkdf2Sync, randomBytes } from "node:crypto";
@@ -22,7 +27,8 @@ const name = (flag("name") ?? "").trim();
 const withMailbox = !args.includes("--no-mailbox");
 
 if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-  console.error("Usage: npm run bootstrap:local -- --email you@example.com --name \"Your Name\"");
+  console.error("Usage: npm run bootstrap:local -- --email you@example.com --name \"Your Name\" [--no-mailbox]");
+  console.error("Creates an owner or resets an owner's password. For a fresh install, open the app instead: the setup wizard does this.");
   process.exit(1);
 }
 
