@@ -10,6 +10,7 @@ export { AdminFeatures } from "./Features";
 export { AdminPolicy } from "./Policy";
 export { AdminLogs } from "./Logs";
 export { AdminSetup } from "./Setup";
+export { AdminDomains } from "./Domains";
 export { AdminApiKeys } from "./ApiKeys";
 export { AdminUnsubscribes } from "./Unsubscribes";
 export { AdminSecurity } from "./Security";
