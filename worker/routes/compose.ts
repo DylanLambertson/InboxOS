@@ -11,6 +11,7 @@ import { forwardQuote, prefixSubject, replyQuote } from "../lib/quote";
 import { deliverMessage, SendError } from "../lib/send";
 import { htmlToText, makeSnippet, newId, normalizeSubject, now, parseJson } from "../lib/util";
 import { parseBody, zAddress, zId } from "../lib/validate";
+import { requestCtx } from "../lib/webhooks";
 
 export const composeRoutes = new Hono<AppEnv>();
 
@@ -283,7 +284,7 @@ composeRoutes.post("/:id/send", async (c) => {
     .run();
   if (!claim.meta.changes) throw new HTTPException(409, { message: "This message is already being sent." });
   try {
-    const sent = await deliverMessage(c.env, m.id);
+    const sent = await deliverMessage(c.env, m.id, requestCtx(c));
     await audit(c, { action: "message.sent", targetType: "message", targetId: m.id, meta: { mailboxId: m.mailbox_id, recipients: to } });
     return c.json({ ok: true, id: sent.id, status: sent.status });
   } catch (err) {

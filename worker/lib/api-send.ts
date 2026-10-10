@@ -13,6 +13,7 @@ import { rateLimit } from "./ratelimit";
 import { deliverMessage, SendError } from "./send";
 import { unsubscribeFooter, unsubscribeHeaders, unsubscribeUrl } from "./unsubscribe";
 import { escapeHtml, htmlToText, makeSnippet, newId, normalizeSubject, now, parseAddress, parseJson } from "./util";
+import { requestCtx } from "./webhooks";
 
 export interface ApiSendInput {
   /** "Name <address>" or a bare address of a mailbox (or alias) the key may use. */
@@ -256,7 +257,7 @@ export async function apiSend(c: Context<AppEnv>, input: ApiSendInput): Promise<
 
   await db.prepare("UPDATE messages SET status = 'queued' WHERE id = ?").bind(id).run();
   try {
-    const sent = await deliverMessage(env, id);
+    const sent = await deliverMessage(env, id, requestCtx(c));
     await audit(c, { action: "api.message_sent", targetType: "message", targetId: id, meta: auditMeta, actor });
     return result(sent);
   } catch (err) {

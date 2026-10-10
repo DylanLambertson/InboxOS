@@ -2,11 +2,12 @@ import { Hono } from "hono";
 import type { AppEnv } from "../env";
 import { ingestReceived, recordDeliveryEvent } from "../lib/inbound";
 import { sendAutoReplies } from "../lib/mail-rules";
-import { notifyReceived } from "../lib/notify";
 import { getWebhookSecret } from "../lib/provider-config";
 import { pushNewMail } from "../lib/push";
 import { verifySvix } from "../lib/svix";
 import { now } from "../lib/util";
+import { deliveryEvent, receivedEvents } from "../lib/webhook-events";
+import { emitFromRequest } from "../lib/webhooks";
 
 export const webhookRoutes = new Hono<AppEnv>();
 
@@ -38,13 +39,14 @@ webhookRoutes.post("/resend", async (c) => {
   try {
     if (evt.type === "email.received") {
       const r = await ingestReceived(c.env, evt.data);
-      if (r.received.length) c.executionCtx.waitUntil(notifyReceived(c.env, r.received));
+      if (r.routed.length) emitFromRequest(c, receivedEvents(c.env.DB, r.routed));
       if (r.received.length) c.executionCtx.waitUntil(pushNewMail(c.env, r.received));
       if (r.autoReplies.length) c.executionCtx.waitUntil(sendAutoReplies(c.env, r.autoReplies));
       return c.json({ ok: true, stored: r.stored, unrouted: r.unrouted });
     }
     if (evt.type.startsWith("email.")) {
-      await recordDeliveryEvent(c.env, evt.type, evt.data, raw);
+      const message = await recordDeliveryEvent(c.env, evt.type, evt.data, raw);
+      emitFromRequest(c, deliveryEvent(c.env.DB, evt.type, evt.data, message).then((e) => (e ? [e] : [])));
     }
     return c.json({ ok: true });
   } catch (err) {

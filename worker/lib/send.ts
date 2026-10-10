@@ -6,6 +6,8 @@ import { getResendApiKey } from "./provider-config";
 import { resend, ResendError, type ResendAttachment } from "./resend";
 import { getBrand, getPolicy } from "./settings";
 import { b64encode, domainOf, formatAddress, htmlToText, makeSnippet, newId, now, parseJson } from "./util";
+import { sentEvent } from "./webhook-events";
+import { emitEvents, type WaitUntil } from "./webhooks";
 
 export interface QuotaUsage {
   /** All emails sent through the provider, including system emails. */
@@ -66,7 +68,7 @@ function wrapHtml(inner: string, fontFamily: string): string {
  * Deliver a stored draft/scheduled message through Resend and move it to Sent.
  * Throws SendError on validation/quota problems; provider failures mark the message failed.
  */
-export async function deliverMessage(env: Env, messageId: string): Promise<MessageRow> {
+export async function deliverMessage(env: Env, messageId: string, ctx?: WaitUntil | null): Promise<MessageRow> {
   const msg = await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(messageId).first<MessageRow>();
   if (!msg) throw new SendError("Message not found", 404);
   if (!["draft", "scheduled", "queued", "failed"].includes(msg.status)) {
@@ -215,7 +217,14 @@ export async function deliverMessage(env: Env, messageId: string): Promise<Messa
     ]);
     throw new SendError(`Sending failed: ${message}`, 502);
   }
-  return (await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(msg.id).first<MessageRow>())!;
+  const sent = (await env.DB.prepare("SELECT * FROM messages WHERE id = ?").bind(msg.id).first<MessageRow>())!;
+  // Outbound webhooks: in the background after a request, inline from the cron.
+  const notify = sentEvent(env.DB, sent, mailbox.address, meta.api?.fromName || mailbox.display_name || brand.defaultFromName)
+    .then((ev) => emitEvents(env, ctx, [ev]))
+    .catch((err) => console.error("message.sent webhook failed", msg.id, err));
+  if (ctx) ctx.waitUntil(notify);
+  else await notify;
+  return sent;
 }
 
 /** Cron: send scheduled messages whose time has come. */

@@ -1,6 +1,6 @@
 import { DEFAULT_PREFERENCES, type Preferences } from "@shared/types";
 import type { Env } from "../env";
-import type { ReceivedNotice } from "./notify";
+import type { ReceivedNotice } from "./inbound";
 import { featureEnabled } from "./features";
 import { getBrand } from "./settings";
 import { b64url, b64decode, parseJson } from "./util";

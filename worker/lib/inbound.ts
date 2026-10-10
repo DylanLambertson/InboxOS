@@ -3,12 +3,24 @@ import type { Env } from "../env";
 import { reopenOnInbound } from "./collab";
 import { attachmentKey, bodyKey, contactStatements, ftsStatements, resolveThread } from "./messages";
 import { isBlocked, type AutoReplyCandidate } from "./mail-rules";
-import type { ReceivedNotice } from "./notify";
 import { applyRulesOnIngest } from "./rules";
 import { getResendApiKey } from "./provider-config";
 import { resend, type ReceivedEmail } from "./resend";
 import { getPolicy } from "./settings";
 import { htmlToText, makeSnippet, newId, normalizeSubject, now, parseAddress, parseAddressList, sanitizeFilename } from "./util";
+
+/** New mail worth a notification (push), one per mailbox it landed in. */
+export interface ReceivedNotice {
+  mailboxId: string;
+  message: { id: string; threadId: string; from: Address; subject: string; snippet: string; date: string };
+}
+
+/** A message filed into a real mailbox (anything but the unrouted area), for outbound webhooks. */
+export interface RoutedMessage {
+  mailboxId: string;
+  folder: string;
+  message: { id: string; threadId: string; from: Address; to: Address[]; cc: Address[]; subject: string; snippet: string; hasAttachments: boolean; date: string };
+}
 
 interface ReceivedEvent {
   email_id: string;
@@ -60,7 +72,7 @@ async function downloadAttachments(env: Env, email: ReceivedEmail) {
 export async function ingestReceived(
   env: Env,
   evt: ReceivedEvent,
-): Promise<{ stored: number; unrouted: boolean; received: ReceivedNotice[]; autoReplies: AutoReplyCandidate[] }> {
+): Promise<{ stored: number; unrouted: boolean; received: ReceivedNotice[]; routed: RoutedMessage[]; autoReplies: AutoReplyCandidate[] }> {
   const email = await resend.getReceived(await getResendApiKey(env), evt.email_id);
   const h = email.headers ?? {};
   const recipients = [
@@ -97,6 +109,7 @@ export async function ingestReceived(
 
   let stored = 0;
   const received: ReceivedNotice[] = [];
+  const routed: RoutedMessage[] = [];
   const autoReplies: AutoReplyCandidate[] = [];
   for (const mailboxId of mailboxIds) {
     const dup = await env.DB.prepare("SELECT id FROM messages WHERE mailbox_id = ? AND resend_id = ?")
@@ -202,7 +215,14 @@ export async function ingestReceived(
     stored++;
     // A customer reply puts a pending/closed conversation back in front of the team.
     if (!unrouted && folder === "inbox") await reopenOnInbound(env.DB, { mailboxId, threadId });
-    // Routed mail is worth telling the panel about; unrouted lands in the admin-only area.
+    if (!unrouted) {
+      routed.push({
+        mailboxId,
+        folder,
+        message: { id, threadId, from, to, cc, subject, snippet: makeSnippet(text), hasAttachments: visibleAttachments > 0, date: t },
+      });
+    }
+    // Routed mail in the inbox is worth a notification; unrouted lands in the admin-only area.
     if (!unrouted && folder === "inbox") {
       if (!ruled.read) received.push({ mailboxId, message: { id, threadId, from, subject, snippet: makeSnippet(text), date: t } });
       const ours = await mailboxAddressSet(env.DB, mailboxId);
@@ -210,7 +230,7 @@ export async function ingestReceived(
       autoReplies.push({ mailboxId, toAddress, from, subject, messageIdHeader, references, headers: lowerHeaders });
     }
   }
-  return { stored, unrouted, received, autoReplies };
+  return { stored, unrouted, received, routed, autoReplies };
 }
 
 /** Higher rank wins, so late or out-of-order webhooks never downgrade a status. */
@@ -235,7 +255,7 @@ const EVENT_STATUS: Record<string, MessageStatus | undefined> = {
   "email.suppressed": "suppressed",
 };
 
-interface DeliveryEventData {
+export interface DeliveryEventData {
   email_id: string;
   to?: string[];
   bounce?: { message?: string; type?: string; subType?: string };
@@ -252,11 +272,17 @@ function describe(type: string, d: DeliveryEventData): string | null {
   return null;
 }
 
-export async function recordDeliveryEvent(env: Env, type: string, data: DeliveryEventData, raw: string): Promise<void> {
+/** Record a provider delivery event; returns the message it was about, when we have it. */
+export async function recordDeliveryEvent(
+  env: Env,
+  type: string,
+  data: DeliveryEventData,
+  raw: string,
+): Promise<{ messageId: string; mailboxId: string } | null> {
   const t = now();
-  const msg = await env.DB.prepare("SELECT id, status FROM messages WHERE resend_id = ? AND direction = 'outbound'")
+  const msg = await env.DB.prepare("SELECT id, mailbox_id, status FROM messages WHERE resend_id = ? AND direction = 'outbound'")
     .bind(data.email_id)
-    .first<{ id: string; status: MessageStatus }>();
+    .first<{ id: string; mailbox_id: string; status: MessageStatus }>();
   const stmts: D1PreparedStatement[] = [
     env.DB.prepare(
       "INSERT INTO email_events (id, message_id, resend_id, type, recipient, detail, payload, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
@@ -294,6 +320,7 @@ export async function recordDeliveryEvent(env: Env, type: string, data: Delivery
     }
   }
   await env.DB.batch(stmts);
+  return msg ? { messageId: msg.id, mailboxId: msg.mailbox_id } : null;
 }
 
 /** A mailbox's own address and aliases, lowercased. */

@@ -17,6 +17,7 @@ import { adminSecurityRoutes } from "./routes/admin-security";
 import { adminSystemRoutes } from "./routes/admin-system";
 import { adminTrafficRoutes } from "./routes/admin-traffic";
 import { adminUserRoutes } from "./routes/admin-users";
+import { adminWebhookRoutes } from "./routes/admin-webhooks";
 import { apiV1Routes } from "./routes/api-v1";
 import { attachmentRoutes } from "./routes/attachments";
 import { authRoutes } from "./routes/auth";
@@ -170,6 +171,7 @@ admin.route("/health", adminHealthRoutes);
 admin.route("/search", adminSearchRoutes);
 admin.route("/domains", adminDomainRoutes);
 admin.route("/setup", adminSetupRoutes);
+admin.route("/webhooks", adminWebhookRoutes);
 admin.route("/", adminSystemRoutes);
 api.route("/admin", admin);
 

@@ -7,6 +7,7 @@ import { heldMailboxIds, heldParam, notHeldSql } from "./lib/legal-hold";
 import { runRetention } from "./lib/retention";
 import { getPolicy } from "./lib/settings";
 import { now } from "./lib/util";
+import { runWebhookDeliveries } from "./lib/webhooks";
 
 /** Runs every minute: scheduled sends. Once an hour (minute 0): housekeeping. */
 export async function runCron(env: Env, scheduledTime: number): Promise<void> {
@@ -19,6 +20,8 @@ export async function runCron(env: Env, scheduledTime: number): Promise<void> {
   // After snoozed mail wakes, so it can be in the digest.
   const digests = await runDigests(env);
   if (digests) console.log(`cron: sent ${digests} unread-mail digest(s)`);
+  const hooks = await runWebhookDeliveries(env).catch((err) => (console.error("cron: webhook retries failed", err), 0));
+  if (hooks) console.log(`cron: retried ${hooks} webhook delivery(ies)`);
   if (new Date(scheduledTime).getUTCMinutes() === 0) await housekeeping(env);
 }
 
@@ -72,6 +75,7 @@ export async function housekeeping(env: Env): Promise<void> {
       env.DB.prepare("DELETE FROM email_events WHERE created_at < ?").bind(ago(policy.logRetentionDays)),
       env.DB.prepare("DELETE FROM audit_logs WHERE created_at < ?").bind(ago(policy.logRetentionDays)),
       env.DB.prepare("DELETE FROM login_events WHERE created_at < ?").bind(ago(policy.logRetentionDays)),
+      env.DB.prepare("DELETE FROM webhook_deliveries WHERE created_at < ? AND status != 'pending'").bind(ago(policy.logRetentionDays)),
     );
   }
   await env.DB.batch(stmts);
