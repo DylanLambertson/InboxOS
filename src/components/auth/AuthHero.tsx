@@ -149,7 +149,7 @@ export function AuthHero() {
             </li>
           ))}
         </ul>
-        <p className="mt-8 text-xs text-white/35">{brand.productName} · {brand.footerText}</p>
+        <p className="mt-8 text-xs text-white/35">{[brand.productName, brand.footerText].filter(Boolean).join(" · ")}</p>
       </div>
     </div>
   );

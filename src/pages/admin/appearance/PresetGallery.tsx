@@ -60,7 +60,7 @@ export function PresetGallery({
 
   return (
     <Section title="Start from a preset" description="Each use case comes with a look. Pick one as a starting point, then adjust anything below.">
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid gap-3 sm:grid-cols-2 2xl:grid-cols-3">
         {USE_CASE_PRESETS.map((p) => {
           const Icon = PRESET_ICONS[p.icon] ?? Paintbrush;
           return (
@@ -68,13 +68,17 @@ export function PresetGallery({
               key={p.id}
               type="button"
               onClick={() => setPicked(p)}
-              className="group flex flex-col gap-2.5 rounded-ui-lg border border-line bg-surface p-3 text-left transition-colors hover:border-line-strong hover:bg-subtle focus-visible:border-accent"
+              aria-current={currentUseCase === p.id || undefined}
+              className={cx(
+                "group flex flex-col gap-2.5 rounded-ui-lg border bg-surface p-3 text-left transition-colors hover:bg-subtle focus-visible:border-accent",
+                currentUseCase === p.id ? "border-accent" : "border-line hover:border-line-strong",
+              )}
             >
               <Swatch preset={p} />
               <div className="flex items-start gap-2">
                 <Icon className="mt-0.5 size-4 shrink-0 text-fg-muted" />
                 <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-1.5 text-[13px] font-medium">
+                  <div className="flex flex-wrap items-center gap-1.5 text-[13px] font-medium">
                     {p.label}
                     {currentUseCase === p.id && <Badge tone="accent">Current</Badge>}
                   </div>

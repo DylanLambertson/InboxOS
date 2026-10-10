@@ -1,11 +1,17 @@
 import { lazy, Suspense, useEffect, useState } from "react";
 
-// The palette itself is a separate chunk, fetched the first time it opens.
-const CommandPalette = lazy(() => import("./CommandPalette"));
+// The palette is a separate chunk. It's fetched when the browser is idle after the app
+// loads, so the first ⌘K opens instantly and no keystrokes are lost while it loads.
+const loadPalette = () => import("./CommandPalette");
+const CommandPalette = lazy(loadPalette);
 
 /** ⌘K / Ctrl+K anywhere opens the command palette; so does an `io:palette` event (e.g. a search button). */
 export function PaletteHost() {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const idle = window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1500));
+    idle(() => void loadPalette());
+  }, []);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.defaultPrevented || e.altKey || e.shiftKey || !(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "k") return;

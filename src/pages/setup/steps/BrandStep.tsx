@@ -13,9 +13,14 @@ import { Panel, StepFrame, type StepProps } from "../StepFrame";
 
 const SWATCHES = ["#4f46e5", "#2563eb", "#0891b2", "#0f766e", "#16a34a", "#ca8a04", "#ea580c", "#dc2626", "#db2777", "#7c3aed", "#334155", "#18181b"];
 
-/** Up to two initials, used when there's no logo. */
-export const monogramFor = (name: string) =>
-  (name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("") || "IO").toUpperCase().slice(0, 2);
+/** Up to two initials, used when there's no logo: "Acme Mail" → "AM", "InboxOS" → "IO", "Acme" → "A". */
+export function monogramFor(name: string): string {
+  const words = name.trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return "IO";
+  if (words.length > 1) return words.slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const capitals = words[0].replace(/[^A-Z]/g, "");
+  return (capitals.length >= 2 ? capitals : words[0][0]).slice(0, 2).toUpperCase();
+}
 
 /** A tiny, live picture of the app with the chosen name, logo and color. */
 function MiniPreview({ productName, logoUrl, accent }: { productName: string; logoUrl: string; accent: string }) {

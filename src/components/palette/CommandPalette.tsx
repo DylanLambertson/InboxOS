@@ -175,8 +175,12 @@ export default function CommandPalette({ onClose }: { onClose: () => void }) {
   // Focus the input on open, give focus back on close.
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
-    requestAnimationFrame(() => input.current?.focus());
-    return () => prev?.focus?.();
+    input.current?.focus();
+    const raf = requestAnimationFrame(() => input.current?.focus());
+    return () => {
+      cancelAnimationFrame(raf);
+      prev?.focus?.();
+    };
   }, []);
 
   const run = (c: Command | undefined) => {
