@@ -1,8 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { Inbox, PenSquare, Send, Star, Upload } from "lucide-react";
+import { AlertTriangle, Inbox, PenSquare, Send, Star, Upload } from "lucide-react";
 import { toast } from "sonner";
 import type { Brand } from "@shared/brand";
+import { contrastRatio } from "@shared/contrast";
+import { resolvePalettes } from "@shared/theme";
 import { api, errorMessage } from "@/lib/api";
 import { applyThemeTokens, readableOn, useBrand } from "@/lib/brand";
 import { useRefreshSetup } from "@/lib/setup";
@@ -70,6 +72,24 @@ function MiniPreview({ productName, logoUrl, accent }: { productName: string; lo
   );
 }
 
+/** Warn when the accent is hard to see as links and highlights on the page background. */
+function AccentContrast({ accent }: { accent: string }) {
+  const brand = useBrand();
+  if (!/^#[0-9a-f]{6}$/i.test(accent)) return null;
+  const { light, dark } = resolvePalettes(brand.theme);
+  const weak = [
+    contrastRatio(accent, light.bg) < 3 && "light",
+    contrastRatio(accent, dark.bg) < 3 && "dark",
+  ].filter(Boolean);
+  if (!weak.length) return null;
+  return (
+    <p className="flex items-start gap-1.5 text-xs text-warning">
+      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
+      This color is hard to read on {weak.join(" and ")} backgrounds. A deeper or brighter shade works better; Admin → Appearance can check every color pairing.
+    </p>
+  );
+}
+
 export function BrandStep({ setup, next, skip, back }: StepProps) {
   const brand = useBrand();
   const qc = useQueryClient();
@@ -127,7 +147,7 @@ export function BrandStep({ setup, next, skip, back }: StepProps) {
   return (
     <StepFrame
       title="Make it yours"
-      description="Your company name appears in emails and on the sign-in page. Everything here can be fine-tuned later in Admin → Branding."
+      description="Your company name appears in emails and on the sign-in page. You can change it all later: identity in Admin → Branding, colors, fonts and dark mode in Admin → Appearance."
       onBack={back}
       onSkip={skip}
       onContinue={save}
@@ -192,6 +212,7 @@ export function BrandStep({ setup, next, skip, back }: StepProps) {
         <div className="space-y-2">
           <p className="text-xs font-medium text-fg-muted">Preview</p>
           <MiniPreview productName={productName} logoUrl={brand.logoUrl} accent={accent} />
+          <AccentContrast accent={accent} />
           <p className="text-xs text-fg-faint">
             {setup.steps.useCase === "done" ? "Spacing and corners come from your use case; " : ""}the color shows across this page as you pick it.
           </p>
