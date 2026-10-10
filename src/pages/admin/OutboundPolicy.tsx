@@ -156,7 +156,7 @@ export function AdminOutboundPolicy() {
     <div className="space-y-6">
       <PageHeader
         title="Signatures & DLP"
-        description="Company signatures, a legal disclaimer, and checks that stop sensitive data leaving by email. Applies to every send: the app, scheduled mail, the API and MCP."
+        description="Company signatures, a legal disclaimer, and checks that stop sensitive data leaving by email. Applies to every send: the app, scheduled mail, the API and MCP clients."
         actions={canManage ? <Button variant="primary" loading={busy} onClick={save}>Save changes</Button> : undefined}
       />
       <Tabs<Tab>
@@ -273,7 +273,7 @@ export function AdminOutboundPolicy() {
         <>
           <Section
             title="Sensitive data checks"
-            description="Checked in the subject, body, quoted text and attachment names before anything is sent. Warn asks the sender to confirm; Block refuses to send, from the app, the API and MCP alike. Every warning and block is recorded in the audit log, without the data itself."
+            description="Checked in the subject, body, quoted text and attachment names before anything is sent. Warn asks the sender to confirm; Block refuses to send, from the app, the API and MCP clients alike. Every warning and block is recorded in the audit log, without the data itself."
           >
             <div className="divide-y divide-line">
               {DLP_RULES.map((r) => (
