@@ -305,3 +305,23 @@ export async function runWebhookDeliveries(env: Env, limit = 50): Promise<number
   await deliverMany(env, results.map((r) => r.id));
   return results.length;
 }
+
+/** Consecutive failures before Admin → Health calls an endpoint failing. */
+export const WEBHOOK_FAILING_STREAK = 3;
+
+/** For Admin → Health: how many endpoints exist, which keep failing and which were switched off automatically. */
+export async function webhookHealth(db: D1Database): Promise<{ endpoints: number; failing: { url: string; streak: number }[]; autoDisabled: string[] } | undefined> {
+  try {
+    const { results } = await db
+      .prepare("SELECT url, enabled, failure_streak, disabled_reason FROM webhook_endpoints")
+      .all<{ url: string; enabled: number; failure_streak: number; disabled_reason: string | null }>();
+    return {
+      endpoints: results.length,
+      failing: results.filter((e) => e.enabled && e.failure_streak >= WEBHOOK_FAILING_STREAK).map((e) => ({ url: e.url, streak: e.failure_streak })),
+      autoDisabled: results.filter((e) => !e.enabled && e.disabled_reason).map((e) => e.url),
+    };
+  } catch {
+    // Before migration 0021 there's nothing to report.
+    return undefined;
+  }
+}

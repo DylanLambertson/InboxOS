@@ -10,6 +10,7 @@ import {
   sendingChecks,
   storageChecks,
   summarize,
+  webhookChecks,
   type HealthSnapshot,
 } from "../worker/lib/health-checks";
 import { healthIssueCount } from "../shared/health";
@@ -288,5 +289,21 @@ describe("health: summary", () => {
     expect(ago(minutesAgo(1), NOW)).toBe("1 minute ago");
     expect(ago(minutesAgo(120), NOW)).toBe("2 hours ago");
     expect(ago(minutesAgo(3 * 24 * 60), NOW)).toBe("3 days ago");
+  });
+});
+
+describe("health: outbound webhooks", () => {
+  it("says nothing when webhooks aren't used", () => {
+    expect(webhookChecks(healthy())).toEqual([]);
+    expect(webhookChecks({ ...healthy(), webhooks: { endpoints: 0, failing: [], autoDisabled: [] } })).toEqual([]);
+  });
+  it("is ok while endpoints deliver, and warns about failing or switched-off ones", () => {
+    expect(webhookChecks({ ...healthy(), webhooks: { endpoints: 2, failing: [], autoDisabled: [] } })[0].status).toBe("ok");
+    const failing = webhookChecks({ ...healthy(), webhooks: { endpoints: 2, failing: [{ url: "https://a.example/h", streak: 5 }], autoDisabled: [] } })[0];
+    expect(failing).toMatchObject({ status: "warn", title: "1 webhook endpoint failing" });
+    expect(failing.detail).toContain("5 times");
+    const off = webhookChecks({ ...healthy(), webhooks: { endpoints: 1, failing: [], autoDisabled: ["https://b.example/h"] } })[0];
+    expect(off.title).toBe("1 webhook endpoint turned off after failing");
+    expect(off.fix?.to).toBe("/admin/webhooks");
   });
 });

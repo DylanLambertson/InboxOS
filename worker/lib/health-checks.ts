@@ -57,6 +57,8 @@ export interface HealthSnapshot {
   };
   storage: { r2: { ok: boolean; message?: string }; d1: { ok: boolean; latest: string | null; message?: string } };
   routing: { unrouted: number; allTraffic: boolean; catchAll: string | null; catchAllMissing: boolean };
+  /** Outbound webhooks, when the feature is on and endpoints exist. */
+  webhooks?: { endpoints: number; failing: { url: string; streak: number }[]; autoDisabled: string[] };
 }
 
 /** "5 minutes ago", "3 days ago": coarse ages for check details. */
@@ -449,10 +451,45 @@ export function routingChecks(s: HealthSnapshot): HealthCheck[] {
   return out;
 }
 
+// ---- Outbound webhooks ----------------------------------------------------------------------
+
+/** Webhook endpoints that keep failing, or were switched off automatically. Nothing when unused. */
+export function webhookChecks(s: HealthSnapshot): HealthCheck[] {
+  const w = s.webhooks;
+  if (!w || !w.endpoints) return [];
+  const fix = { label: "Open webhooks", to: "/admin/webhooks" };
+  if (w.autoDisabled.length) {
+    return [
+      {
+        id: "jobs.webhooks",
+        area: "jobs",
+        status: "warn",
+        title: `${plural(w.autoDisabled.length, "webhook endpoint")} turned off after failing`,
+        detail: `${w.autoDisabled.slice(0, 3).join(", ")} stopped answering, so deliveries were paused. Fix the receiver, then turn it back on.`,
+        fix,
+      },
+    ];
+  }
+  if (w.failing.length) {
+    const worst = [...w.failing].sort((a, b) => b.streak - a.streak)[0];
+    return [
+      {
+        id: "jobs.webhooks",
+        area: "jobs",
+        status: "warn",
+        title: `${plural(w.failing.length, "webhook endpoint")} failing`,
+        detail: `${worst.url} has failed ${plural(worst.streak, "time")} in a row. Deliveries are retried for about a day.`,
+        fix,
+      },
+    ];
+  }
+  return [{ id: "jobs.webhooks", area: "jobs", status: "ok", title: "Webhooks delivering", detail: `${plural(w.endpoints, "endpoint")}, none failing.` }];
+}
+
 // ---- Report ---------------------------------------------------------------------------------
 
 export function evaluateHealth(s: HealthSnapshot): HealthCheck[] {
-  return [...providerChecks(s), ...domainChecks(s), ...jobChecks(s), ...sendingChecks(s), ...securityChecks(s), ...storageChecks(s), ...routingChecks(s)];
+  return [...providerChecks(s), ...domainChecks(s), ...jobChecks(s), ...webhookChecks(s), ...sendingChecks(s), ...securityChecks(s), ...storageChecks(s), ...routingChecks(s)];
 }
 
 const WEIGHT: Record<HealthStatus, number | null> = { ok: 1, warn: 0.5, fail: 0, info: null };

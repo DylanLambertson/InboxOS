@@ -4,6 +4,7 @@ import { mailDomains } from "@shared/brand";
 import type { AppEnv, Env } from "../env";
 import { evaluateHealth, summarize, type HealthSnapshot, type ProviderKeyCheck } from "../lib/health-checks";
 import { lastCronRun } from "../lib/heartbeat";
+import { webhookHealth } from "../lib/webhooks";
 import { ipAllowed } from "../lib/ip-allowlist";
 import { getResendApiKey, getWebhookSecret } from "../lib/provider-config";
 import { resend, ResendError } from "../lib/resend";
@@ -97,6 +98,7 @@ async function snapshot(c: Context<AppEnv>): Promise<HealthSnapshot> {
       .catch(() => null),
   ]);
 
+  const webhooks = workspace.features.webhooks ? await webhookHealth(db) : undefined;
   const n = (k: string) => Number(row?.[k] ?? 0);
   const s = (k: string) => (row?.[k] as string | null) ?? null;
   const allow = policy.ipAllowlist ?? [];
@@ -146,6 +148,7 @@ async function snapshot(c: Context<AppEnv>): Promise<HealthSnapshot> {
       catchAll: catchAll?.address ?? null,
       catchAllMissing: !!policy.catchAllMailboxId && !catchAll,
     },
+    webhooks,
   };
 }
 
