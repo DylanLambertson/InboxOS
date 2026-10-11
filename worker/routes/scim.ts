@@ -33,6 +33,7 @@ import { mailDomains } from "@shared/brand";
 import { getBrand, getPolicy } from "../lib/settings";
 import { ensureMailbox, getUserByEmail, insertUser, offboardStatements } from "../lib/users";
 import { now } from "../lib/util";
+import { emitFromRequest } from "../lib/webhooks";
 import { emailInvite, issueToken } from "./admin-users";
 
 /** SCIM 2.0 (RFC 7644) for Okta, Microsoft Entra ID and other identity providers. Mounted at /scim/v2. */
@@ -181,6 +182,7 @@ scimRoutes.post("/Users", async (c) => {
     actor: actor(c),
     meta: { email: m.email, externalId: m.externalId ?? null, active, onboarding: settings.onboarding, ...done },
   });
+  emitFromRequest(c, [{ type: "user.created", data: { id, email: m.email, name, role: "member", status, via: "scim" } }]);
   return sendUser(c, await loadUser(c, id), 201);
 });
 
@@ -236,6 +238,9 @@ async function updateUser(c: C, target: ScimRow, state: ScimUserState, settings:
     actor: actor(c),
     meta: { email: m.email, from: { email: target.email, name: target.name, status: target.status }, to: { email: m.email, name, status }, externalId, ...done },
   });
+  if (status === "disabled" && target.status !== "disabled") {
+    emitFromRequest(c, [{ type: "user.disabled", data: { id: target.id, email: m.email, name, role: target.role, status, via: "scim" } }]);
+  }
   return loadUser(c, target.id);
 }
 
