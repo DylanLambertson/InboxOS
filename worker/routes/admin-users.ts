@@ -1,18 +1,23 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
-import type { Role, UserStatus } from "@shared/types";
+import type { AdminUserRow, PageOf } from "@shared/admin";
+import { recordsToCsv } from "@shared/csv";
+import type { Role } from "@shared/types";
 import type { AppEnv, Env, SessionUser } from "../env";
 import { audit } from "../lib/audit";
+import { csvDownload, EXPORT_MAX_ROWS } from "../lib/csv-download";
 import { isUserHeld } from "../lib/legal-hold";
 import { getBrand } from "../lib/settings";
 import { templates } from "../lib/email-templates";
 import { sendSystemEmail } from "../lib/system-mail";
 import { maskEmail } from "../lib/digest";
 import { storedRole } from "../lib/roles";
+import { manageProblem, nextStatus, parseUserFilter, parseUserSort, userChangeProblem, userListSql } from "../lib/user-admin";
 import { ensureMailbox, getUser, getUserByEmail, insertUser, offboardStatements, withRole, type UserRow } from "../lib/users";
-import { newId, now, sha256hex } from "../lib/util";
+import { clampInt, newId, now, parseJson, sha256hex } from "../lib/util";
 import { parseBody, zEmail } from "../lib/validate";
+import { emitFromRequest } from "../lib/webhooks";
 
 export const adminUserRoutes = new Hono<AppEnv>();
 
@@ -21,32 +26,93 @@ interface UserListRow extends UserRow {
   passkey_count: number;
 }
 
+const LIST_SELECT = `SELECT u.*, (SELECT COUNT(*) FROM mailbox_members mm WHERE mm.user_id = u.id) AS mailbox_count,
+  (SELECT COUNT(*) FROM passkeys p WHERE p.user_id = u.id) AS passkey_count FROM users u`;
+
+function userJson(row: UserListRow): AdminUserRow {
+  const u = withRole(row)!;
+  return {
+    id: u.id,
+    email: u.email,
+    name: u.name,
+    role: u.role,
+    status: u.status,
+    avatarColor: u.avatar_color,
+    totpEnabled: !!u.totp_enabled,
+    googleLinked: !!u.google_sub,
+    hasPassword: !!u.password_hash,
+    passkeyCount: u.passkey_count,
+    mailboxCount: u.mailbox_count,
+    lastLoginAt: u.last_login_at,
+    lockedUntil: u.locked_until && u.locked_until > now() ? u.locked_until : null,
+    // Masked: admins can see that reminders go outside the company, not the full address.
+    digest: u.digest_enabled && u.personal_email ? { hours: u.digest_hours, to: maskEmail(u.personal_email) } : null,
+    createdAt: u.created_at,
+  };
+}
+
+/** Everyone, for pickers (mailbox members, holds, filters). The Users page uses /search. */
 adminUserRoutes.get("/", async (c) => {
+  const { results } = await c.env.DB.prepare(`${LIST_SELECT} ORDER BY u.status = 'disabled', u.name COLLATE NOCASE, u.email`).all<UserListRow>();
+  return c.json(results.map(userJson));
+});
+
+/** One page of the Users table: search, filters, sort. */
+adminUserRoutes.get("/search", async (c) => {
+  const params = c.req.query();
+  const filter = parseUserFilter(params);
+  const { sort, dir } = parseUserSort(params);
+  const limit = clampInt(params.limit, 10, 200, 50);
+  const page = clampInt(params.page, 1, 100_000, 1);
+  const { where, binds, order } = userListSql(filter, sort, dir);
+  const db = c.env.DB;
+  const [rows, total, statuses] = await Promise.all([
+    db.prepare(`${LIST_SELECT} ${where} ORDER BY ${order} LIMIT ? OFFSET ?`).bind(...binds, limit, (page - 1) * limit).all<UserListRow>(),
+    db.prepare(`SELECT COUNT(*) AS n FROM users u ${where}`).bind(...binds).first<{ n: number }>(),
+    db.prepare("SELECT status, COUNT(*) AS n FROM users GROUP BY status").all<{ status: string; n: number }>(),
+  ]);
+  const counts = Object.fromEntries(statuses.results.map((r) => [r.status, r.n]));
+  const body: PageOf<AdminUserRow> & { counts: Record<string, number> } = { items: rows.results.map(userJson), total: total?.n ?? 0, page, limit, counts };
+  return c.json(body);
+});
+
+/** CSV of the users matching the current filters, in a shape the import understands. */
+adminUserRoutes.get("/export", async (c) => {
+  const params = c.req.query();
+  const { sort, dir } = parseUserSort(params);
+  const { where, binds, order } = userListSql(parseUserFilter(params), sort, dir);
   const { results } = await c.env.DB.prepare(
     `SELECT u.*, (SELECT COUNT(*) FROM mailbox_members mm WHERE mm.user_id = u.id) AS mailbox_count,
-       (SELECT COUNT(*) FROM passkeys p WHERE p.user_id = u.id) AS passkey_count
-     FROM users u ORDER BY u.status = 'disabled', u.name COLLATE NOCASE, u.email`,
-  ).all<UserListRow>();
-  return c.json(
-    results.map((row) => withRole(row)!).map((u) => ({
-      id: u.id,
-      email: u.email,
-      name: u.name,
-      role: u.role,
-      status: u.status,
-      avatarColor: u.avatar_color,
-      totpEnabled: !!u.totp_enabled,
-      googleLinked: !!u.google_sub,
-      hasPassword: !!u.password_hash,
-      passkeyCount: u.passkey_count,
-      mailboxCount: u.mailbox_count,
-      lastLoginAt: u.last_login_at,
-      lockedUntil: u.locked_until && u.locked_until > now() ? u.locked_until : null,
-      // Masked: admins can see that reminders go outside the company, not the full address.
-      digest: u.digest_enabled && u.personal_email ? { hours: u.digest_hours, to: maskEmail(u.personal_email) } : null,
-      createdAt: u.created_at,
-    })),
+       (SELECT COUNT(*) FROM passkeys p WHERE p.user_id = u.id) AS passkey_count,
+       (SELECT m.address FROM mailbox_members mm JOIN mailboxes m ON m.id = mm.mailbox_id
+          WHERE mm.user_id = u.id AND mm.role = 'owner' AND m.type = 'personal' AND m.is_system = 0 ORDER BY m.created_at LIMIT 1) AS personal_mailbox,
+       (SELECT group_concat(m.address || ':' || mm.role, ';') FROM mailbox_members mm JOIN mailboxes m ON m.id = mm.mailbox_id
+          WHERE mm.user_id = u.id AND m.is_system = 0) AS mailbox_access
+     FROM users u ${where} ORDER BY ${order} LIMIT ?`,
+  )
+    .bind(...binds, EXPORT_MAX_ROWS)
+    .all<UserListRow & { personal_mailbox: string | null; mailbox_access: string | null }>();
+  const rows = results.map((r) => ({ ...withRole(r)!, personal_mailbox: r.personal_mailbox, mailbox_access: r.mailbox_access }));
+  type R = (typeof rows)[number];
+  const csv = recordsToCsv<R>(
+    [
+      { header: "email", value: (r) => r.email },
+      { header: "name", value: (r) => r.name },
+      { header: "role", value: (r) => r.role },
+      { header: "mailbox", value: (r) => r.personal_mailbox ?? "" },
+      { header: "job_title", value: (r) => r.job_title ?? "" },
+      { header: "phone", value: (r) => r.phone ?? "" },
+      { header: "status", value: (r) => r.status },
+      { header: "two_factor", value: (r) => (r.totp_enabled || r.passkey_count ? "yes" : "no") },
+      { header: "passkeys", value: (r) => r.passkey_count ?? 0 },
+      { header: "mailbox_access", value: (r) => r.mailbox_access ?? "" },
+      { header: "last_sign_in", value: (r) => r.last_login_at ?? "" },
+      { header: "created", value: (r) => r.created_at },
+    ],
+    rows,
   );
+  await audit(c, { action: "user.exported", targetType: "user", meta: { count: rows.length, filter: parseUserFilter(params) } });
+  return csvDownload("users", csv);
 });
 
 export async function issueToken(env: Env, userId: string, type: "invite" | "reset", createdBy: string, hours: number): Promise<string> {
@@ -108,20 +174,65 @@ adminUserRoutes.post("/", async (c) => {
   const inviteUrl = await issueToken(c.env, id, "invite", actor.id, 24 * 7);
   const emailed = body.sendEmail ? await emailInvite(c.env, body.email, inviteUrl, actor.name || actor.email, body.name) : false;
   await audit(c, { action: "user.invited", targetType: "user", targetId: id, meta: { email: body.email, role: body.role, mailboxId, access: body.access } });
+  emitFromRequest(c, [{ type: "user.created", data: { id, email: body.email, name: body.name, role: body.role, status: "invited", via: "admin" } }]);
   return c.json({ id, inviteUrl, emailed }, 201);
 });
 
 async function loadTarget(db: D1Database, actor: SessionUser, id: string): Promise<UserRow> {
   const u = await getUser(db, id);
   if (!u) throw new HTTPException(404, { message: "User not found" });
-  if (u.role === "owner" && actor.role !== "owner") throw new HTTPException(403, { message: "Only owners can manage owners." });
+  const problem = manageProblem(actor, u);
+  if (problem) throw new HTTPException(403, { message: problem });
   return u;
 }
 
-async function activeOwnerCount(db: D1Database): Promise<number> {
+export async function activeOwnerCount(db: D1Database): Promise<number> {
   const r = await db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'owner' AND status = 'active'").first<{ n: number }>();
   return r?.n ?? 0;
 }
+
+/** Everything about one person for the detail panel. Sessions and sign-ins come from Admin → Security's endpoints. */
+adminUserRoutes.get("/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new HTTPException(400, { message: "Invalid user" });
+  const db = c.env.DB;
+  const u = await db.prepare(`${LIST_SELECT} WHERE u.id = ?`).bind(id).first<UserListRow>();
+  if (!u) throw new HTTPException(404, { message: "User not found" });
+  const [{ results: mailboxes }, { results: events }, held] = await Promise.all([
+    db
+      .prepare(
+        `SELECT m.id, m.address, m.name, m.display_name, m.type, m.color, m.is_active, mm.role FROM mailbox_members mm
+         JOIN mailboxes m ON m.id = mm.mailbox_id WHERE mm.user_id = ? AND m.is_system = 0 ORDER BY m.type = 'shared', m.address`,
+      )
+      .bind(id)
+      .all<{ id: string; address: string; name: string; display_name: string; type: string; color: string; is_active: number; role: string }>(),
+    db
+      .prepare(
+        `SELECT id, created_at, actor_email, action, target_type, target_id, meta FROM audit_logs
+         WHERE (target_type = 'user' AND target_id = ?1) OR actor_id = ?1 ORDER BY created_at DESC LIMIT 25`,
+      )
+      .bind(id)
+      .all<{ id: string; created_at: string; actor_email: string | null; action: string; target_type: string | null; target_id: string | null; meta: string }>(),
+    isUserHeld(db, id),
+  ]);
+  return c.json({
+    ...userJson(u),
+    jobTitle: u.job_title ?? "",
+    phone: u.phone ?? "",
+    updatedAt: u.updated_at,
+    scimManaged: !!u.scim_external_id,
+    legalHold: held,
+    mailboxes: mailboxes.map((m) => ({ id: m.id, address: m.address, name: m.name, displayName: m.display_name, type: m.type, color: m.color, isActive: !!m.is_active, role: m.role })),
+    audit: events.map((e) => ({
+      id: e.id,
+      createdAt: e.created_at,
+      actorEmail: e.actor_email,
+      action: e.action,
+      byThem: e.target_id !== id,
+      meta: parseJson<Record<string, unknown>>(e.meta, {}),
+    })),
+  });
+});
 
 adminUserRoutes.patch("/:id", async (c) => {
   const body = await parseBody(
@@ -135,16 +246,9 @@ adminUserRoutes.patch("/:id", async (c) => {
   );
   const actor = c.get("user");
   const target = await loadTarget(c.env.DB, actor, c.req.param("id"));
-  if (body.role === "owner" && actor.role !== "owner") throw new HTTPException(403, { message: "Only owners can grant owner." });
-  if (target.id === actor.id && (body.role && body.role !== target.role || body.status === "disabled")) {
-    throw new HTTPException(400, { message: "You can't change your own role or disable yourself." });
-  }
-  const losingOwner = target.role === "owner" && target.status === "active" && ((body.role && body.role !== "owner") || body.status === "disabled");
-  if (losingOwner && (await activeOwnerCount(c.env.DB)) <= 1) {
-    throw new HTTPException(400, { message: "There must always be at least one active owner." });
-  }
-  // Invited users stay invited until they accept, unless being disabled.
-  const status: UserStatus = body.status === "disabled" ? "disabled" : body.status === "active" && target.status === "disabled" ? (target.password_hash || target.google_sub ? "active" : "invited") : target.status;
+  const problem = userChangeProblem(actor, target, { role: body.role, status: body.status }, await activeOwnerCount(c.env.DB));
+  if (problem) throw new HTTPException(problem.startsWith("Only owners") ? 403 : 400, { message: problem });
+  const status = nextStatus(target, body.status);
   const role: Role = body.role ?? target.role;
   const stored = storedRole(role);
   const stmts: D1PreparedStatement[] = [
@@ -162,6 +266,9 @@ adminUserRoutes.patch("/:id", async (c) => {
     targetId: target.id,
     meta: { email: target.email, from: { role: target.role, status: target.status }, to: { role, status }, unlock: !!body.unlock },
   });
+  if (status === "disabled" && target.status !== "disabled") {
+    emitFromRequest(c, [{ type: "user.disabled", data: { id: target.id, email: target.email, name: body.name ?? target.name, role, status, via: "admin" } }]);
+  }
   return c.json({ ok: true });
 });
 
@@ -200,12 +307,15 @@ adminUserRoutes.post("/:id/reset-password", async (c) => {
   return c.json({ resetUrl, emailed });
 });
 
+/** Turn off TOTP and sign them out (shared with bulk "reset 2FA"). */
+export const reset2faStatements = (db: D1Database, userId: string): D1PreparedStatement[] => [
+  db.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery_codes = NULL, updated_at = ? WHERE id = ?").bind(now(), userId),
+  db.prepare("DELETE FROM sessions WHERE user_id = ?").bind(userId),
+];
+
 adminUserRoutes.post("/:id/reset-2fa", async (c) => {
   const target = await loadTarget(c.env.DB, c.get("user"), c.req.param("id"));
-  await c.env.DB.batch([
-    c.env.DB.prepare("UPDATE users SET totp_enabled = 0, totp_secret = NULL, recovery_codes = NULL, updated_at = ? WHERE id = ?").bind(now(), target.id),
-    c.env.DB.prepare("DELETE FROM sessions WHERE user_id = ?").bind(target.id),
-  ]);
+  await c.env.DB.batch(reset2faStatements(c.env.DB, target.id));
   await audit(c, { action: "user.2fa_reset", targetType: "user", targetId: target.id, meta: { email: target.email } });
   return c.json({ ok: true });
 });
@@ -228,18 +338,17 @@ adminUserRoutes.post("/:id/sign-out", async (c) => {
   return c.json({ ok: true });
 });
 
+export const LEGAL_HOLD_USER = "This person is under legal hold and can't be deleted. Disable them instead, or release the hold first.";
+
 adminUserRoutes.delete("/:id", async (c) => {
   const actor = c.get("user");
   const target = await loadTarget(c.env.DB, actor, c.req.param("id"));
-  if (target.id === actor.id) throw new HTTPException(400, { message: "You can't delete yourself." });
-  if (target.role === "owner" && target.status === "active" && (await activeOwnerCount(c.env.DB)) <= 1) {
-    throw new HTTPException(400, { message: "There must always be at least one active owner." });
-  }
+  const problem = userChangeProblem(actor, target, { delete: true }, await activeOwnerCount(c.env.DB));
+  if (problem) throw new HTTPException(400, { message: problem });
   // Deleting the user drops their memberships, which is what a user hold covers.
-  if (await isUserHeld(c.env.DB, target.id)) {
-    throw new HTTPException(409, { message: "This person is under legal hold and can't be deleted. Disable them instead, or release the hold first." });
-  }
+  if (await isUserHeld(c.env.DB, target.id)) throw new HTTPException(409, { message: LEGAL_HOLD_USER });
   await c.env.DB.prepare("DELETE FROM users WHERE id = ?").bind(target.id).run();
   await audit(c, { action: "user.deleted", targetType: "user", targetId: target.id, meta: { email: target.email } });
+  emitFromRequest(c, [{ type: "user.deleted", data: { id: target.id, email: target.email, name: target.name, via: "admin" } }]);
   return c.json({ ok: true });
 });

@@ -59,3 +59,26 @@ export async function auditSystem(db: D1Database, e: Omit<AuditEntry, "actor">):
     console.error("audit failed", err);
   }
 }
+
+/**
+ * Several events from one request in a few batched writes (bulk actions and imports:
+ * one entry per affected row plus a summary). Never throws.
+ */
+export async function auditMany(c: Context<AppEnv>, entries: AuditEntry[]): Promise<void> {
+  if (!entries.length) return;
+  const ip = clientIp(c);
+  const ua = c.req.header("user-agent")?.slice(0, 300) ?? null;
+  const t = now();
+  try {
+    const stmts = entries.map((e) => {
+      const actor = e.actor === undefined ? c.get("user") ?? null : e.actor;
+      return c.env.DB.prepare(
+        `INSERT INTO audit_logs (id, actor_id, actor_email, action, target_type, target_id, ip, user_agent, meta, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ).bind(newId(), actor?.id ?? null, actor?.email ?? null, e.action, e.targetType ?? null, e.targetId ?? null, ip, ua, JSON.stringify(e.meta ?? {}), t);
+    });
+    for (let i = 0; i < stmts.length; i += 100) await c.env.DB.batch(stmts.slice(i, i + 100));
+  } catch (err) {
+    console.error("audit failed", err);
+  }
+}

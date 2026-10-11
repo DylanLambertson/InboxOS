@@ -30,3 +30,6 @@ export function kpiDelta(k: Kpi): number | null {
   if (!k.previous) return k.current ? null : 0;
   return (k.current - k.previous) / k.previous;
 }
+
+// Admin tables: filters, sorting, paging and bulk actions.
+export * from "./admin-lists";
