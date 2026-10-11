@@ -17,6 +17,7 @@ import {
 import type { AppEnv } from "../env";
 import { auditMany, type AuditEntry } from "../lib/audit";
 import { addressTaken } from "../lib/mailbox-admin";
+import { zProfilePatch } from "../lib/profile";
 import { ensureMailbox, insertUser } from "../lib/users";
 import { now } from "../lib/util";
 import { parseBody } from "../lib/validate";
@@ -93,10 +94,16 @@ adminImportRoutes.post("/users", async (c) => {
   const users = await existing(db, "SELECT email AS v FROM users WHERE email IN (SELECT value FROM json_each(?))", values.map((v) => v.email));
   const taken = await existing(db, TAKEN_SQL, values.flatMap((v) => (v.mailbox ? [v.mailbox] : [])));
   const mailboxSeen = new Map<string, number>();
+  const zProfile = zProfilePatch.pick({ jobTitle: true, phone: true, department: true, timezone: true });
   for (const x of checked) {
     if (!x.value || x.result.status === "error") continue;
     const v = x.value;
-    if (v.role === "owner" && actor.role !== "owner") {
+    // The same rules as editing a profile (single line, phone characters, known time zone).
+    const profile = zProfile.safeParse({ jobTitle: v.jobTitle, phone: v.phone, department: v.department, timezone: v.timezone });
+    if (!profile.success) {
+      x.result.status = "error";
+      x.result.errors.push(...profile.error.issues.map((i) => `${String(i.path[0] ?? "Profile")}: ${i.message}`));
+    } else if (v.role === "owner" && actor.role !== "owner") {
       x.result.status = "error";
       x.result.errors.push("Only owners can add owners.");
     } else if (users.has(v.email)) {
@@ -122,7 +129,9 @@ adminImportRoutes.post("/users", async (c) => {
       // Checked again right before creating, in case an earlier row (or someone else) just took it.
       if (v.mailbox && (await addressTaken(db, v.mailbox))) throw new Error(`The address ${v.mailbox} is already in use.`);
       const id = await insertUser(db, { email: v.email, name: v.name, role: v.role, status: "invited" });
-      if (v.jobTitle || v.phone) await db.prepare("UPDATE users SET job_title = ?, phone = ? WHERE id = ?").bind(v.jobTitle, v.phone, id).run();
+      if (v.jobTitle || v.phone || v.department || v.timezone) {
+        await db.prepare("UPDATE users SET job_title = ?, phone = ?, department = ?, timezone = ? WHERE id = ?").bind(v.jobTitle, v.phone, v.department, v.timezone, id).run();
+      }
       const mailboxId = v.mailbox ? await ensureMailbox(db, { address: v.mailbox, displayName: v.name, type: "personal", ownerId: id }) : null;
       const url = await issueToken(c.env, id, "invite", actor.id, 24 * 7);
       if (v.sendInvite) {

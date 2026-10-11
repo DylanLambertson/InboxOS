@@ -166,6 +166,9 @@ describe("import row checks", () => {
     const bad = checkUserRow({ email: "not-an-email", role: "boss", mailbox: "x", sendInvite: "perhaps" });
     expect(bad.value).toBeNull();
     expect(bad.errors).toHaveLength(4);
+    expect(checkUserRow({ email: "a@b.co", timezone: "Europe/Berlin", phone: "+49 30 1234" }).value).toMatchObject({ timezone: "Europe/Berlin" });
+    expect(checkUserRow({ email: "a@b.co", timezone: "Mars/Olympus" }).errors[0]).toMatch(/time zone/);
+    expect(checkUserRow({ email: "a@b.co", phone: "call me" }).errors[0]).toMatch(/Phone/);
   });
 
   it("validates mailbox and alias rows", () => {

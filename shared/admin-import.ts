@@ -4,6 +4,7 @@
  * The browser runs these for an instant preview; the server runs them again
  * (never trusting the client) and adds the checks that need the database.
  */
+import { isValidTimeZone, PROFILE_LIMITS } from "./profile";
 import type { MailboxRole, Role } from "./types";
 
 export const IMPORT_MAX_ROWS = 1000;
@@ -29,6 +30,8 @@ export const IMPORT_FIELDS: Record<ImportKind, ImportField[]> = {
     { key: "mailbox", label: "Personal mailbox", aliases: ["personalmailbox", "mailboxaddress", "workemail", "workaddress", "address"], hint: "Optional. Creates a personal mailbox they own." },
     { key: "jobTitle", label: "Job title", aliases: ["title", "position", "jobtitle"], hint: "Optional, used in signatures." },
     { key: "phone", label: "Phone", aliases: ["telephone", "phonenumber", "mobile", "tel"], hint: "Optional, used in signatures." },
+    { key: "department", label: "Department", aliases: ["dept", "team", "division"], hint: "Optional, shown in the team directory." },
+    { key: "timezone", label: "Time zone", aliases: ["tz", "timezone", "zone"], hint: "Optional, e.g. Europe/Berlin." },
     { key: "sendInvite", label: "Send invite", aliases: ["invite", "sendinvite", "email invite", "notify"], hint: "yes or no. Defaults to yes." },
   ],
   mailboxes: [
@@ -47,9 +50,9 @@ export const IMPORT_FIELDS: Record<ImportKind, ImportField[]> = {
 /** Example rows for the downloadable templates. */
 export const IMPORT_TEMPLATES: Record<ImportKind, string[][]> = {
   users: [
-    ["email", "name", "role", "mailbox", "job_title", "phone", "send_invite"],
-    ["jane@example.com", "Jane Doe", "member", "jane@yourcompany.com", "Account Manager", "+1 555 0100", "yes"],
-    ["sam@example.com", "Sam Lee", "admin", "", "", "", "no"],
+    ["email", "name", "role", "mailbox", "job_title", "phone", "department", "timezone", "send_invite"],
+    ["jane@example.com", "Jane Doe", "member", "jane@yourcompany.com", "Account Manager", "+1 555 0100", "Sales", "America/New_York", "yes"],
+    ["sam@example.com", "Sam Lee", "admin", "", "", "", "", "", "no"],
   ],
   mailboxes: [
     ["address", "name", "display_name", "type", "members"],
@@ -117,6 +120,8 @@ export interface UserImportRow {
   mailbox: string | null;
   jobTitle: string;
   phone: string;
+  department: string;
+  timezone: string;
   sendInvite: boolean;
 }
 
@@ -160,12 +165,17 @@ export function checkUserRow(raw: Record<string, unknown>): RowCheck<UserImportR
   const name = s(raw.name);
   const jobTitle = s(raw.jobTitle);
   const phone = s(raw.phone);
+  const department = s(raw.department);
+  const timezone = s(raw.timezone);
   tooLong(errors, "Name", name, 120);
   tooLong(errors, "Job title", jobTitle, 120);
   tooLong(errors, "Phone", phone, 40);
+  tooLong(errors, "Department", department, PROFILE_LIMITS.department);
+  if (phone && !/^[0-9+().\-\s/x]*$/i.test(phone)) errors.push("Phone can only use digits, spaces and + ( ) -.");
+  if (timezone && !isValidTimeZone(timezone)) errors.push(`Unknown time zone "${timezone}". Use a name like Europe/Berlin.`);
   if (!name && email) warnings.push("No name; they can add one when they accept.");
   if (errors.length) return { value: null, errors, warnings };
-  return { value: { email, name, role: role!, mailbox, jobTitle, phone, sendInvite: sendInvite! }, errors, warnings };
+  return { value: { email, name, role: role!, mailbox, jobTitle, phone, department, timezone, sendInvite: sendInvite! }, errors, warnings };
 }
 
 export function checkMailboxRow(raw: Record<string, unknown>): RowCheck<MailboxImportRow> {
