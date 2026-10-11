@@ -17,11 +17,15 @@ import { emitFromRequest } from "../lib/webhooks";
 
 export const adminMailboxRoutes = new Hono<AppEnv>();
 
-/** Every mailbox with all members, for pickers (access dialogs, holds, traffic filters). The Mailboxes page uses /search. */
-adminMailboxRoutes.get("/", async (c) => {
-  const db = c.env.DB;
+/**
+ * Mailboxes with all members, aliases and stats: every mailbox (for pickers like access
+ * dialogs, holds and traffic filters), or just one (`only`) for the detail dialog.
+ */
+async function fullMailboxes(db: D1Database, only?: string) {
+  const one = only ? " AND id = ?" : "";
+  const bindOne = <T extends D1PreparedStatement>(s: T) => (only ? s.bind(only) : s);
   const [{ results: boxes }, { results: members }, { results: aliases }, { results: stats }] = await Promise.all([
-    db.prepare("SELECT * FROM mailboxes WHERE is_system = 0 ORDER BY is_active DESC, type, address").all<{
+    bindOne(db.prepare(`SELECT * FROM mailboxes WHERE is_system = 0${one} ORDER BY is_active DESC, type, address`)).all<{
       id: string;
       address: string;
       name: string;
@@ -32,44 +36,44 @@ adminMailboxRoutes.get("/", async (c) => {
       is_active: number;
       created_at: string;
     }>(),
-    db
-      .prepare(
+    bindOne(
+      db.prepare(
         `SELECT mm.mailbox_id, mm.role, u.id, u.name, u.email, u.avatar_color FROM mailbox_members mm
-         JOIN users u ON u.id = mm.user_id ORDER BY u.name COLLATE NOCASE`,
-      )
-      .all<{ mailbox_id: string; role: MailboxRole; id: string; name: string; email: string; avatar_color: string }>(),
-    db.prepare("SELECT address, mailbox_id FROM mailbox_aliases ORDER BY address").all<{ address: string; mailbox_id: string }>(),
-    db
-      .prepare("SELECT mailbox_id, COUNT(*) AS messages, COALESCE(SUM(size), 0) AS bytes, MAX(date) AS last FROM messages GROUP BY mailbox_id")
-      .all<{ mailbox_id: string; messages: number; bytes: number; last: string | null }>(),
+         JOIN users u ON u.id = mm.user_id ${only ? "WHERE mm.mailbox_id = ?" : ""} ORDER BY u.name COLLATE NOCASE`,
+      ),
+    ).all<{ mailbox_id: string; role: MailboxRole; id: string; name: string; email: string; avatar_color: string }>(),
+    bindOne(db.prepare(`SELECT address, mailbox_id FROM mailbox_aliases ${only ? "WHERE mailbox_id = ?" : ""} ORDER BY address`)).all<{ address: string; mailbox_id: string }>(),
+    bindOne(
+      db.prepare(`SELECT mailbox_id, COUNT(*) AS messages, COALESCE(SUM(size), 0) AS bytes, MAX(date) AS last FROM messages ${only ? "WHERE mailbox_id = ?" : ""} GROUP BY mailbox_id`),
+    ).all<{ mailbox_id: string; messages: number; bytes: number; last: string | null }>(),
   ]);
   const [policy, held] = await Promise.all([getPolicy(db), heldMailboxIds(db)]);
-  return c.json(
-    boxes.map((b) => {
-      const s = stats.find((x) => x.mailbox_id === b.id);
-      return {
-        id: b.id,
-        address: b.address,
-        name: b.name,
-        displayName: b.display_name,
-        type: b.type,
-        color: b.color,
-        signatureHtml: b.signature_html,
-        isActive: !!b.is_active,
-        isCatchAll: policy.catchAllMailboxId === b.id,
-        legalHold: held.has(b.id),
-        createdAt: b.created_at,
-        messageCount: s?.messages ?? 0,
-        storageBytes: s?.bytes ?? 0,
-        lastActivity: s?.last ?? null,
-        aliases: aliases.filter((a) => a.mailbox_id === b.id).map((a) => a.address),
-        members: members
-          .filter((m) => m.mailbox_id === b.id)
-          .map((m) => ({ userId: m.id, name: m.name, email: m.email, avatarColor: m.avatar_color, role: m.role })),
-      };
-    }),
-  );
-});
+  return boxes.map((b) => {
+    const s = stats.find((x) => x.mailbox_id === b.id);
+    return {
+      id: b.id,
+      address: b.address,
+      name: b.name,
+      displayName: b.display_name,
+      type: b.type,
+      color: b.color,
+      signatureHtml: b.signature_html,
+      isActive: !!b.is_active,
+      isCatchAll: policy.catchAllMailboxId === b.id,
+      legalHold: held.has(b.id),
+      createdAt: b.created_at,
+      messageCount: s?.messages ?? 0,
+      storageBytes: s?.bytes ?? 0,
+      lastActivity: s?.last ?? null,
+      aliases: aliases.filter((a) => a.mailbox_id === b.id).map((a) => a.address),
+      members: members
+        .filter((m) => m.mailbox_id === b.id)
+        .map((m) => ({ userId: m.id, name: m.name, email: m.email, avatarColor: m.avatar_color, role: m.role })),
+    };
+  });
+}
+
+adminMailboxRoutes.get("/", async (c) => c.json(await fullMailboxes(c.env.DB)));
 
 interface MailboxListRow {
   id: string;
@@ -199,6 +203,15 @@ adminMailboxRoutes.get("/aliases/export", async (c) => {
   );
   await audit(c, { action: "mailbox.aliases_exported", targetType: "mailbox", meta: { count: results.length } });
   return csvDownload("aliases", csv);
+});
+
+/** One mailbox with all members and aliases, for the detail dialog. */
+adminMailboxRoutes.get("/:id", async (c) => {
+  const id = c.req.param("id");
+  if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) throw new HTTPException(400, { message: "Invalid mailbox" });
+  const [box] = await fullMailboxes(c.env.DB, id);
+  if (!box) throw new HTTPException(404, { message: "Mailbox not found" });
+  return c.json(box);
 });
 
 adminMailboxRoutes.post("/", async (c) => {
