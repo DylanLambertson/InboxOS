@@ -17,3 +17,4 @@ export { AdminSecurity } from "./Security";
 export { AdminProvisioning } from "./Provisioning";
 export { AdminCompliance } from "./Compliance";
 export { AdminOutboundPolicy } from "./OutboundPolicy";
+export { AdminWebhooks } from "./Webhooks";

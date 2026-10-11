@@ -58,6 +58,7 @@ export const router = createBrowserRouter([
           { path: "logs/:kind?", lazy: page(p.adminLogs, "AdminLogs") },
           { path: "setup", lazy: page(p.adminSetup, "AdminSetup") },
           { path: "domains", lazy: page(p.adminDomains, "AdminDomains") },
+          { path: "webhooks", lazy: gated("webhooks", p.adminWebhooks, "AdminWebhooks") },
         ],
       },
     ],

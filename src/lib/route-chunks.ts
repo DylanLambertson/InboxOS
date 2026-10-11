@@ -36,6 +36,7 @@ export const pages = {
   adminOutbound: () => import("../pages/admin/OutboundPolicy"),
   adminLogs: () => import("../pages/admin/Logs"),
   adminSetup: () => import("../pages/admin/Setup"),
+  adminWebhooks: () => import("../pages/admin/Webhooks"),
   adminDomains: () => import("../pages/admin/Domains"),
 } satisfies Record<string, () => Promise<unknown>>;
 
@@ -69,6 +70,7 @@ const BY_PATH: [string, () => Promise<unknown>][] = [
   ["/admin/outbound", pages.adminOutbound],
   ["/admin/logs", pages.adminLogs],
   ["/admin/setup", pages.adminSetup],
+  ["/admin/webhooks", pages.adminWebhooks],
   ["/admin/domains", pages.adminDomains],
   ["/admin", pages.adminOverview],
   ["/setup", pages.setup],
