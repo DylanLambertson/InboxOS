@@ -148,7 +148,7 @@ function NewKeyDialog({ mailboxes, onClose, onCreated }: { mailboxes: MailboxLit
             checked={actAs}
             onChange={setActAs}
             label="Act as a user (X-Act-As)"
-            hint="For an integration that works on behalf of your users. Each request may pass a user's email, and the key is narrowed to the mailboxes that user belongs to."
+            hint="For an integration that works on behalf of your users. Each request may pass a user's email in X-Act-As, and the key is narrowed to the mailboxes that user belongs to."
           />
         </Field>
         <Field label="Mailboxes">
