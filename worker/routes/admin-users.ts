@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { AdminUserRow, PageOf } from "@shared/admin";
 import { recordsToCsv } from "@shared/csv";
+import { avatarUrl } from "@shared/profile";
 import type { Role } from "@shared/types";
 import type { AppEnv, Env, SessionUser } from "../env";
 import { audit } from "../lib/audit";
@@ -38,6 +39,7 @@ function userJson(row: UserListRow): AdminUserRow {
     role: u.role,
     status: u.status,
     avatarColor: u.avatar_color,
+    avatarUrl: avatarUrl(u.id, u.avatar_key),
     totpEnabled: !!u.totp_enabled,
     googleLinked: !!u.google_sub,
     hasPassword: !!u.password_hash,

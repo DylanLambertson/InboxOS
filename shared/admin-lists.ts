@@ -45,6 +45,8 @@ export interface AdminUserRow {
   role: Role;
   status: UserStatus;
   avatarColor: string;
+  /** Profile photo, when they uploaded one. */
+  avatarUrl: string | null;
   totpEnabled: boolean;
   googleLinked: boolean;
   hasPassword: boolean;
@@ -95,7 +97,7 @@ export interface AdminMailboxRow {
   memberCount: number;
   aliasCount: number;
   /** The first few members, for avatars. */
-  members: { userId: string; name: string; email: string; avatarColor: string; role: MailboxRole }[];
+  members: { userId: string; name: string; email: string; avatarColor: string; avatarUrl: string | null; role: MailboxRole }[];
   messageCount: number;
   storageBytes: number;
   lastActivity: string | null;

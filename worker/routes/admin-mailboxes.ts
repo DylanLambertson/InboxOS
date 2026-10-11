@@ -3,6 +3,7 @@ import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import type { AdminMailboxRow, PageOf } from "@shared/admin";
 import { recordsToCsv } from "@shared/csv";
+import { avatarUrl } from "@shared/profile";
 import type { MailboxRole } from "@shared/types";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
@@ -38,10 +39,10 @@ async function fullMailboxes(db: D1Database, only?: string) {
     }>(),
     bindOne(
       db.prepare(
-        `SELECT mm.mailbox_id, mm.role, u.id, u.name, u.email, u.avatar_color FROM mailbox_members mm
+        `SELECT mm.mailbox_id, mm.role, u.id, u.name, u.email, u.avatar_color, u.avatar_key FROM mailbox_members mm
          JOIN users u ON u.id = mm.user_id ${only ? "WHERE mm.mailbox_id = ?" : ""} ORDER BY u.name COLLATE NOCASE`,
       ),
-    ).all<{ mailbox_id: string; role: MailboxRole; id: string; name: string; email: string; avatar_color: string }>(),
+    ).all<{ mailbox_id: string; role: MailboxRole; id: string; name: string; email: string; avatar_color: string; avatar_key: string | null }>(),
     bindOne(db.prepare(`SELECT address, mailbox_id FROM mailbox_aliases ${only ? "WHERE mailbox_id = ?" : ""} ORDER BY address`)).all<{ address: string; mailbox_id: string }>(),
     bindOne(
       db.prepare(`SELECT mailbox_id, COUNT(*) AS messages, COALESCE(SUM(size), 0) AS bytes, MAX(date) AS last FROM messages ${only ? "WHERE mailbox_id = ?" : ""} GROUP BY mailbox_id`),
@@ -68,7 +69,7 @@ async function fullMailboxes(db: D1Database, only?: string) {
       aliases: aliases.filter((a) => a.mailbox_id === b.id).map((a) => a.address),
       members: members
         .filter((m) => m.mailbox_id === b.id)
-        .map((m) => ({ userId: m.id, name: m.name, email: m.email, avatarColor: m.avatar_color, role: m.role })),
+        .map((m) => ({ userId: m.id, name: m.name, email: m.email, avatarColor: m.avatar_color, avatarUrl: avatarUrl(m.id, m.avatar_key), role: m.role })),
     };
   });
 }
@@ -105,12 +106,12 @@ adminMailboxRoutes.get("/search", async (c) => {
   const [{ results: members }, { results: stats }, policy, held] = await Promise.all([
     db
       .prepare(
-        `SELECT * FROM (SELECT mm.mailbox_id, mm.role, u.id, u.name, u.email, u.avatar_color,
+        `SELECT * FROM (SELECT mm.mailbox_id, mm.role, u.id, u.name, u.email, u.avatar_color, u.avatar_key,
            ROW_NUMBER() OVER (PARTITION BY mm.mailbox_id ORDER BY mm.role = 'owner' DESC, u.name COLLATE NOCASE) AS n
          FROM mailbox_members mm JOIN users u ON u.id = mm.user_id WHERE mm.mailbox_id IN (SELECT value FROM json_each(?))) WHERE n <= 5`,
       )
       .bind(ids)
-      .all<{ mailbox_id: string; role: MailboxRole; id: string; name: string; email: string; avatar_color: string }>(),
+      .all<{ mailbox_id: string; role: MailboxRole; id: string; name: string; email: string; avatar_color: string; avatar_key: string | null }>(),
     db
       .prepare(
         `SELECT mailbox_id, COUNT(*) AS messages, COALESCE(SUM(size), 0) AS bytes, MAX(date) AS last FROM messages
@@ -136,7 +137,7 @@ adminMailboxRoutes.get("/search", async (c) => {
       createdAt: b.created_at,
       memberCount: b.member_count,
       aliasCount: b.alias_count,
-      members: members.filter((m) => m.mailbox_id === b.id).map((m) => ({ userId: m.id, name: m.name, email: m.email, avatarColor: m.avatar_color, role: m.role })),
+      members: members.filter((m) => m.mailbox_id === b.id).map((m) => ({ userId: m.id, name: m.name, email: m.email, avatarColor: m.avatar_color, avatarUrl: avatarUrl(m.id, m.avatar_key), role: m.role })),
       messageCount: s?.messages ?? 0,
       storageBytes: s?.bytes ?? 0,
       lastActivity: s?.last ?? null,
