@@ -25,8 +25,11 @@ const STALE: Record<string, number> = {
 };
 
 const PAGED = ["admin-traffic", "admin-suppressions", "admin-sign-ins", "admin-sessions", "admin-search"];
+/** Paged tables nested under a list key, so the list's invalidations still reach them. */
+const PAGED_NESTED = [["admin-users", "search"], ["admin-mailboxes", "search"], ["admin-webhook-deliveries"]];
 
 export function applyQueryDefaults(qc: QueryClient) {
   for (const [key, staleTime] of Object.entries(STALE)) qc.setQueryDefaults([key], { staleTime });
   for (const key of PAGED) qc.setQueryDefaults([key], { staleTime: 15_000, placeholderData: keepPreviousData });
+  for (const key of PAGED_NESTED) qc.setQueryDefaults(key, { staleTime: 15_000, placeholderData: keepPreviousData });
 }
