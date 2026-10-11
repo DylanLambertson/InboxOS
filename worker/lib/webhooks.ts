@@ -10,7 +10,7 @@ import {
 import type { Env } from "../env";
 import { auditSystem } from "./audit";
 import { openSecret } from "./secret-box";
-import { getWorkspace } from "./settings";
+import { featureEnabled } from "./features";
 import { b64decode, b64encode, newId, now, parseJson } from "./util";
 
 /**
@@ -98,7 +98,7 @@ async function enqueue(db: D1Database, rows: { endpointId: string; type: Webhook
 export async function emitEvents(env: Env, ctx: WaitUntil | null | undefined, events: QueuedEvent[]): Promise<void> {
   if (!events.length) return;
   try {
-    if (!(await getWorkspace(env.DB)).features.webhooks) return;
+    if (!(await featureEnabled(env.DB, "webhooks"))) return;
     const { results } = await env.DB.prepare("SELECT id, events FROM webhook_endpoints WHERE enabled = 1").all<{ id: string; events: string }>();
     if (!results.length) return;
     const subs = results.map((e) => ({ id: e.id, events: new Set(parseJson<string[]>(e.events, [])) }));
@@ -296,7 +296,7 @@ export async function attemptDelivery(env: Env, deliveryId: string): Promise<Att
 
 /** Cron: retry deliveries that are due. Returns how many were attempted. */
 export async function runWebhookDeliveries(env: Env, limit = 50): Promise<number> {
-  if (!(await getWorkspace(env.DB)).features.webhooks) return 0;
+  if (!(await featureEnabled(env.DB, "webhooks"))) return 0;
   const { results } = await env.DB.prepare(
     "SELECT id FROM webhook_deliveries WHERE status = 'pending' AND next_attempt_at <= ? ORDER BY next_attempt_at LIMIT ?",
   )

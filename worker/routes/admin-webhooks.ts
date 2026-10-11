@@ -1,11 +1,11 @@
-import { Hono, type MiddlewareHandler } from "hono";
+import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { z } from "zod";
 import { MAX_ENDPOINTS, SUBSCRIBABLE_EVENTS, webhookUrlProblem } from "@shared/webhooks";
 import type { AppEnv } from "../env";
 import { audit } from "../lib/audit";
 import { maskSecret, sealSecret } from "../lib/secret-box";
-import { getWorkspace } from "../lib/settings";
+import { requireWebhooks } from "../lib/features";
 import { clampInt, newId, now, parseJson } from "../lib/util";
 import { parseBody } from "../lib/validate";
 import { attemptDelivery, enqueueDirect, eventBody, generateWebhookSecret, SECRET_PURPOSE } from "../lib/webhooks";
@@ -13,13 +13,7 @@ import { attemptDelivery, enqueueDirect, eventBody, generateWebhookSecret, SECRE
 /** Admin → Webhooks: endpoints, their signing secrets, test events and the delivery log. */
 export const adminWebhookRoutes = new Hono<AppEnv>();
 
-/** Webhooks can be switched off in Admin → Features; the API then behaves as if it isn't there. */
-const requireWebhooks: MiddlewareHandler<AppEnv> = async (c, next) => {
-  if (!(await getWorkspace(c.env.DB)).features.webhooks) {
-    throw new HTTPException(404, { message: "Webhooks are turned off. Turn them on in Admin → Features." });
-  }
-  await next();
-};
+// Switched off in Admin → Features: the API refuses, like the rest of the app.
 adminWebhookRoutes.use("*", requireWebhooks);
 
 interface EndpointRow {
