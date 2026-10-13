@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Report a security vulnerability
+    url: https://github.com/DylanLambertson/InboxOS/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
+  - name: Setup and troubleshooting guide
+    url: https://github.com/DylanLambertson/InboxOS#troubleshooting
+    about: Most setup problems are covered here and in Admin → Health.
