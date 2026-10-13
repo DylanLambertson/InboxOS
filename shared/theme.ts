@@ -101,7 +101,7 @@ export const BASE_DARK: Palette = {
 export const SYSTEM_FONT_STACK = 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
 
 export const DEFAULT_THEME: ThemeTokens = {
-  accent: "#4f46e5",
+  accent: "#6210f8",
   radius: "md",
   density: "comfortable",
   fontFamily: `"Inter", ${SYSTEM_FONT_STACK}`,

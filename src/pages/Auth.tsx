@@ -5,7 +5,7 @@ import { ArrowLeft, CheckCircle2, FingerprintPattern, KeyRound } from "lucide-re
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
 import { useSetupStatus } from "@/lib/setup";
-import { Logo } from "@/components/layout/Logo";
+import { HeroLogo, Logo } from "@/components/layout/Logo";
 import { AuthHero } from "@/components/auth/AuthHero";
 import { Button, Field, Input, Spinner } from "@/components/ui/primitives";
 import { cancelPasskeyPrompt, isPasskeyCancel, passkeysSupported, signInWithPasskey } from "@/lib/passkeys";
@@ -46,13 +46,8 @@ export function AuthLayout({ title, subtitle, children }: { title: string; subti
         <div className="relative overflow-hidden bg-[#0a0a0b] px-6 py-8 text-white lg:hidden">
           <div className="io-glow io-glow-a" style={{ background: brand.theme.accent }} />
           <div className="io-dots absolute inset-0" />
-          <div className="relative flex items-center gap-2.5">
-            {brand.logoUrl ? (
-              <img src={brand.logoUrl} alt="" className="size-8 rounded-lg object-contain" />
-            ) : (
-              <span className="flex size-8 items-center justify-center rounded-lg bg-white text-xs font-bold text-black">{brand.monogram}</span>
-            )}
-            <span className="text-[15px] font-semibold tracking-tight">{brand.productName}</span>
+          <div className="relative flex items-center">
+            <HeroLogo label={brand.productName} />
           </div>
         </div>
 
@@ -91,7 +86,7 @@ function EmailField({ id, value, onChange, autoComplete, autoFocus }: { id?: str
   // Without a domain yet (fresh install), it's a plain email field.
   const full = value.includes("@") || !brand.primaryDomain;
   return (
-    <div className="group flex h-10 w-full items-stretch overflow-hidden rounded-ui border border-line bg-surface transition-colors hover:border-line-strong focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft">
+    <div className="group flex h-10 w-full items-stretch overflow-hidden rounded-ui border border-line bg-surface transition-colors hover:border-line-strong focus-within:border-accent-ink focus-within:ring-3 focus-within:ring-accent-soft">
       <input
         id={id}
         type="text"

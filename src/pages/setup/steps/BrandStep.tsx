@@ -1,17 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, Inbox, PenSquare, Send, Star, Upload } from "lucide-react";
+import { Inbox, PenSquare, Send, Star, Upload } from "lucide-react";
 import { toast } from "sonner";
-import type { Brand } from "@shared/brand";
-import { contrastRatio } from "@shared/contrast";
-import { resolvePalettes } from "@shared/theme";
+import { DEFAULT_BRAND, INBOXOS_LOGO, type Brand } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
 import { applyThemeTokens, readableOn, useBrand } from "@/lib/brand";
 import { useRefreshSetup } from "@/lib/setup";
 import { Button, cx, Field, Input } from "@/components/ui/primitives";
 import { Panel, StepFrame, type StepProps } from "../StepFrame";
 
-const SWATCHES = ["#4f46e5", "#2563eb", "#0891b2", "#0f766e", "#16a34a", "#ca8a04", "#ea580c", "#dc2626", "#db2777", "#7c3aed", "#334155", "#18181b"];
+const SWATCHES = ["#6210f8", "#4f46e5", "#2563eb", "#0891b2", "#0f766e", "#16a34a", "#ca8a04", "#ea580c", "#dc2626", "#db2777", "#7c3aed", "#334155", "#18181b"];
 
 /** Up to two initials, used when there's no logo: "Acme Mail" → "AM", "InboxOS" → "IO", "Acme" → "A". */
 export function monogramFor(name: string): string {
@@ -25,6 +23,7 @@ export function monogramFor(name: string): string {
 /** A tiny, live picture of the app with the chosen name, logo and color. */
 function MiniPreview({ productName, logoUrl, accent }: { productName: string; logoUrl: string; accent: string }) {
   const fg = readableOn(accent);
+  const ink = "var(--accent-ink)"; // follows the live preview of the picked accent
   const rows = [
     ["Priya Shah", "Website proposal", true],
     ["Jordan Lee", "Intro call next week?", true],
@@ -54,7 +53,7 @@ function MiniPreview({ productName, logoUrl, accent }: { productName: string; lo
           ].map(([Icon, label, active]) => {
             const I = Icon as typeof Inbox;
             return (
-              <div key={label as string} className="flex items-center gap-1.5 rounded-ui-sm px-1.5 py-1 text-[10px]" style={active ? { background: `color-mix(in oklab, ${accent} 12%, transparent)`, color: accent } : undefined}>
+              <div key={label as string} className="flex items-center gap-1.5 rounded-ui-sm px-1.5 py-1 text-[10px]" style={active ? { background: `color-mix(in oklab, ${accent} 12%, transparent)`, color: ink } : undefined}>
                 <I className="size-2.5" />
                 <span className={active ? "font-medium" : "text-fg-muted"}>{label as string}</span>
               </div>
@@ -64,7 +63,7 @@ function MiniPreview({ productName, logoUrl, accent }: { productName: string; lo
         <div className="min-w-0 flex-1 divide-y divide-line">
           {rows.map(([from, subject, unread]) => (
             <div key={from} className="flex items-start gap-1.5 px-3 py-2">
-              <span className="mt-1 size-1.5 shrink-0 rounded-full" style={{ background: unread ? accent : "transparent" }} />
+              <span className="mt-1 size-1.5 shrink-0 rounded-full" style={{ background: unread ? ink : "transparent" }} />
               <div className="min-w-0">
                 <div className={cx("truncate text-[11px]", unread ? "font-semibold text-fg" : "text-fg-muted")}>{from}</div>
                 <div className="truncate text-[10px] text-fg-muted">{subject}</div>
@@ -74,24 +73,6 @@ function MiniPreview({ productName, logoUrl, accent }: { productName: string; lo
         </div>
       </div>
     </div>
-  );
-}
-
-/** Warn when the accent is hard to see as links and highlights on the page background. */
-function AccentContrast({ accent }: { accent: string }) {
-  const brand = useBrand();
-  if (!/^#[0-9a-f]{6}$/i.test(accent)) return null;
-  const { light, dark } = resolvePalettes(brand.theme);
-  const weak = [
-    contrastRatio(accent, light.bg) < 3 && "light",
-    contrastRatio(accent, dark.bg) < 3 && "dark",
-  ].filter(Boolean);
-  if (!weak.length) return null;
-  return (
-    <p className="flex items-start gap-1.5 text-xs text-warning">
-      <AlertTriangle className="mt-0.5 size-3.5 shrink-0" />
-      This color is hard to read on {weak.join(" and ")} backgrounds. A deeper or brighter shade works better; Admin → Appearance can check every color pairing.
-    </p>
   );
 }
 
@@ -129,6 +110,10 @@ export function BrandStep({ setup, next, skip, back }: StepProps) {
     }
   };
 
+  // The InboxOS logo belongs to the InboxOS name: rename the app and it falls back to initials.
+  const keepsStockLogo = brand.logoUrl !== INBOXOS_LOGO || (productName.trim() || brand.productName) === DEFAULT_BRAND.productName;
+  const logoUrl = keepsStockLogo ? brand.logoUrl : "";
+
   const save = async () => {
     setBusy(true);
     try {
@@ -138,6 +123,7 @@ export function BrandStep({ setup, next, skip, back }: StepProps) {
       // Keep the auto monogram in step with the name, unless someone already chose their own.
       if (brand.monogram === monogramFor(brand.productName) || brand.monogram === "IO") body.monogram = monogramFor(product);
       if (!brand.defaultFromName && companyName.trim()) body.defaultFromName = companyName.trim();
+      if (!keepsStockLogo) body.logoUrl = "";
       const b = await api.put<Brand>("admin/settings/brand", body);
       saved.current = b.theme;
       qc.setQueryData(["brand"], b);
@@ -170,15 +156,15 @@ export function BrandStep({ setup, next, skip, back }: StepProps) {
             </Field>
             <Field label="Logo" hint="A square PNG, SVG or JPG under 1 MB.">
               <div className="flex items-center gap-3">
-                {brand.logoUrl ? (
-                  <img src={brand.logoUrl} alt="Current logo" className="size-10 rounded-ui border border-line object-contain p-0.5" />
+                {logoUrl ? (
+                  <img src={logoUrl} alt="Current logo" className="size-10 rounded-ui border border-line object-contain p-0.5" />
                 ) : (
                   <span className="flex size-10 items-center justify-center rounded-ui text-sm font-bold" style={{ background: accent, color: readableOn(accent) }}>
                     {monogramFor(productName)}
                   </span>
                 )}
                 <Button size="sm" icon={<Upload className="size-4" />} loading={uploading} onClick={() => file.current?.click()}>
-                  {brand.logoUrl ? "Replace" : "Upload"}
+                  {logoUrl ? "Replace" : "Upload"}
                 </Button>
                 <input
                   ref={file}
@@ -193,7 +179,7 @@ export function BrandStep({ setup, next, skip, back }: StepProps) {
                 />
               </div>
             </Field>
-            <Field label="Accent color">
+            <Field label="Accent color" hint="Buttons use it as is; links and highlights get a deeper or lighter shade where needed to stay readable.">
               <div className="flex flex-wrap items-center gap-2">
                 {SWATCHES.map((c) => (
                   <button
@@ -216,8 +202,7 @@ export function BrandStep({ setup, next, skip, back }: StepProps) {
         </Panel>
         <div className="space-y-2">
           <p className="text-xs font-medium text-fg-muted">Preview</p>
-          <MiniPreview productName={productName} logoUrl={brand.logoUrl} accent={accent} />
-          <AccentContrast accent={accent} />
+          <MiniPreview productName={productName} logoUrl={logoUrl} accent={accent} />
           <p className="text-xs text-fg-faint">
             {setup.steps.useCase === "done" ? "Spacing and corners come from your use case; " : ""}the color shows across this page as you pick it.
           </p>

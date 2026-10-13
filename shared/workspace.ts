@@ -79,7 +79,7 @@ export const USE_CASE_PRESETS: UseCasePreset[] = [
     label: "Team",
     tagline: "Personal and shared inboxes for a small company.",
     icon: "Users",
-    theme: { accent: "#4f46e5", radius: "md", density: "comfortable" },
+    theme: { accent: "#6210f8", radius: "md", density: "comfortable" },
     features: { compliance: false, provisioning: false, outreach: false },
     policy: {},
   },

@@ -41,7 +41,7 @@ export function textOn(hex: string): string {
 const abs = (url: string, appUrl: string) => (url.startsWith("/") ? `${appUrl.replace(/\/$/, "")}${url}` : url);
 
 export function renderEmail(brand: Brand, appUrl: string, c: EmailContent): { html: string; text: string } {
-  const accent = HEX.test(brand.theme.accent) ? brand.theme.accent : "#4f46e5";
+  const accent = HEX.test(brand.theme.accent) ? brand.theme.accent : "#6210f8";
   const onAccent = textOn(accent);
   const font = `-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif`;
   const e = escapeHtml;

@@ -1,4 +1,4 @@
-import type { Brand } from "@shared/brand";
+import { INBOXOS_LOGO, type Brand } from "@shared/brand";
 import { api } from "./api";
 import { readableOn } from "./brand";
 
@@ -49,7 +49,20 @@ async function draw(brand: Brand, logo: HTMLImageElement | null, size: number, i
   return new Promise((resolve, reject) => canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("Icon render failed"))), "image/png"));
 }
 
+/** The bundled InboxOS icons (public/icons), already drawn for each size. */
+async function stockIcon(name: string): Promise<Blob> {
+  const res = await fetch(`/icons/${name}.png`);
+  if (!res.ok) throw new Error("Icon could not be loaded");
+  return res.blob();
+}
+
 export async function regenerateAppIcons(brand: Brand): Promise<void> {
+  if (brand.logoUrl === INBOXOS_LOGO) {
+    const form = new FormData();
+    for (const spec of SPECS) form.append(spec.name, new File([await stockIcon(spec.name)], `${spec.name}.png`, { type: "image/png" }));
+    await api.post("admin/settings/icons", form);
+    return;
+  }
   let logo: HTMLImageElement | null = null;
   if (brand.logoUrl) {
     try {

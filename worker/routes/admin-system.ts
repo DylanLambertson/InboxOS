@@ -8,6 +8,7 @@ import { templates, type TemplateName } from "../lib/email-templates";
 import { likeEscape } from "../lib/search";
 import { getOverview } from "../lib/overview";
 import { syncDomainAliases } from "../lib/domains";
+import { INBOXOS_LOGO } from "@shared/brand";
 import { sanitizeTheme } from "@shared/theme";
 import { loadSettings, saveSetting } from "../lib/settings";
 import { allowlistLockoutProblem, isValidCidr } from "../lib/ip-allowlist";
@@ -36,7 +37,7 @@ const zBrand = z.object({
     .string()
     .trim()
     .max(400_000)
-    .refine((v) => v === "" || v.startsWith("https://") || v.startsWith("/api/brand/logo") || /^data:image\/(png|jpeg|svg\+xml|webp|gif);base64,/.test(v), "Logo must be an https URL or an uploaded image"),
+    .refine((v) => v === "" || v === INBOXOS_LOGO || v.startsWith("https://") || v.startsWith("/api/brand/logo") || /^data:image\/(png|jpeg|svg\+xml|webp|gif);base64,/.test(v), "Logo must be an https URL or an uploaded image"),
   monogram: z.string().trim().min(1).max(3),
   // Partial token updates are merged over the current theme and sanitized (see shared/theme.ts).
   theme: z.record(z.string(), z.unknown()),

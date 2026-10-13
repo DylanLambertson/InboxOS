@@ -6,7 +6,7 @@ import { cx, Input, Section, Select } from "@/components/ui/primitives";
 import { ColorField, Segmented, SettingRow } from "./controls";
 import { customFontStack, ensurePreviewFont, FONT_CHOICES } from "./theme-utils";
 
-const ACCENTS = ["#4f46e5", "#2563eb", "#0891b2", "#0f766e", "#059669", "#65a30d", "#d97706", "#ea580c", "#e11d48", "#db2777", "#9333ea", "#334155"];
+const ACCENTS = ["#6210f8", "#4f46e5", "#2563eb", "#0891b2", "#0f766e", "#059669", "#65a30d", "#d97706", "#ea580c", "#e11d48", "#db2777", "#9333ea", "#334155"];
 
 const RADII: { value: Radius; label: string }[] = [
   { value: "none", label: "Square" },
@@ -79,7 +79,7 @@ export function TokenEditor({ theme, set }: { theme: ThemeTokens; set: (patch: P
                 onClick={() => set({ radius: r.value })}
                 className={cx(
                   "flex w-14 flex-col items-center gap-1 rounded-ui border px-1 py-1.5 text-[11px] font-medium transition-colors",
-                  theme.radius === r.value ? "border-accent bg-accent-softer text-accent" : "border-line text-fg-muted hover:border-line-strong hover:text-fg",
+                  theme.radius === r.value ? "border-accent-ink bg-accent-softer text-accent-ink" : "border-line text-fg-muted hover:border-line-strong hover:text-fg",
                 )}
               >
                 <span className="size-5 border-2 border-current" style={{ borderRadius: radiusValue(r.value) === "0px" ? 0 : `calc(${radiusValue(r.value)} * 0.6)` }} />

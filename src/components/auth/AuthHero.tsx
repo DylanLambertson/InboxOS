@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CalendarClock, CheckCheck, Inbox, ShieldCheck } from "lucide-react";
 import { useBrand } from "@/lib/brand";
+import { HeroLogo } from "@/components/layout/Logo";
 
 const FEATURES = [
   { icon: Inbox, text: "Every team inbox in one place" },
@@ -104,13 +105,8 @@ export function AuthHero() {
       <div className="io-glow io-glow-b" style={{ background: brand.theme.accent }} />
       <div className="io-dots absolute inset-0" />
 
-      <div className="relative z-10 flex items-center gap-2.5 p-8 lg:p-10">
-        {brand.logoUrl ? (
-          <img src={brand.logoUrl} alt="" className="size-8 rounded-lg object-contain" />
-        ) : (
-          <span className="flex size-8 items-center justify-center rounded-lg bg-white text-xs font-bold text-black">{brand.monogram}</span>
-        )}
-        <span className="text-sm font-semibold tracking-tight">{brand.companyName}</span>
+      <div className="relative z-10 flex items-center p-8 lg:p-10">
+        <HeroLogo label={brand.companyName} />
       </div>
 
       <div className="relative z-10 flex flex-1 items-center justify-center px-8">

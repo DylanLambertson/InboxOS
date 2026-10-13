@@ -5,8 +5,8 @@
  * from the white-label settings (see src/lib/brand.tsx); everything else derives from them.
  */
 :root {
-  --accent: #4f46e5;
-  --accent-ink: #4f46e5;
+  --accent: #6210f8;
+  --accent-ink: #6210f8;
   --radius: 10px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -50,7 +50,7 @@
     --text: #ededf0;
     --text-muted: #9d9da8;
     --text-faint: #62626c;
-    --accent-ink: #726bea;
+    --accent-ink: #9158fa;
     --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
     --accent-softer: color-mix(in oklab, var(--accent) 11%, transparent);
     --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
@@ -72,7 +72,7 @@
   --text: #ededf0;
   --text-muted: #9d9da8;
   --text-faint: #62626c;
-  --accent-ink: #726bea;
+  --accent-ink: #9158fa;
   --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
   --accent-softer: color-mix(in oklab, var(--accent) 11%, transparent);
   --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { BASE_DARK, DEFAULT_THEME, resolvePalettes, sanitizeTheme } from "../shared/theme";
 import { DEFAULT_WORKSPACE, FEATURE_KEYS, presetFeatures, sanitizeWorkspace, USE_CASE_PRESETS } from "../shared/workspace";
+import { DEFAULT_BRAND, INBOXOS_LOGO, isStockBrand } from "../shared/brand";
 import { normalizeBrand } from "../worker/lib/settings";
 
 describe("sanitizeTheme", () => {
@@ -70,5 +71,14 @@ describe("workspace presets", () => {
     expect(w.features.templates).toBe(DEFAULT_WORKSPACE.features.templates);
     expect(w.features).not.toHaveProperty("bogus");
     expect(sanitizeWorkspace({ useCase: "spaceship" }).useCase).toBe(DEFAULT_WORKSPACE.useCase);
+  });
+});
+
+describe("stock brand", () => {
+  it("starts with the InboxOS logo and recognises it", () => {
+    expect(DEFAULT_BRAND.logoUrl).toBe(INBOXOS_LOGO);
+    expect(isStockBrand(DEFAULT_BRAND)).toBe(true);
+    expect(isStockBrand({ productName: "Acme Mail", logoUrl: INBOXOS_LOGO })).toBe(false);
+    expect(isStockBrand({ productName: "InboxOS", logoUrl: "" })).toBe(false);
   });
 });

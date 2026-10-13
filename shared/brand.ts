@@ -20,7 +20,7 @@ export interface Brand {
    * and compose shows a switch to pick which domain to send from.
    */
   additionalDomains: string[];
-  /** Absolute URL or data: URI of a logo (square works best). Empty = monogram. */
+  /** URL or data: URI of a logo (square works best). Empty = monogram. */
   logoUrl: string;
   /** 1–3 letters shown when no logo is set. */
   monogram: string;
@@ -38,12 +38,16 @@ export interface Brand {
   defaultFromName: string;
 }
 
+/** The InboxOS mark and wordmark (public/brand), used until an install sets its own logo. */
+export const INBOXOS_LOGO = "/brand/inboxos-mark.png";
+export const INBOXOS_WORDMARK = "/brand/inboxos-wordmark.png";
+
 export const DEFAULT_BRAND: Brand = {
   companyName: "",
   productName: "InboxOS",
   primaryDomain: "",
   additionalDomains: [],
-  logoUrl: "",
+  logoUrl: INBOXOS_LOGO,
   monogram: "IO",
   theme: DEFAULT_THEME,
   loginHeadline: "Welcome back",
@@ -52,6 +56,9 @@ export const DEFAULT_BRAND: Brand = {
   footerText: "",
   defaultFromName: "",
 };
+
+/** True while an install still uses the stock InboxOS name and logo (so the full wordmark fits). */
+export const isStockBrand = (b: Pick<Brand, "productName" | "logoUrl">) => b.productName === DEFAULT_BRAND.productName && b.logoUrl === INBOXOS_LOGO;
 
 /** Organization policies, editable from Admin → Settings. */
 export interface OrgPolicy {
