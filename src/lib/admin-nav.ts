@@ -101,7 +101,7 @@ export const ADMIN_NAV: AdminNavGroup[] = [
     id: "developers",
     label: "Developers",
     items: [
-      { to: "/admin/api", label: "API & MCP", icon: Braces, feature: "api", keywords: ["api keys", "tokens", "assistant", "integrations"] },
+      { to: "/admin/api", label: "API & MCP", icon: Braces, feature: "api", keywords: ["api keys", "tokens", "mcp", "integrations"] },
       { to: "/admin/webhooks", label: "Webhooks", icon: Webhook, feature: "webhooks", configOnly: true, keywords: ["events", "callbacks", "notify"] },
     ],
   },

@@ -1,0 +1,38 @@
+InboxOS
+Copyright (C) 2026 Dylan Lambertson <me@dylanlambertson.dev>
+https://github.com/DylanLambertson/InboxOS
+
+This program is free software: you can redistribute it and/or modify it
+under the terms of the GNU Affero General Public License as published by
+the Free Software Foundation, version 3 of the License.
+
+This program is distributed in the hope that it will be useful, but
+WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Affero
+General Public License for more details.
+
+You should have received a copy of the GNU Affero General Public License
+along with this program, in the file LICENSE. If not, see
+<https://www.gnu.org/licenses/>.
+
+
+Name and logo
+-------------
+
+"InboxOS", the InboxOS logo and the InboxOS app icon are the property of
+Dylan Lambertson. The AGPL covers the source code, not the name or the
+artwork in public/brand, public/icons and .github.
+
+You may use the name and logo to refer to the project, for example to say
+that your product is built on InboxOS or to link to this repository.
+If you distribute a modified version or offer one as a hosted service,
+please give it its own name and logo so that people aren't led to think
+it is the original or is endorsed by the author. Self-hosted installs
+are free to keep the stock name and logo for their own users.
+
+
+Third-party software
+--------------------
+
+InboxOS depends on open-source packages that remain under their own
+licenses. The full list is in package.json and package-lock.json.
