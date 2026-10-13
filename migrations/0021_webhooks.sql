@@ -1,6 +1,5 @@
 -- Outbound webhooks (Admin → Webhooks): endpoints that receive signed event
 -- notifications, and a log of every delivery attempt for debugging and retries.
--- Replaces the single NOTIFY_WEBHOOK_URL / NOTIFY_WEBHOOK_SECRET environment hook.
 CREATE TABLE webhook_endpoints (
   id               TEXT PRIMARY KEY,
   url              TEXT NOT NULL,
