@@ -1,8 +1,9 @@
-<p align="center">
-  <img src=".github/screenshots/inbox-light.png" alt="InboxOS inbox" width="100%" />
-</p>
-
-<h1 align="center">InboxOS</h1>
+<h1 align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/brand/inboxos-wordmark.png" />
+    <img src=".github/logo-light.png" alt="InboxOS" width="420" />
+  </picture>
+</h1>
 
 <p align="center">
   <strong>Self-hosted email for your team, on your own domain.</strong><br />
@@ -11,10 +12,14 @@
 </p>
 
 <p align="center">
-  <a href="./LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-4f46e5" /></a>
+  <a href="./LICENSE"><img alt="License: AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-6210f8" /></a>
   <img alt="Cloudflare Workers" src="https://img.shields.io/badge/Cloudflare-Workers%20%2B%20D1%20%2B%20R2-F38020?logo=cloudflare&logoColor=white" />
   <img alt="React 19" src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" />
   <img alt="TypeScript" src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" />
+</p>
+
+<p align="center">
+  <img src=".github/screenshots/inbox-light.png" alt="The InboxOS inbox" width="100%" />
 </p>
 
 ---
@@ -88,6 +93,8 @@
 | **Health center**: every problem with a fix | **Appearance**: presets, palettes and live previews |
 | ![Inbox in dark mode](.github/screenshots/inbox-dark.png) | ![Webhooks](.github/screenshots/webhooks.png) |
 | **Dark mode**, from the same theme tokens | **Webhooks**: signed, retried and logged |
+| ![Sign-in page](.github/screenshots/signin.png) | |
+| **Sign-in**, with your name, logo and colors | |
 
 ## How it works
 
@@ -156,12 +163,12 @@ The first visit to a fresh install opens `/setup`. Every step can be skipped and
 
 ## Make it yours
 
-Everything people see comes from settings, not code.
+Everything people see comes from settings, not code. A fresh install wears the InboxOS logo and purple accent; rename the app in the setup wizard and the logo steps aside for your initials until you upload your own.
 
 | Where | What |
 |---|---|
 | **Admin → Branding** | Company and app name, logo, monogram, sign-in headline, support email, footer, default sender name, previews of every system email |
-| **Admin → Appearance** | Use-case presets, accent, corner radius, density, fonts, text size, default color mode, and full light and dark palettes with contrast warnings. Import and export themes as JSON. |
+| **Admin → Appearance** | Use-case presets, accent, corner radius, density, fonts, text size, default color mode, and full light and dark palettes with contrast warnings. Bright accents stay readable: links and highlights automatically use a deeper shade on light backgrounds. Import and export themes as JSON. |
 | **Admin → Features** | Turn features on or off for the whole workspace. Off means hidden in the UI and refused by the API; nothing is deleted. |
 | **Settings → Profile** | Each person's photo, title, pronouns, time zone, color mode and density |
 
