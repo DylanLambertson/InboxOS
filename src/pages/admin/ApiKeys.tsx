@@ -71,14 +71,21 @@ function CreatedKey({ created, onClose }: { created: { key: string; scopes: stri
           <Code>{created.key}</Code>
         </Field>
         {forMcp && (
-          <>
-            <Field label="Server URL with the key" hint="For clients that can't send headers. Paste this as the server URL.">
+          <div className="space-y-3">
+            <p className="font-medium text-fg">Connect an MCP client</p>
+            <Field label="Server URL" hint="Streamable HTTP transport.">
+              <Code>{`${origin}/mcp`}</Code>
+            </Field>
+            <Field label="Header">
+              <Code>{`Authorization: Bearer ${created.key}`}</Code>
+            </Field>
+            <Field label="Config file" hint="For clients configured with JSON. Clients that can't send headers can use the key-in-URL form instead.">
+              <Code>{JSON.stringify({ mcpServers: { inboxos: { type: "http", url: `${origin}/mcp`, headers: { Authorization: `Bearer ${created.key}` } } } }, null, 2)}</Code>
+            </Field>
+            <Field label="Key-in-URL form">
               <Code>{`${origin}/mcp/${created.key}`}</Code>
             </Field>
-            <Field label="Server URL and header">
-              <Code>{`${origin}/mcp  ·  Authorization: Bearer ${created.key}`}</Code>
-            </Field>
-          </>
+          </div>
         )}
         {created.scopes.includes("send") && (
           <Field label="Another service (e.g. your backend)" hint="POST JSON to this URL with Authorization: Bearer <key>.">
@@ -152,7 +159,7 @@ function NewKeyDialog({ mailboxes, onClose, onCreated }: { mailboxes: MailboxLit
           />
         </Field>
         <Field label="Mailboxes">
-          <CheckRow checked={limit} onChange={setLimit} label="Only specific mailboxes" hint="Recommended for MCP clients. Otherwise the key can use every mailbox." />
+          <CheckRow checked={limit} onChange={setLimit} label="Only specific mailboxes" hint="Recommended for MCP clients and outreach tools. Otherwise the key can use every mailbox." />
           {limit && (
             <div className="mt-2.5 max-h-48 space-y-2 overflow-y-auto rounded-ui border border-line p-3">
               {mailboxes.filter((m) => m.isActive).map((m) => (
