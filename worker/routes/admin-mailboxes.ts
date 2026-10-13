@@ -15,6 +15,7 @@ import { ensureMailbox } from "../lib/users";
 import { clampInt, now } from "../lib/util";
 import { parseBody, zColor, zEmail, zId } from "../lib/validate";
 import { emitFromRequest } from "../lib/webhooks";
+import { assertFeature } from "../lib/features";
 
 export const adminMailboxRoutes = new Hono<AppEnv>();
 
@@ -226,6 +227,7 @@ adminMailboxRoutes.post("/", async (c) => {
       members: z.array(z.object({ userId: zId, role: z.enum(["owner", "editor", "viewer"]) })).max(200).default([]),
     }),
   );
+  if (body.type === "shared") await assertFeature(c, "sharedInboxes");
   if (await addressTaken(c.env.DB, body.address)) throw new HTTPException(409, { message: "That address is already in use." });
   const id = await ensureMailbox(c.env.DB, { address: body.address, name: body.name, displayName: body.displayName, type: body.type });
   if (body.members.length) {
@@ -255,6 +257,7 @@ adminMailboxRoutes.patch("/:id", async (c) => {
       isCatchAll: z.boolean().optional(),
     }),
   );
+  if (body.type === "shared") await assertFeature(c, "sharedInboxes");
   const res = await c.env.DB.prepare(
     `UPDATE mailboxes SET name = COALESCE(?, name), display_name = COALESCE(?, display_name), type = COALESCE(?, type), color = COALESCE(?, color),
        signature_html = COALESCE(?, signature_html), is_active = COALESCE(?, is_active), updated_at = ? WHERE id = ? AND is_system = 0`,

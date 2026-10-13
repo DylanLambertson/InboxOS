@@ -10,6 +10,7 @@ import { deleteMailboxStep, mailboxBulkParamsProblem, mailboxListSql, parseMailb
 import { now } from "../lib/util";
 import { parseBody, zId } from "../lib/validate";
 import { emitFromRequest, type QueuedEvent } from "../lib/webhooks";
+import { assertFeature } from "../lib/features";
 
 /** POST /api/admin/mailboxes/bulk: one action for many mailboxes, with a dry run that explains each row. */
 export const adminMailboxBulkRoutes = new Hono<AppEnv>();
@@ -45,6 +46,7 @@ adminMailboxBulkRoutes.post("/bulk", async (c) => {
   const db = c.env.DB;
   const problem = mailboxBulkParamsProblem(body.action, body.params);
   if (problem) throw new HTTPException(400, { message: problem });
+  if (body.action === "set_type" && body.params.type === "shared") await assertFeature(c, "sharedInboxes");
   if (body.action === "delete" && !body.dryRun && body.params.confirm?.toLowerCase() !== "delete") {
     throw new HTTPException(400, { message: 'Type "delete" to confirm.' });
   }

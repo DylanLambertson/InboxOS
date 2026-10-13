@@ -89,8 +89,8 @@ async function snapshot(c: Context<AppEnv>): Promise<HealthSnapshot> {
       : Promise.resolve(null),
     lastCronRun(db).catch(() => null),
     probe(() => env.FILES.list({ limit: 1 })),
-    // A recent migration (0019) added the secrets table.
-    probe(() => db.prepare("SELECT name FROM secrets LIMIT 1").all()),
+    // The newest migration (0021) added the webhook tables.
+    probe(() => db.prepare("SELECT id FROM webhook_endpoints LIMIT 1").all()),
     db
       .prepare("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")
       .first<{ name: string }>()

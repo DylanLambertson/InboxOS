@@ -14,6 +14,7 @@ import { ensureMailbox, getUserByEmail, insertUser } from "../lib/users";
 import { domainOf, formatAddress, newId, now } from "../lib/util";
 import { parseBody, zEmail } from "../lib/validate";
 import { emailInvite, issueToken } from "./admin-users";
+import { assertFeature } from "../lib/features";
 
 /** Wizard steps that create things: mailboxes and invitations. Mounted under /api/admin/setup. */
 export const setupTeamRoutes = new Hono<AppEnv>();
@@ -33,6 +34,7 @@ setupTeamRoutes.post("/mailboxes", async (c) => {
       shared: z.array(z.object({ address: zEmail, name: z.string().trim().max(80).default("") })).max(20).default([]),
     }),
   );
+  if (body.shared.length) await assertFeature(c, "sharedInboxes");
   const me = c.get("user");
   const { brand } = await loadSettings(c.env.DB);
   const domains = mailDomains(brand);

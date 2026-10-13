@@ -191,6 +191,18 @@ describe("mailboxes table and bulk", () => {
   });
 });
 
+describe("shared inboxes switch", () => {
+  it("refuses new shared mailboxes when the feature is off, but leaves personal ones alone", async () => {
+    sqlite.exec(`INSERT INTO settings (key, value, updated_at) VALUES ('workspace', '{"useCase":"personal","features":{"sharedInboxes":false}}', '2026-01-01')`);
+    invalidateSettings();
+    expect((await call("POST", "/mailboxes", { address: "team@acme.test", type: "shared" })).status).toBe(403);
+    expect((await call("POST", "/mailboxes", { address: "me@acme.test", type: "personal" })).status).toBe(201);
+    expect((await call("POST", "/mailboxes/bulk", { ids: ["mb1"], action: "set_type", params: { type: "shared" } })).status).toBe(403);
+    const imp = await call("POST", "/import/mailboxes", { rows: [{ address: "sales@acme.test", type: "shared" }, { address: "pat@acme.test", type: "personal" }], dryRun: true });
+    expect(imp.body.results.map((r: { status: string }) => r.status)).toEqual(["error", "create"]);
+  });
+});
+
 describe("webhook endpoints", () => {
   it("creates an endpoint, sends a signed test event and logs it", async () => {
     const fetchMock = vi.fn(async () => new Response("ok", { status: 200 }));

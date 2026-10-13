@@ -8,8 +8,11 @@ import { isValidTimeZone, PROFILE_LIMITS } from "./profile";
 import type { MailboxRole, Role } from "./types";
 
 export const IMPORT_MAX_ROWS = 1000;
-/** Rows per commit request; the wizard sends bigger files in chunks and shows progress. */
-export const IMPORT_CHUNK = 25;
+/**
+ * Rows per commit request; the wizard sends bigger files in chunks and shows progress.
+ * Kept small so each request stays under the D1 free plan's 50 queries per invocation.
+ */
+export const IMPORT_CHUNK = 8;
 
 export type ImportKind = "users" | "mailboxes" | "aliases";
 

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { mailDomains } from "@shared/brand";
 import { api, errorMessage } from "@/lib/api";
 import { useBrand } from "@/lib/brand";
+import { useFeature } from "@/lib/workspace";
 import { Button, Field, Input, Select } from "@/components/ui/primitives";
 import { Modal } from "@/components/ui/overlay";
 
@@ -15,7 +16,8 @@ export function CreateMailboxDialog({ onClose, onCreated }: { onClose: () => voi
   const [domain, setDomain] = useState(domains[0]);
   const [name, setName] = useState("");
   const [displayName, setDisplayName] = useState("");
-  const [type, setType] = useState<"shared" | "personal">("shared");
+  const sharedOn = useFeature("sharedInboxes");
+  const [type, setType] = useState<"shared" | "personal">(sharedOn ? "shared" : "personal");
   const [busy, setBusy] = useState(false);
   const submit = async () => {
     setBusy(true);
@@ -82,7 +84,7 @@ export function CreateMailboxDialog({ onClose, onCreated }: { onClose: () => voi
         </div>
         <Field label="Type">
           <Select value={type} onChange={(e) => setType(e.target.value as "shared" | "personal")}>
-            <option value="shared">Shared — a team inbox</option>
+            {sharedOn && <option value="shared">Shared — a team inbox</option>}
             <option value="personal">Personal — one person's inbox</option>
           </Select>
         </Field>

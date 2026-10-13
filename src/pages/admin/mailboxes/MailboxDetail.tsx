@@ -6,6 +6,7 @@ import type { MailboxRole } from "@shared/types";
 import { api, errorMessage } from "@/lib/api";
 import { fileSize, mailboxLabel } from "@/lib/format";
 import { useMe } from "@/lib/queries";
+import { useFeature } from "@/lib/workspace";
 import { LABEL_COLORS } from "@/components/mail/LabelDialog";
 import { Avatar, Button, cx, Field, IconButton, Input, LoadError, Select, Spinner, Switch } from "@/components/ui/primitives";
 import { Modal, useConfirm } from "@/components/ui/overlay";
@@ -58,6 +59,7 @@ export function MailboxDetail({ id, onClose, readOnly }: { id: string; onClose: 
 }
 
 function MailboxDetailForm({ box, onClose, readOnly }: { box: AdminMailbox; onClose: () => void; readOnly: boolean }) {
+  const sharedOn = useFeature("sharedInboxes");
   const qc = useQueryClient();
   const confirm = useConfirm();
   const { data: me } = useMe();
@@ -127,7 +129,7 @@ function MailboxDetailForm({ box, onClose, readOnly }: { box: AdminMailbox; onCl
           <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
             <Field label="Type">
               <Select value={box.type} onChange={(e) => run(() => api.patch(`admin/mailboxes/${box.id}`, { type: e.target.value }))}>
-                <option value="shared">Shared</option>
+                {(sharedOn || box.type === "shared") && <option value="shared">Shared</option>}
                 <option value="personal">Personal</option>
               </Select>
             </Field>

@@ -4,6 +4,7 @@ import { ChevronDown, Power, PowerOff, Tags, Trash2, UserMinus, UserPlus, X } fr
 import { ACCESS_NAME, BULK_CHUNK, type AdminUserRow, type MailboxBulkAction } from "@shared/admin";
 import type { MailboxRole } from "@shared/types";
 import { api } from "@/lib/api";
+import { useFeature } from "@/lib/workspace";
 import { Button, Field, IconButton, Select } from "@/components/ui/primitives";
 import { Menu, Modal } from "@/components/ui/overlay";
 import { BulkDialog, type BulkSpec, type BulkTargets } from "../table/BulkDialog";
@@ -41,7 +42,8 @@ export function MailboxBulkBar({ count, targets, onClear, onDone }: { count: num
   const [ask, setAsk] = useState<null | "add_member" | "remove_member" | "set_type">(null);
   const [userId, setUserId] = useState("");
   const [access, setAccess] = useState<MailboxRole>("editor");
-  const [type, setType] = useState<"shared" | "personal">("shared");
+  const sharedOn = useFeature("sharedInboxes");
+  const [type, setType] = useState<"shared" | "personal">(sharedOn ? "shared" : "personal");
   const [running, setRunning] = useState<BulkSpec | null>(null);
   const person = users.find((u) => u.id === userId);
 
@@ -93,7 +95,7 @@ export function MailboxBulkBar({ count, targets, onClear, onDone }: { count: num
         {ask === "set_type" ? (
           <Field label="Type">
             <Select value={type} onChange={(e) => setType(e.target.value as "shared" | "personal")}>
-              <option value="shared">Shared: a team inbox</option>
+              {sharedOn && <option value="shared">Shared: a team inbox</option>}
               <option value="personal">Personal: one person's inbox</option>
             </Select>
           </Field>

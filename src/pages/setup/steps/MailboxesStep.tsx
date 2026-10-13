@@ -4,6 +4,7 @@ import { Inbox, Plus, Users, X } from "lucide-react";
 import { toast } from "sonner";
 import { api, errorMessage } from "@/lib/api";
 import { useDomainList, useRefreshSetup } from "@/lib/setup";
+import { useFeature } from "@/lib/workspace";
 import { Badge, Button, Checkbox, cx, Input } from "@/components/ui/primitives";
 import { Panel, StepFrame, type StepProps } from "../StepFrame";
 
@@ -63,7 +64,8 @@ export function MailboxesStep({ setup, next, skip, back, goto }: StepProps) {
     );
   }
 
-  const chosenShared = shared.filter((s) => s.on && validLocal(s.local) && !existing.has(`${s.local}@${primary}`));
+  const sharedOn = useFeature("sharedInboxes");
+  const chosenShared = shared.filter((s) => sharedOn && s.on && validLocal(s.local) && !existing.has(`${s.local}@${primary}`));
   const wantPersonal = personal.on && validLocal(personal.local);
   const nothing = !wantPersonal && !chosenShared.length;
 
@@ -121,30 +123,32 @@ export function MailboxesStep({ setup, next, skip, back, goto }: StepProps) {
         </Panel>
       )}
 
-      <Panel title="Shared inboxes" description="Suggested for how you'll use it. Everyone you give access can read and reply.">
-        <ul className="space-y-2.5">
-          {shared.map((s) => {
-            const taken = existing.has(`${s.local}@${primary}`);
-            return (
-              <li key={s.key} className="flex items-center gap-3">
-                <Checkbox checked={s.on && !taken} onChange={(v) => setShared((rows) => rows.map((r) => (r.key === s.key ? { ...r, on: v } : r)))} label={`Create ${s.local}@${primary}`} />
-                <AddressInput label="Shared address" local={s.local} setLocal={(v) => setShared((rows) => rows.map((r) => (r.key === s.key ? { ...r, local: v, on: true } : r)))} domain={primary} setDomain={() => {}} domains={[primary]} />
-                <Input aria-label="Name in the sidebar" value={s.name} onChange={(e) => setShared((rows) => rows.map((r) => (r.key === s.key ? { ...r, name: e.target.value } : r)))} className="w-32 max-sm:hidden" placeholder="Name" />
-                {taken ? (
-                  <Badge tone="success">Exists</Badge>
-                ) : (
-                  <button type="button" aria-label="Remove" onClick={() => setShared((rows) => rows.filter((r) => r.key !== s.key))} className="rounded p-1 text-fg-muted hover:bg-muted hover:text-fg">
-                    <X className="size-4" />
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-        <Button size="sm" variant="ghost" className="mt-3" icon={<Plus className="size-4" />} onClick={() => setShared((rows) => [...rows, { key: `n${Date.now()}`, on: true, local: "", name: "" }])}>
-          Add a shared inbox
-        </Button>
-      </Panel>
+      {sharedOn && (
+        <Panel title="Shared inboxes" description="Suggested for how you'll use it. Everyone you give access can read and reply.">
+          <ul className="space-y-2.5">
+            {shared.map((s) => {
+              const taken = existing.has(`${s.local}@${primary}`);
+              return (
+                <li key={s.key} className="flex items-center gap-3">
+                  <Checkbox checked={s.on && !taken} onChange={(v) => setShared((rows) => rows.map((r) => (r.key === s.key ? { ...r, on: v } : r)))} label={`Create ${s.local}@${primary}`} />
+                  <AddressInput label="Shared address" local={s.local} setLocal={(v) => setShared((rows) => rows.map((r) => (r.key === s.key ? { ...r, local: v, on: true } : r)))} domain={primary} setDomain={() => {}} domains={[primary]} />
+                  <Input aria-label="Name in the sidebar" value={s.name} onChange={(e) => setShared((rows) => rows.map((r) => (r.key === s.key ? { ...r, name: e.target.value } : r)))} className="w-32 max-sm:hidden" placeholder="Name" />
+                  {taken ? (
+                    <Badge tone="success">Exists</Badge>
+                  ) : (
+                    <button type="button" aria-label="Remove" onClick={() => setShared((rows) => rows.filter((r) => r.key !== s.key))} className="rounded p-1 text-fg-muted hover:bg-muted hover:text-fg">
+                      <X className="size-4" />
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+          <Button size="sm" variant="ghost" className="mt-3" icon={<Plus className="size-4" />} onClick={() => setShared((rows) => [...rows, { key: `n${Date.now()}`, on: true, local: "", name: "" }])}>
+            Add a shared inbox
+          </Button>
+        </Panel>
+      )}
       {domains.length > 1 && <p className="text-xs text-fg-muted">Each mailbox also gets its address on {domains.filter((d) => d !== primary).join(", ")}.</p>}
     </StepFrame>
   );

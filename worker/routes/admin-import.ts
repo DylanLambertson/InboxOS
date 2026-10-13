@@ -16,6 +16,7 @@ import {
 } from "@shared/admin-import";
 import type { AppEnv } from "../env";
 import { auditMany, type AuditEntry } from "../lib/audit";
+import { featureEnabled, featureOffMessage } from "../lib/features";
 import { addressTaken } from "../lib/mailbox-admin";
 import { zProfilePatch } from "../lib/profile";
 import { ensureMailbox, insertUser } from "../lib/users";
@@ -168,8 +169,14 @@ adminImportRoutes.post("/mailboxes", async (c) => {
     ? await db.prepare("SELECT id, email FROM users WHERE email IN (SELECT value FROM json_each(?))").bind(JSON.stringify([...new Set(memberEmails)])).all<{ id: string; email: string }>()
     : { results: [] as { id: string; email: string }[] };
   const userId = new Map(people.map((p) => [p.email.toLowerCase(), p.id]));
+  const sharedOn = await featureEnabled(db, "sharedInboxes");
   for (const x of checked) {
     if (!x.value || x.result.status === "error") continue;
+    if (!sharedOn && x.value.type === "shared") {
+      x.result.status = "error";
+      x.result.errors = [...x.result.errors, featureOffMessage("sharedInboxes")];
+      continue;
+    }
     if (taken.has(x.value.address)) {
       x.result.status = "skip";
       x.result.warnings = ["Already exists; left unchanged."];

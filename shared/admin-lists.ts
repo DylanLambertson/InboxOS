@@ -118,10 +118,13 @@ export interface MailboxBulkParams {
 
 /** Most rows a bulk selection may cover (a dry run checks them all at once). */
 export const BULK_MAX = 1000;
-/** Rows per commit request; the console sends bigger selections in chunks and shows progress. */
-export const BULK_CHUNK = 50;
+/**
+ * Rows per commit request; the console sends bigger selections in chunks and shows progress.
+ * Kept small so each request stays well under the D1 free plan's 50 queries per invocation.
+ */
+export const BULK_CHUNK = 10;
 /** Smaller chunks for actions that send email. */
-export const BULK_EMAIL_CHUNK = 20;
+export const BULK_EMAIL_CHUNK = 5;
 /** Messages a bulk mailbox delete purges per request; the client repeats until done. */
 export const BULK_PURGE_BUDGET = 500;
 

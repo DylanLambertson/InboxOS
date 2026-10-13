@@ -46,7 +46,7 @@ export const FEATURES: Record<FeatureKey, FeatureInfo> = {
   scheduledSend: { label: "Scheduled send", description: "Write now, deliver later.", group: "Mail" },
   templates: { label: "Templates", description: "Reusable replies for common questions.", group: "Mail" },
   contacts: { label: "Contacts", description: "An address book with notes and tags.", group: "Mail" },
-  mailRules: { label: "Mail rules", description: "Filter, label, forward or auto-reply automatically.", group: "Mail" },
+  mailRules: { label: "Mail rules", description: "Filter, label or forward mail automatically. Vacation replies and blocked senders stay available.", group: "Mail" },
   outreach: { label: "Outreach & unsubscribes", description: "Unsubscribe links and a do-not-email list for cold outreach.", group: "Mail" },
   digest: { label: "Unread digests", description: "Daily unread summaries sent to a personal address.", group: "Mail" },
   push: { label: "Push notifications", description: "Phone and desktop notifications for new mail.", group: "Mail" },
