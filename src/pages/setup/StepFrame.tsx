@@ -52,7 +52,7 @@ export function StepFrame({
   return (
     <section aria-labelledby="setup-step-title" className="flex min-h-full flex-col">
       <header className="mb-7">
-        {eyebrow && <p className="mb-2 text-xs font-medium tracking-wide text-accent uppercase">{eyebrow}</p>}
+        {eyebrow && <p className="mb-2 text-xs font-medium tracking-wide text-accent-ink uppercase">{eyebrow}</p>}
         <h1 id="setup-step-title" ref={heading} tabIndex={-1} className="text-2xl font-semibold tracking-tight text-fg outline-none">
           {title}
         </h1>

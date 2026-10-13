@@ -15,7 +15,7 @@ export function ColorField({ value, onChange, label, invalid }: { value: string;
   return (
     <span
       className={cx(
-        "inline-flex h-8 items-center gap-1.5 rounded-ui border bg-surface pr-2 pl-1 transition-colors focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft",
+        "inline-flex h-8 items-center gap-1.5 rounded-ui border bg-surface pr-2 pl-1 transition-colors focus-within:border-accent-ink focus-within:ring-3 focus-within:ring-accent-soft",
         invalid ? "border-warning" : "border-line hover:border-line-strong",
       )}
     >
@@ -66,7 +66,7 @@ export function Segmented<T extends string>({
           key={o.value}
           title={o.hint}
           className={cx(
-            "flex cursor-pointer items-center gap-1.5 rounded-ui-sm px-3 py-1 text-[13px] font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent",
+            "flex cursor-pointer items-center gap-1.5 rounded-ui-sm px-3 py-1 text-[13px] font-medium transition-colors has-[:focus-visible]:outline-2 has-[:focus-visible]:outline-accent-ink",
             value === o.value ? "bg-raised text-fg shadow-ui-sm" : "text-fg-muted hover:text-fg",
           )}
         >

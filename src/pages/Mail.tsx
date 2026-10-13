@@ -270,7 +270,7 @@ export function MailPage() {
               onKeyDown={(e) => e.key === "Escape" && (e.currentTarget.blur(), e.stopPropagation())}
               placeholder={unified ? "Search all inboxes" : `Search ${mailboxLabel(mailbox)}`}
               aria-label="Search mail"
-              className="h-9 w-full rounded-ui border border-transparent bg-muted pr-16 pl-8 text-[13px] outline-none placeholder:text-fg-faint focus:border-accent focus:bg-surface focus:ring-3 focus:ring-accent-soft"
+              className="h-9 w-full rounded-ui border border-transparent bg-muted pr-16 pl-8 text-[13px] outline-none placeholder:text-fg-faint focus:border-accent-ink focus:bg-surface focus:ring-3 focus:ring-accent-soft"
             />
             <span className="absolute top-1/2 right-1 flex -translate-y-1/2 items-center">
               {q && (
@@ -324,7 +324,7 @@ export function MailPage() {
                 onClick={() => setStatusChip(s)}
                 className={cx(
                   "h-6 shrink-0 rounded-full px-2.5 text-xs font-medium transition-colors",
-                  convStatus === s ? "bg-accent-soft text-accent" : "text-fg-muted hover:bg-muted hover:text-fg",
+                  convStatus === s ? "bg-accent-soft text-accent-ink" : "text-fg-muted hover:bg-muted hover:text-fg",
                 )}
               >
                 {s ? s[0].toUpperCase() + s.slice(1) : "All"}
@@ -456,7 +456,7 @@ function SearchHelp({ onPick }: { onPick: (s: string) => void }) {
               onClick={() => (onPick(op), setOpen(false))}
               className="flex w-full items-center justify-between gap-3 rounded-ui-sm px-2 py-1.5 text-left hover:bg-muted"
             >
-              <code className="text-xs font-medium text-accent">{op}</code>
+              <code className="text-xs font-medium text-accent-ink">{op}</code>
               <span className="truncate text-xs text-fg-muted">{desc}</span>
             </button>
           ))}

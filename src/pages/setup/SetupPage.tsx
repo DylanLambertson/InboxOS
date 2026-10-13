@@ -129,7 +129,7 @@ export function SetupPage() {
         <div className="io-form-in max-w-sm text-center">
           <h1 className="text-xl font-semibold tracking-tight">Only an owner can run setup</h1>
           <p className="mt-2 text-sm text-fg-muted">Ask the owner of this workspace to finish setting it up.</p>
-          <Link to="/" className="mt-6 inline-block text-sm font-medium text-accent hover:underline">
+          <Link to="/" className="mt-6 inline-block text-sm font-medium text-accent-ink hover:underline">
             Go to your inbox
           </Link>
         </div>

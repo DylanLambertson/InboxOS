@@ -246,7 +246,7 @@ export function AdminBranding() {
                   rel="noopener"
                   className="group flex items-center gap-3 rounded-ui border border-line p-3 transition-colors hover:border-line-strong hover:bg-subtle"
                 >
-                  <span className="flex size-8 items-center justify-center rounded-ui-sm bg-accent-soft text-accent">
+                  <span className="flex size-8 items-center justify-center rounded-ui-sm bg-accent-soft text-accent-ink">
                     <t.icon className="size-4" />
                   </span>
                   <span className="min-w-0 flex-1">

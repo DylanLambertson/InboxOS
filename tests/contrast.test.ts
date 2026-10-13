@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { contrastLevel, contrastProblems, contrastRatio, hexToRgb, paletteContrastChecks, readableOn, relativeLuminance } from "../shared/contrast";
+import { accentInk, contrastLevel, contrastProblems, contrastRatio, hexToRgb, paletteContrastChecks, readableOn, relativeLuminance } from "../shared/contrast";
 import { BASE_DARK, BASE_LIGHT, DEFAULT_THEME } from "../shared/theme";
 import { USE_CASE_PRESETS } from "../shared/workspace";
 
@@ -62,5 +62,23 @@ describe("palette checks", () => {
     expect(check.fg).toBe(readableOn("#a3a3a3"));
     expect(check.min).toBe(3);
     expect(check.ratio).toBeGreaterThan(0);
+  });
+});
+
+describe("accentInk", () => {
+  it("keeps an accent that is already legible on the background", () => {
+    expect(accentInk("#4f46e5", "#ffffff")).toBe("#4f46e5");
+    expect(accentInk("#c6f135", "#0e0e10")).toBe("#c6f135");
+  });
+
+  it("darkens a bright accent on light backgrounds and lightens a dark one on dark backgrounds", () => {
+    const onWhite = accentInk("#c6f135", "#ffffff");
+    expect(contrastRatio(onWhite, "#ffffff")).toBeGreaterThanOrEqual(4.5);
+    const onBlack = accentInk("#1e1b4b", "#0e0e10");
+    expect(contrastRatio(onBlack, "#0e0e10")).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it("passes invalid colors through", () => {
+    expect(accentInk("nope", "#ffffff")).toBe("nope");
   });
 });

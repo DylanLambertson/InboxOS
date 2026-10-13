@@ -14,7 +14,7 @@ const validLocal = (v: string) => /^[a-z0-9](?:[a-z0-9._-]{0,62}[a-z0-9])?$/.tes
 /** local@domain editor with a domain picker when there are several domains. */
 function AddressInput({ local, setLocal, domain, setDomain, domains, label }: { local: string; setLocal: (v: string) => void; domain: string; setDomain: (v: string) => void; domains: string[]; label: string }) {
   return (
-    <div className={cx("flex h-9 min-w-0 flex-1 items-stretch overflow-hidden rounded-ui border bg-surface focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft", local && !validLocal(local) ? "border-danger" : "border-line")}>
+    <div className={cx("flex h-9 min-w-0 flex-1 items-stretch overflow-hidden rounded-ui border bg-surface focus-within:border-accent-ink focus-within:ring-3 focus-within:ring-accent-soft", local && !validLocal(local) ? "border-danger" : "border-line")}>
       <input aria-label={label} value={local} onChange={(e) => setLocal(e.target.value.toLowerCase().replace(/\s/g, ""))} className="min-w-0 flex-1 bg-transparent px-3 text-sm outline-none" />
       {domains.length > 1 ? (
         <select aria-label="Domain" value={domain} onChange={(e) => setDomain(e.target.value)} className="border-l border-line bg-subtle px-2 text-sm text-fg-muted outline-none">

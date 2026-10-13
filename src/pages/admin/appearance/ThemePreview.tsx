@@ -46,7 +46,7 @@ export function MiniMail({ theme, brand, mode }: { theme: ThemeTokens; brand: Pi
           ].map((n) => (
             <div
               key={n.label}
-              className={cx("flex items-center gap-2 rounded-ui-sm px-2", n.active ? "bg-accent-soft font-medium text-accent" : "text-fg-muted")}
+              className={cx("flex items-center gap-2 rounded-ui-sm px-2", n.active ? "bg-accent-soft font-medium text-accent-ink" : "text-fg-muted")}
               style={{ paddingBlock: pad(4) }}
             >
               <n.icon className="size-3 shrink-0" />
@@ -67,7 +67,7 @@ export function MiniMail({ theme, brand, mode }: { theme: ThemeTokens; brand: Pi
           </div>
           {ROWS.map((r, i) => (
             <div key={r.subject} className={cx("relative flex gap-2 border-b border-line px-2.5", i === 0 ? "bg-accent-soft" : "")} style={{ paddingBlock: pad(7) }}>
-              {r.unread && <span className="absolute top-1/2 left-1 size-1 -translate-y-1/2 rounded-full bg-accent" />}
+              {r.unread && <span className="absolute top-1/2 left-1 size-1 -translate-y-1/2 rounded-full bg-accent-ink" />}
               <span className="mt-0.5 size-5 shrink-0 rounded-full" style={{ background: r.color }} />
               <div className="min-w-0 flex-1">
                 <div className="flex items-baseline gap-1">
@@ -86,7 +86,7 @@ export function MiniMail({ theme, brand, mode }: { theme: ThemeTokens; brand: Pi
           <div className="mb-1 font-semibold">Kickoff notes and next steps</div>
           <div className="mb-3 flex items-center gap-1.5">
             <span className="rounded-full bg-success-soft px-1.5 text-[0.8em] font-medium text-success">Open</span>
-            <span className="rounded-full bg-accent-soft px-1.5 text-[0.8em] font-medium text-accent">Client</span>
+            <span className="rounded-full bg-accent-soft px-1.5 text-[0.8em] font-medium text-accent-ink">Client</span>
           </div>
           <div className="rounded-ui border border-line bg-surface p-2.5 shadow-ui-sm">
             <div className="mb-2 flex items-center gap-2">
@@ -98,7 +98,7 @@ export function MiniMail({ theme, brand, mode }: { theme: ThemeTokens; brand: Pi
             </div>
             <p className="text-fg">Thanks all, here's a recap of what we agreed today.</p>
             <p className="mt-1 text-fg-muted">
-              Next review is Thursday. <span className="text-accent underline">Open the brief</span>
+              Next review is Thursday. <span className="text-accent-ink underline">Open the brief</span>
             </p>
           </div>
           <div className="mt-auto flex gap-1.5 pt-3">

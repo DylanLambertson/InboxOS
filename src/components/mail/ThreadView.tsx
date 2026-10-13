@@ -174,8 +174,8 @@ export function ThreadView({
         {conv && <ReplyingBanner people={conv.replying} />}
 
         {primary.folder === "scheduled" && (
-          <div className="mx-5 mb-3 flex flex-wrap items-center gap-3 rounded-ui border border-accent/30 bg-accent-softer px-4 py-3 text-[13px]">
-            <Clock className="size-4 text-accent" />
+          <div className="mx-5 mb-3 flex flex-wrap items-center gap-3 rounded-ui border border-accent-ink/30 bg-accent-softer px-4 py-3 text-[13px]">
+            <Clock className="size-4 text-accent-ink" />
             <span className="flex-1">Scheduled to send {primary.scheduledAt ? longDate(primary.scheduledAt) : "soon"}.</span>
             {!readOnly && (
               <Button size="sm" onClick={unschedule} icon={<PenSquare className="size-3.5" />}>

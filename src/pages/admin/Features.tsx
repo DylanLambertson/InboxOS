@@ -71,7 +71,7 @@ export function AdminFeatures() {
         description={
           <>
             Picking a use case shows its recommended switches below; nothing changes until you save. To also apply its look, use a preset in{" "}
-            <Link to="/admin/appearance" className="font-medium text-accent hover:underline">
+            <Link to="/admin/appearance" className="font-medium text-accent-ink hover:underline">
               Appearance
             </Link>
             .
@@ -92,7 +92,7 @@ export function AdminFeatures() {
                 onClick={() => setUseCase(p.id)}
                 className={cx(
                   "flex items-start gap-3 rounded-ui border p-3 text-left transition-colors disabled:cursor-default",
-                  active ? "border-accent bg-accent-softer" : "border-line hover:border-line-strong hover:bg-subtle",
+                  active ? "border-accent-ink bg-accent-softer" : "border-line hover:border-line-strong hover:bg-subtle",
                 )}
               >
                 <span className={cx("flex size-8 shrink-0 items-center justify-center rounded-ui-sm", active ? "bg-accent text-accent-fg" : "bg-muted text-fg-muted")}>

@@ -103,7 +103,7 @@ function Highlighted({ text, query }: { text: string; query: string }) {
   ranges.forEach(([s, e], i) => {
     if (s > at) parts.push(text.slice(at, s));
     parts.push(
-      <mark key={i} className="bg-transparent font-semibold text-accent">
+      <mark key={i} className="bg-transparent font-semibold text-accent-ink">
         {text.slice(s, e)}
       </mark>,
     );

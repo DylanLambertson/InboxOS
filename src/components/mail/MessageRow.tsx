@@ -41,10 +41,10 @@ export const MessageRow = memo(function MessageRow({ m, selected, checked, focus
         "group relative flex cursor-pointer gap-3 border-b border-line px-3 transition-colors select-none",
         compact ? "py-2" : "py-3",
         selected ? "bg-accent-soft" : checked ? "bg-accent-softer" : "hover:bg-subtle",
-        focused && !selected && "ring-1 ring-accent/40 ring-inset",
+        focused && !selected && "ring-1 ring-accent-ink/40 ring-inset",
       )}
     >
-      {unread && <span className="absolute top-1/2 left-1 size-1.5 -translate-y-1/2 rounded-full bg-accent" aria-label="Unread" />}
+      {unread && <span className="absolute top-1/2 left-1 size-1.5 -translate-y-1/2 rounded-full bg-accent-ink" aria-label="Unread" />}
       <div className="relative flex shrink-0 items-start pt-0.5">
         <div className={cx("transition-opacity", checked ? "opacity-0" : "group-hover:opacity-0", compact && "hidden")}>
           <Avatar email={showRecipients ? m.to[0]?.email ?? m.from.email : m.from.email} name={showRecipients ? m.to[0]?.name : m.from.name} size={32} />
@@ -67,8 +67,8 @@ export const MessageRow = memo(function MessageRow({ m, selected, checked, focus
             </span>
           )}
           {m.hasAttachments && <Paperclip className="size-3.5 shrink-0 text-fg-faint" />}
-          {m.folder === "scheduled" && <Clock className="size-3.5 shrink-0 text-accent" />}
-          {m.folder === "snoozed" && <AlarmClock className="size-3.5 shrink-0 text-accent" aria-label="Snoozed until" />}
+          {m.folder === "scheduled" && <Clock className="size-3.5 shrink-0 text-accent-ink" />}
+          {m.folder === "snoozed" && <AlarmClock className="size-3.5 shrink-0 text-accent-ink" aria-label="Snoozed until" />}
           {m.convStatus === "pending" && <Hourglass className="size-3.5 shrink-0 text-warning" aria-label="Pending" />}
           {m.convStatus === "closed" && <CheckCircle2 className="size-3.5 shrink-0 text-success" aria-label="Closed" />}
           {m.assignee && (

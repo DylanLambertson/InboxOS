@@ -110,12 +110,12 @@ export function DataTable<T>(p: Props<T>) {
         {selection!.all ? (
           <>
             All {p.total.toLocaleString()} {p.noun} matching your filters are selected.
-            <button className="font-medium text-accent hover:underline" onClick={() => onSelection!(emptySelection())}>Clear selection</button>
+            <button className="font-medium text-accent-ink hover:underline" onClick={() => onSelection!(emptySelection())}>Clear selection</button>
           </>
         ) : (
           <>
             All {rows.length} {p.noun} on this page are selected.
-            <button className="font-medium text-accent hover:underline" onClick={() => onSelection!({ all: true })}>
+            <button className="font-medium text-accent-ink hover:underline" onClick={() => onSelection!({ all: true })}>
               Select all {p.total.toLocaleString()} matching
             </button>
           </>
@@ -181,7 +181,7 @@ export function DataTable<T>(p: Props<T>) {
                       onKeyDown={(e) => onRowKey(e, i, row)}
                       onClick={(e) => onRowClick(e, row)}
                       className={cx(
-                        "outline-none focus-visible:bg-subtle focus-visible:shadow-[inset_2px_0_0_var(--accent)]",
+                        "outline-none focus-visible:bg-subtle focus-visible:shadow-[inset_2px_0_0_var(--accent-ink)]",
                         p.onOpen && "cursor-pointer",
                         on ? "bg-accent-softer" : "hover:bg-subtle",
                         p.rowClassName?.(row),

@@ -18,7 +18,7 @@ function NoteBody({ body, members, meId }: { body: string; members: MailboxMembe
       {segments.map((s, i) => {
         if (s.kind === "link") {
           return (
-            <a key={i} href={s.href} target="_blank" rel="noopener noreferrer nofollow" className="text-accent underline underline-offset-2">
+            <a key={i} href={s.href} target="_blank" rel="noopener noreferrer nofollow" className="text-accent-ink underline underline-offset-2">
               {s.text}
             </a>
           );
@@ -26,7 +26,7 @@ function NoteBody({ body, members, meId }: { body: string; members: MailboxMembe
         if (s.kind === "mention") {
           const m = byHandle.get(s.handle);
           return (
-            <span key={i} title={m ? `${personName(m)} <${m.email}>` : undefined} className={cx("rounded px-0.5 font-medium", m?.id === meId ? "bg-accent text-accent-fg" : "bg-accent-soft text-accent")}>
+            <span key={i} title={m ? `${personName(m)} <${m.email}>` : undefined} className={cx("rounded px-0.5 font-medium", m?.id === meId ? "bg-accent text-accent-fg" : "bg-accent-soft text-accent-ink")}>
               {s.text}
             </span>
           );

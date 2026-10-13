@@ -163,7 +163,7 @@ export function ImportWizard({ kind, onClose, onDone }: { kind: ImportKind; onCl
           const order = ["source", "map", "preview", "running", "done"];
           const active = order.indexOf(step) >= order.indexOf(s);
           return (
-            <li key={s} className={cx("flex-1 border-t-2 pt-1.5", active ? "border-accent text-fg" : "border-line")}>
+            <li key={s} className={cx("flex-1 border-t-2 pt-1.5", active ? "border-accent-ink text-fg" : "border-line")}>
               {i + 1}. {["Upload", "Match columns", "Review", "Import"][i]}
             </li>
           );
@@ -178,7 +178,7 @@ export function ImportWizard({ kind, onClose, onDone }: { kind: ImportKind; onCl
       {step === "source" && (
         <div className="space-y-4">
           <label
-            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-ui border-2 border-dashed border-line px-6 py-8 text-center hover:border-accent hover:bg-subtle"
+            className="flex cursor-pointer flex-col items-center justify-center gap-2 rounded-ui border-2 border-dashed border-line px-6 py-8 text-center hover:border-accent-ink hover:bg-subtle"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => (e.preventDefault(), onFile(e.dataTransfer.files[0]))}
           >
@@ -197,7 +197,7 @@ export function ImportWizard({ kind, onClose, onDone }: { kind: ImportKind; onCl
                 <li key={f.key}><span className="font-medium text-fg">{f.label}</span>{f.required && " (required)"}: {f.hint}</li>
               ))}
             </ul>
-            <button className="mt-2 inline-flex items-center gap-1 font-medium text-accent hover:underline" onClick={() => downloadCsv(`${kind}-template`, IMPORT_TEMPLATES[kind])}>
+            <button className="mt-2 inline-flex items-center gap-1 font-medium text-accent-ink hover:underline" onClick={() => downloadCsv(`${kind}-template`, IMPORT_TEMPLATES[kind])}>
               <Download className="size-3.5" /> Download a template
             </button>
           </div>

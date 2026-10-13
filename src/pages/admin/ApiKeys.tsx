@@ -230,7 +230,7 @@ export function AdminApiKeys() {
       </Card>
 
       <Section title="Do-not-email list" description="People who unsubscribed, hard-bounced or marked you as spam. API sends to them are refused.">
-        <Link to="/admin/unsubscribes" className="text-[13px] font-medium text-accent hover:underline">
+        <Link to="/admin/unsubscribes" className="text-[13px] font-medium text-accent-ink hover:underline">
           See everyone on the list →
         </Link>
       </Section>

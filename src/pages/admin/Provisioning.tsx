@@ -163,7 +163,7 @@ export function AdminProvisioning() {
         </div>
       </Section>
 
-      <Section title="Recent activity" description={<>Changes made by your identity provider. The full history is in the <Link to="/admin/logs/audit" className="text-accent hover:underline">audit log</Link>.</>}>
+      <Section title="Recent activity" description={<>Changes made by your identity provider. The full history is in the <Link to="/admin/logs/audit" className="text-accent-ink hover:underline">audit log</Link>.</>}>
         {!activity.length ? (
           <EmptyState icon={<UserPlus className="size-5" />} title="Nothing yet" body="Changes appear here once your identity provider starts syncing." />
         ) : (

@@ -90,7 +90,7 @@ function MailboxList({ boxes, currentId, onNavigate }: { boxes: MailboxSummary[]
       >
         {color ? <span className="size-2.5 shrink-0 rounded-full" style={{ background: color }} /> : <Inboxes className="size-4 shrink-0" />}
         <span className="min-w-0 flex-1 truncate">{label}</span>
-        {!!unread && <span className="text-[11px] font-semibold tabular-nums text-accent">{unread > 999 ? "999+" : unread}</span>}
+        {!!unread && <span className="text-[11px] font-semibold tabular-nums text-accent-ink">{unread > 999 ? "999+" : unread}</span>}
       </Link>
     );
   };
@@ -119,7 +119,7 @@ function NavItem({ to, icon: Icon, label, count, color, onNavigate }: { to: stri
       className={({ isActive }) =>
         cx(
           "group flex h-[calc(2rem*var(--density,1))] items-center gap-2.5 rounded-ui-sm px-2.5 text-[13px] transition-colors",
-          isActive ? "bg-accent-soft font-medium text-accent" : "text-fg-muted hover:bg-muted hover:text-fg",
+          isActive ? "bg-accent-soft font-medium text-accent-ink" : "text-fg-muted hover:bg-muted hover:text-fg",
         )
       }
     >

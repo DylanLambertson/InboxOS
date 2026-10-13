@@ -54,10 +54,10 @@ export function UseCaseStep({ setup, next, skip }: StepProps) {
               onClick={() => setPicked(p.id)}
               className={cx(
                 "group relative flex items-start gap-3 rounded-ui-lg border bg-surface p-4 text-left shadow-ui-sm transition-[border,box-shadow,transform] duration-150 hover:-translate-y-px hover:border-line-strong",
-                on ? "border-accent ring-3 ring-accent-soft" : "border-line",
+                on ? "border-accent-ink ring-3 ring-accent-soft" : "border-line",
               )}
             >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-ui" style={{ background: `color-mix(in oklab, ${p.theme.accent} 14%, transparent)`, color: p.theme.accent }}>
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-ui" style={{ background: `color-mix(in oklab, ${p.theme.accent} 14%, transparent)`, color: `color-mix(in oklab, ${p.theme.accent} 55%, var(--text))` }}>
                 <Icon className="size-[18px]" />
               </span>
               <span className="min-w-0 flex-1">

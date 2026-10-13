@@ -56,7 +56,7 @@ export function SearchBox({ value, onChange, placeholder }: { value: string; onC
 export function FilterChip({ label, value, options, onChange }: { label: string; value: string; options: { value: string; label: string }[]; onChange: (v: string) => void }) {
   const current = options.find((o) => o.value === value);
   return (
-    <span className={cx("inline-flex h-8 items-center rounded-full border text-[13px]", current ? "border-accent/40 bg-accent-soft text-accent" : "border-line bg-surface text-fg-muted")}>
+    <span className={cx("inline-flex h-8 items-center rounded-full border text-[13px]", current ? "border-accent-ink/40 bg-accent-soft text-accent-ink" : "border-line bg-surface text-fg-muted")}>
       <Menu
         width={220}
         items={options.map((o) => ({ label: o.label, checked: o.value === value, onSelect: () => onChange(o.value === value ? "" : o.value) }))}

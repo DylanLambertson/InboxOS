@@ -68,7 +68,7 @@ export function AttachmentChip({
         </button>
       )}
       {progress !== undefined && (
-        <span className="absolute bottom-0 left-0 h-0.5 bg-accent transition-[width]" style={{ width: `${progress}%` }} />
+        <span className="absolute bottom-0 left-0 h-0.5 bg-accent-ink transition-[width]" style={{ width: `${progress}%` }} />
       )}
     </div>
   );

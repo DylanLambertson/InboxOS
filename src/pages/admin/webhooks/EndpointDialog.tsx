@@ -91,7 +91,7 @@ export function EndpointDialog({ endpoint, onClose, onSaved }: { endpoint?: Webh
                 <legend className="sr-only">{group}</legend>
                 <div className="flex items-center justify-between border-b border-line bg-subtle px-3 py-1.5">
                   <span className="text-xs font-semibold text-fg-muted">{group}</span>
-                  <button type="button" className="text-xs font-medium text-accent hover:underline" onClick={() => toggle(keys, !all)}>
+                  <button type="button" className="text-xs font-medium text-accent-ink hover:underline" onClick={() => toggle(keys, !all)}>
                     {all ? "Clear" : "Select all"}
                   </button>
                 </div>

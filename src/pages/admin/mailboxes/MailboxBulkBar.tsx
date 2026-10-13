@@ -55,7 +55,7 @@ export function MailboxBulkBar({ count, targets, onClear, onDone }: { count: num
   };
 
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-ui border border-accent/30 bg-accent-softer px-3 py-2" role="toolbar" aria-label="Bulk actions">
+    <div className="flex flex-wrap items-center gap-2 rounded-ui border border-accent-ink/30 bg-accent-softer px-3 py-2" role="toolbar" aria-label="Bulk actions">
       <span className="text-[13px] font-medium">{boxes(count)} selected</span>
       <IconButton size="sm" label="Clear selection" onClick={onClear}>
         <X className="size-4" />

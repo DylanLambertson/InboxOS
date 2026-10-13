@@ -22,11 +22,11 @@ export function SetupBanner() {
   };
   return (
     <div className="flex items-center gap-3 border-b border-line bg-accent-softer px-4 py-2 text-[13px]">
-      <Sparkles className="size-4 shrink-0 text-accent" aria-hidden />
+      <Sparkles className="size-4 shrink-0 text-accent-ink" aria-hidden />
       <span className="min-w-0 flex-1 truncate text-fg">
         Setup is {data.progress}% done.<span className="text-fg-muted max-sm:hidden"> Finish connecting your domain and email provider to start sending and receiving.</span>
       </span>
-      <Link to={`/setup/${data.nextStep}`} className="shrink-0 font-medium text-accent hover:underline">
+      <Link to={`/setup/${data.nextStep}`} className="shrink-0 font-medium text-accent-ink hover:underline">
         Continue setup
       </Link>
       <button type="button" onClick={dismiss} aria-label="Hide setup reminder" className="shrink-0 rounded-ui-sm p-1 text-fg-muted hover:bg-muted hover:text-fg">

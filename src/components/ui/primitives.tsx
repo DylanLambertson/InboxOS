@@ -86,7 +86,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
 const width = (className?: string) => (className && /(^|\s)(max-|min-)?w-/.test(className) ? "" : "w-full");
 
 const fieldBase =
-  "rounded-ui border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-faint transition-colors hover:border-line-strong focus:border-accent focus:outline-none focus:ring-3 focus:ring-accent-soft disabled:opacity-60";
+  "rounded-ui border border-line bg-surface px-3 text-sm text-fg placeholder:text-fg-faint transition-colors hover:border-line-strong focus:border-accent-ink focus:outline-none focus:ring-3 focus:ring-accent-soft disabled:opacity-60";
 
 export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(function Input({ className, ...rest }, ref) {
   return <input ref={ref} className={cx(fieldBase, width(className), "h-9", className)} {...rest} />;
@@ -160,7 +160,7 @@ export { Avatar } from "./Avatar";
 type Tone = "neutral" | "accent" | "success" | "warning" | "danger";
 const tones: Record<Tone, string> = {
   neutral: "bg-muted text-fg-muted",
-  accent: "bg-accent-soft text-accent",
+  accent: "bg-accent-soft text-accent-ink",
   success: "bg-success-soft text-success",
   warning: "bg-warning-soft text-warning",
   danger: "bg-danger-soft text-danger",

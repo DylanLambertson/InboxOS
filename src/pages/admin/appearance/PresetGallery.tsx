@@ -17,7 +17,7 @@ function Swatch({ preset }: { preset: UseCasePreset }) {
     <div className="flex items-center gap-1 border-b border-line px-1.5 py-1">
       <span className="size-2.5 rounded-full bg-muted" />
       <span className={cx("h-1 rounded-full", unread ? "bg-fg" : "bg-line-strong")} style={{ width: w }} />
-      {unread && <span className="ml-auto size-1 rounded-full bg-accent" />}
+      {unread && <span className="ml-auto size-1 rounded-full bg-accent-ink" />}
     </div>
   );
   return (
@@ -70,8 +70,8 @@ export function PresetGallery({
               onClick={() => setPicked(p)}
               aria-current={currentUseCase === p.id || undefined}
               className={cx(
-                "group flex flex-col gap-2.5 rounded-ui-lg border bg-surface p-3 text-left transition-colors hover:bg-subtle focus-visible:border-accent",
-                currentUseCase === p.id ? "border-accent" : "border-line hover:border-line-strong",
+                "group flex flex-col gap-2.5 rounded-ui-lg border bg-surface p-3 text-left transition-colors hover:bg-subtle focus-visible:border-accent-ink",
+                currentUseCase === p.id ? "border-accent-ink" : "border-line hover:border-line-strong",
               )}
             >
               <Swatch preset={p} />
@@ -103,9 +103,9 @@ export function PresetGallery({
             <button
               type="button"
               onClick={() => (onApplyLook(picked), setPicked(null))}
-              className="flex w-full items-start gap-3 rounded-ui border border-line p-3 text-left transition-colors hover:border-accent hover:bg-accent-softer"
+              className="flex w-full items-start gap-3 rounded-ui border border-line p-3 text-left transition-colors hover:border-accent-ink hover:bg-accent-softer"
             >
-              <Paintbrush className="mt-0.5 size-4 shrink-0 text-accent" />
+              <Paintbrush className="mt-0.5 size-4 shrink-0 text-accent-ink" />
               <span>
                 <span className="block text-[13px] font-medium">Just the look</span>
                 <span className="block text-xs text-fg-muted">Accent, corners and density go into the editor below. Nothing is saved until you click Save.</span>
@@ -113,7 +113,7 @@ export function PresetGallery({
             </button>
             <div className={cx("rounded-ui border border-line p-3", !isOwner && "opacity-60")}>
               <div className="flex items-start gap-3">
-                <ToggleRight className="mt-0.5 size-4 shrink-0 text-accent" />
+                <ToggleRight className="mt-0.5 size-4 shrink-0 text-accent-ink" />
                 <div className="min-w-0 flex-1">
                   <p className="text-[13px] font-medium">Look and features</p>
                   <p className="text-xs text-fg-muted">

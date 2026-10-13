@@ -46,7 +46,7 @@ export function DoneStep({ setup, back, goto }: StepProps) {
       onBack={back}
     >
       {!missing.length && (
-        <div className="flex items-center gap-3 rounded-ui-lg bg-accent-soft px-4 py-3 text-[13px] text-accent">
+        <div className="flex items-center gap-3 rounded-ui-lg bg-accent-soft px-4 py-3 text-[13px] text-accent-ink">
           <PartyPopper className="size-5 shrink-0" /> Setup complete.
         </div>
       )}

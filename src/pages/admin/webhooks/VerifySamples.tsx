@@ -68,7 +68,7 @@ export function VerifySamples() {
   return (
     <div className="space-y-3">
       <p className="text-[13px] text-fg-muted">
-        Requests follow the <a className="text-accent hover:underline" href="https://www.standardwebhooks.com" target="_blank" rel="noreferrer">Standard Webhooks</a> spec, so its
+        Requests follow the <a className="text-accent-ink hover:underline" href="https://www.standardwebhooks.com" target="_blank" rel="noreferrer">Standard Webhooks</a> spec, so its
         libraries work too. Each request has <code className="font-mono text-xs">webhook-id</code>, <code className="font-mono text-xs">webhook-timestamp</code> and{" "}
         <code className="font-mono text-xs">webhook-signature</code> headers; the signature is an HMAC-SHA256 of <code className="font-mono text-xs">id.timestamp.body</code>.
         Answer with any 2xx within 10 seconds; anything else is retried after 1 minute, 5 minutes, 30 minutes, 2, 6 and 12 hours. Use <code className="font-mono text-xs">webhook-id</code> to ignore repeats.

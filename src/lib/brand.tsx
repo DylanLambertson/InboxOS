@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { DEFAULT_BRAND, type Brand } from "@shared/brand";
-import { readableOn } from "@shared/contrast";
+import { accentInk, readableOn } from "@shared/contrast";
 import { densityScale, PALETTE_KEYS, radiusValue, resolvePalettes, type Density, type Palette, type ThemeTokens } from "@shared/theme";
 import type { DensityPreference, ThemePreference } from "@shared/types";
 import { api } from "./api";
@@ -17,7 +17,9 @@ const kebab = (k: string) => k.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 const VAR_NAME: Partial<Record<keyof Palette, string>> = { text: "text", textMuted: "text-muted", textFaint: "text-faint" };
 /** The CSS variable a palette key is written to, e.g. textMuted → --text-muted. */
 export const paletteVarName = (k: keyof Palette) => `--${VAR_NAME[k] ?? kebab(k)}`;
-const paletteVars = (p: Palette) => PALETTE_KEYS.map((k) => `${paletteVarName(k)}:${p[k]};`).join("");
+/** A palette's variables, plus the accent shade that stays legible on its background. */
+const paletteVars = (p: Palette, accent: string) =>
+  PALETTE_KEYS.map((k) => `${paletteVarName(k)}:${p[k]};`).join("") + `--accent-ink:${accentInk(accent, p.bg)};`;
 
 /**
  * The CSS for a theme: palettes for both color modes (respecting an explicit
@@ -35,10 +37,10 @@ export function themeCss(theme: ThemeTokens): string {
     `--density:${densityScale(theme.density)};`,
   ].join("");
   return [
-    `:root{${shared}${paletteVars(light)}}`,
-    `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${paletteVars(dark)}}}`,
-    `:root[data-theme="dark"]{${paletteVars(dark)}}`,
-    `:root[data-theme="light"]{${paletteVars(light)}}`,
+    `:root{${shared}${paletteVars(light, theme.accent)}}`,
+    `@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){${paletteVars(dark, theme.accent)}}}`,
+    `:root[data-theme="dark"]{${paletteVars(dark, theme.accent)}}`,
+    `:root[data-theme="light"]{${paletteVars(light, theme.accent)}}`,
   ].join("\n");
 }
 

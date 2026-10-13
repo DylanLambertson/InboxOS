@@ -1,5 +1,5 @@
 import type { CSSProperties } from "react";
-import { readableOn } from "@shared/contrast";
+import { accentInk, readableOn } from "@shared/contrast";
 import { BASE_DARK, BASE_LIGHT, densityScale, PALETTE_KEYS, radiusValue, resolvePalettes, SYSTEM_FONT_STACK, type Palette, type ThemeTokens } from "@shared/theme";
 import { paletteVarName } from "@/lib/brand";
 
@@ -18,6 +18,7 @@ export function scopedThemeStyle(theme: ThemeTokens, mode: Mode): CSSProperties 
   const vars: Record<string, string> = {
     "--accent": theme.accent,
     "--accent-fg": readableOn(theme.accent),
+    "--accent-ink": accentInk(theme.accent, p.bg),
     "--accent-soft": `color-mix(in oklab, ${theme.accent} ${dark ? 20 : 10}%, transparent)`,
     "--accent-softer": `color-mix(in oklab, ${theme.accent} ${dark ? 11 : 6}%, transparent)`,
     "--danger-soft": `color-mix(in oklab, ${p.danger} 10%, transparent)`,

@@ -20,7 +20,7 @@ export function FeatureOff({ feature }: { feature: FeatureKey }) {
       }
       action={
         canManage ? (
-          <Link to="/admin/features" className="text-[13px] font-medium text-accent hover:underline">
+          <Link to="/admin/features" className="text-[13px] font-medium text-accent-ink hover:underline">
             Open Features
           </Link>
         ) : undefined

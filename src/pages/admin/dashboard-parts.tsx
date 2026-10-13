@@ -66,7 +66,7 @@ export function KpiTile({ label, kpi, days, spark, color, goodWhenDown, hint }: 
 
 export function Meter({ label, used, limit, note }: { label: string; used: number; limit: number; note?: string }) {
   const pct = limit ? Math.min(100, (used / limit) * 100) : 0;
-  const tone = pct >= 90 ? "bg-danger" : pct >= 70 ? "bg-warning" : "bg-accent";
+  const tone = pct >= 90 ? "bg-danger" : pct >= 70 ? "bg-warning" : "bg-accent-ink";
   return (
     <Card className="p-5">
       <div className="flex items-baseline justify-between gap-2">
@@ -146,7 +146,7 @@ export function SetupCard({ status }: { status: SetupStatus }) {
   const done = steps.filter(([, v]) => v).length;
   const pct = steps.length ? Math.round((done / steps.length) * 100) : 0;
   return (
-    <Card className="overflow-hidden border-accent/30">
+    <Card className="overflow-hidden border-accent-ink/30">
       <div className="flex flex-wrap items-center gap-4 bg-accent-softer px-5 py-4">
         <div className="min-w-0 flex-1">
           <h2 className="text-sm font-semibold">Finish setting up</h2>
@@ -159,7 +159,7 @@ export function SetupCard({ status }: { status: SetupStatus }) {
         </Link>
       </div>
       <div className="h-1 bg-muted">
-        <div className="h-full bg-accent transition-[width] duration-500" style={{ width: `${pct}%` }} />
+        <div className="h-full bg-accent-ink transition-[width] duration-500" style={{ width: `${pct}%` }} />
       </div>
       <ul className="grid gap-x-6 gap-y-2 px-5 py-4 sm:grid-cols-2 lg:grid-cols-3">
         {steps.map(([key, ok]) => (

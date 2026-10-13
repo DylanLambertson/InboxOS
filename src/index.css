@@ -6,6 +6,7 @@
  */
 :root {
   --accent: #4f46e5;
+  --accent-ink: #4f46e5;
   --radius: 10px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 
@@ -49,6 +50,7 @@
     --text: #ededf0;
     --text-muted: #9d9da8;
     --text-faint: #62626c;
+    --accent-ink: #726bea;
     --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
     --accent-softer: color-mix(in oklab, var(--accent) 11%, transparent);
     --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
@@ -70,6 +72,7 @@
   --text: #ededf0;
   --text-muted: #9d9da8;
   --text-faint: #62626c;
+  --accent-ink: #726bea;
   --accent-soft: color-mix(in oklab, var(--accent) 20%, transparent);
   --accent-softer: color-mix(in oklab, var(--accent) 11%, transparent);
   --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
@@ -93,6 +96,7 @@
   --color-fg-faint: var(--text-faint);
   --color-accent: var(--accent);
   --color-accent-fg: var(--accent-fg);
+  --color-accent-ink: var(--accent-ink);
   --color-accent-soft: var(--accent-soft);
   --color-accent-softer: var(--accent-softer);
   --color-series-1: var(--series-1);
@@ -157,7 +161,7 @@
     background: var(--accent-soft);
   }
   :focus-visible {
-    outline: 2px solid var(--accent);
+    outline: 2px solid var(--accent-ink);
     outline-offset: 2px;
   }
   button {
@@ -187,12 +191,12 @@
   .rte ul { list-style: disc; padding-left: 1.5em; margin: 0 0 0.5em; }
   .rte ol { list-style: decimal; padding-left: 1.5em; margin: 0 0 0.5em; }
   .rte blockquote { border-left: 3px solid var(--border-strong); padding-left: 0.9em; color: var(--text-muted); margin: 0 0 0.5em; }
-  .rte a { color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+  .rte a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
   .rte code { background: var(--bg-muted); padding: 0.1em 0.35em; border-radius: 4px; font-size: 0.9em; }
   .rte pre { background: var(--bg-muted); padding: 0.75em 1em; border-radius: 8px; overflow-x: auto; }
   .rte hr { border: 0; border-top: 1px solid var(--border); margin: 1em 0; }
   .rte img { max-width: 100%; height: auto; border-radius: 4px; }
-  .rte img.ProseMirror-selectednode { outline: 2px solid var(--accent); }
+  .rte img.ProseMirror-selectednode { outline: 2px solid var(--accent-ink); }
   .rte p.is-editor-empty:first-child::before {
     content: attr(data-placeholder);
     color: var(--text-faint);

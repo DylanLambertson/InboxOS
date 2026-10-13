@@ -14,7 +14,7 @@ function Stage({ tone, label, detail }: { tone: Tone; label: string; detail?: st
   const Icon = tone === "done" ? CheckCircle2 : tone === "fail" ? XCircle : tone === "wait" ? Loader2 : CircleDashed;
   return (
     <li className="flex items-start gap-2.5">
-      <Icon className={cx("mt-0.5 size-4 shrink-0", tone === "done" ? "text-success" : tone === "fail" ? "text-danger" : tone === "wait" ? "animate-spin text-accent" : "text-fg-faint")} />
+      <Icon className={cx("mt-0.5 size-4 shrink-0", tone === "done" ? "text-success" : tone === "fail" ? "text-danger" : tone === "wait" ? "animate-spin text-accent-ink" : "text-fg-faint")} />
       <div className="min-w-0">
         <div className={cx("text-[13px]", tone === "idle" ? "text-fg-muted" : "text-fg")}>{label}</div>
         {detail && <div className="text-xs text-fg-muted">{detail}</div>}

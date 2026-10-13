@@ -59,14 +59,14 @@ export function ApiKeyHelp() {
     <ol className="list-decimal space-y-1.5 pl-5 text-[13px] text-fg-muted marker:text-fg-faint">
       <li>
         Sign in to Resend (or{" "}
-        <a className="font-medium text-accent hover:underline" href="https://resend.com/signup" target="_blank" rel="noreferrer">
+        <a className="font-medium text-accent-ink hover:underline" href="https://resend.com/signup" target="_blank" rel="noreferrer">
           create a free account
         </a>
         ).
       </li>
       <li>
         Open{" "}
-        <a className="inline-flex items-center gap-1 font-medium text-accent hover:underline" href="https://resend.com/api-keys" target="_blank" rel="noreferrer">
+        <a className="inline-flex items-center gap-1 font-medium text-accent-ink hover:underline" href="https://resend.com/api-keys" target="_blank" rel="noreferrer">
           API Keys <ExternalLink className="size-3" />
         </a>{" "}
         and click <b className="text-fg">Create API key</b>.
@@ -122,7 +122,7 @@ export function ManualWebhookSteps({ endpoint }: { endpoint: string }) {
       <ol className="list-decimal space-y-1.5 pl-5 text-[13px] text-fg-muted marker:text-fg-faint">
         <li>
           In Resend, open{" "}
-          <a className="font-medium text-accent hover:underline" href="https://resend.com/webhooks" target="_blank" rel="noreferrer">
+          <a className="font-medium text-accent-ink hover:underline" href="https://resend.com/webhooks" target="_blank" rel="noreferrer">
             Webhooks
           </a>{" "}
           and click <b className="text-fg">Add webhook</b>.

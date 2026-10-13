@@ -71,7 +71,7 @@ export function AdminSetup() {
         }
       >
         <div className="mb-5 h-1.5 overflow-hidden rounded-full bg-muted">
-          <div className="h-full rounded-full bg-accent transition-[width] duration-500" style={{ width: `${data.progress}%` }} />
+          <div className="h-full rounded-full bg-accent-ink transition-[width] duration-500" style={{ width: `${data.progress}%` }} />
         </div>
         <ul className="divide-y divide-line">
           {steps.map((s) => {
@@ -92,7 +92,7 @@ export function AdminSetup() {
                 </span>
                 <Badge tone={b.tone}>{b.label}</Badge>
                 {href && (
-                  <Link to={href} className="flex items-center gap-1 text-xs font-medium text-accent hover:underline" aria-label={`Open ${STEP_INFO[s].label}`}>
+                  <Link to={href} className="flex items-center gap-1 text-xs font-medium text-accent-ink hover:underline" aria-label={`Open ${STEP_INFO[s].label}`}>
                     Open <ArrowRight className="size-3" />
                   </Link>
                 )}

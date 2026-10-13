@@ -232,7 +232,7 @@ function LinkPopover({ editor, onClose }: { editor: TipTap; onClose: () => void 
 export function RichTextField({ value, onChange, placeholder, minHeight = 140 }: { value: string; onChange: (html: string) => void; placeholder?: string; minHeight?: number }) {
   const editor = useMailEditor({ content: value, placeholder, onUpdate: onChange });
   return (
-    <div className="overflow-hidden rounded-ui border border-line bg-surface focus-within:border-accent focus-within:ring-3 focus-within:ring-accent-soft">
+    <div className="overflow-hidden rounded-ui border border-line bg-surface focus-within:border-accent-ink focus-within:ring-3 focus-within:ring-accent-soft">
       <EditorToolbar editor={editor} className="border-b border-line bg-subtle px-1.5 py-1" />
       <div className="cursor-text px-3 py-2.5" style={{ minHeight }} onClick={() => editor?.commands.focus()}>
         <EditorContent editor={editor} />

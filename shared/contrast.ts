@@ -42,6 +42,26 @@ export function readableOn(hex: string): string {
   return relativeLuminance(hex) > 0.45 ? "#111111" : "#ffffff";
 }
 
+const toHex = (rgb: number[]) => "#" + rgb.map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+
+/**
+ * The accent as used for text, borders and focus rings on a given background: the
+ * accent itself when it's already legible there, otherwise the closest shade (mixed
+ * toward black on light backgrounds, white on dark ones) that reaches `min`. Lets a
+ * bright accent like lime fill buttons while links stay readable on white.
+ */
+export function accentInk(accent: string, bg: string, min = 4.5): string {
+  const a = hexToRgb(accent);
+  if (!a || !hexToRgb(bg)) return accent;
+  if (contrastRatio(accent, bg) >= min) return accent.toLowerCase();
+  const toward = relativeLuminance(bg) > 0.18 ? 0 : 255;
+  for (let t = 0.05; t < 1; t += 0.05) {
+    const hex = toHex(a.map((v) => v + (toward - v) * t));
+    if (contrastRatio(hex, bg) >= min) return hex;
+  }
+  return toward ? "#ffffff" : "#000000";
+}
+
 export type ContrastLevel = "AAA" | "AA" | "AA Large" | "Fail";
 
 /** WCAG rating for normal-size text at a given ratio. */

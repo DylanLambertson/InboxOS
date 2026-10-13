@@ -31,7 +31,7 @@ export function DomainsStep({ setup, next, skip, back, goto }: StepProps) {
           <Info className="mt-0.5 size-4 shrink-0" />
           <span>
             Connect the email provider first to get the DNS records for your domain.{" "}
-            <button type="button" className="font-medium text-accent hover:underline" onClick={() => goto("provider")}>
+            <button type="button" className="font-medium text-accent-ink hover:underline" onClick={() => goto("provider")}>
               Connect Resend
             </button>
           </span>

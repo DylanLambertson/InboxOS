@@ -28,7 +28,7 @@ export function ProviderHints({ domain, records }: { domain: string; records: Ex
             onClick={() => setId(id === h.id ? null : h.id)}
             className={cx(
               "h-7 rounded-full border px-3 text-xs font-medium transition-colors",
-              id === h.id ? "border-accent bg-accent-soft text-accent" : "border-line bg-surface text-fg-muted hover:border-line-strong hover:text-fg",
+              id === h.id ? "border-accent-ink bg-accent-soft text-accent-ink" : "border-line bg-surface text-fg-muted hover:border-line-strong hover:text-fg",
             )}
           >
             {h.name}

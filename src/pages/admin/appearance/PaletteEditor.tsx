@@ -83,7 +83,7 @@ export function PaletteEditor({ theme, set }: { theme: ThemeTokens; set: (patch:
                 <div key={k} className="flex items-center gap-3 py-2">
                   <span className="min-w-0 flex-1 text-[13px]">
                     {PALETTE_LABELS[k]}
-                    {k in overrides && <span className="ml-1.5 text-[11px] text-accent">custom</span>}
+                    {k in overrides && <span className="ml-1.5 text-[11px] text-accent-ink">custom</span>}
                     {flagged.has(k) && <AlertTriangle className="ml-1.5 inline size-3 text-warning" aria-label="Low contrast" />}
                   </span>
                   <ColorField label={PALETTE_LABELS[k]} value={p[k]} onChange={(hex) => setKey(k, hex)} invalid={flagged.has(k)} />

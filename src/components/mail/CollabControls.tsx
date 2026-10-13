@@ -7,7 +7,7 @@ import { Avatar, cx } from "../ui/primitives";
 import { Menu, type MenuItem } from "../ui/overlay";
 
 export const STATUS_META: Record<ConversationStatus, { label: string; icon: typeof CircleDot; tone: string }> = {
-  open: { label: "Open", icon: CircleDot, tone: "text-accent" },
+  open: { label: "Open", icon: CircleDot, tone: "text-accent-ink" },
   pending: { label: "Pending", icon: Hourglass, tone: "text-warning" },
   closed: { label: "Closed", icon: CheckCircle2, tone: "text-success" },
 };

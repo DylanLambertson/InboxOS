@@ -194,7 +194,7 @@ function Tile({ label, value, hint, active, onClick }: { label: string; value: n
       aria-pressed={active}
       className={cx(
         "rounded-ui border bg-surface p-4 text-left transition-colors hover:border-line-strong",
-        active ? "border-accent ring-1 ring-accent" : "border-line",
+        active ? "border-accent-ink ring-1 ring-accent-ink" : "border-line",
       )}
     >
       <p className="text-xs font-medium text-fg-muted">{label}</p>

@@ -243,7 +243,7 @@ export function Menu({
                     {it.label}
                     {it.hint && <span className="block truncate text-[11px] text-fg-muted">{it.hint}</span>}
                   </span>
-                  {it.checked && <span className="text-accent">✓</span>}
+                  {it.checked && <span className="text-accent-ink">✓</span>}
                   {it.shortcut && <span className="text-[11px] text-fg-faint">{it.shortcut}</span>}
                 </button>
               ),

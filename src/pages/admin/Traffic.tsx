@@ -48,7 +48,7 @@ function StatTile({ label, value, active, tone, onClick }: { label: string; valu
       onClick={onClick}
       className={cx(
         "rounded-ui-lg border bg-surface p-4 text-left shadow-ui-sm transition-colors hover:border-line-strong",
-        active ? "border-accent ring-3 ring-accent-soft" : "border-line",
+        active ? "border-accent-ink ring-3 ring-accent-soft" : "border-line",
       )}
     >
       <p className="text-xs font-medium text-fg-muted">{label}</p>
@@ -308,7 +308,7 @@ export function AdminTraffic() {
             {rows.map((r) => (
               <button key={r.id} onClick={() => setOpen(r.id)} className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-subtle">
                 <span
-                  className={cx("flex size-8 shrink-0 items-center justify-center rounded-full", r.direction === "inbound" ? "bg-accent-soft text-accent" : "bg-muted text-fg-muted")}
+                  className={cx("flex size-8 shrink-0 items-center justify-center rounded-full", r.direction === "inbound" ? "bg-accent-soft text-accent-ink" : "bg-muted text-fg-muted")}
                   title={r.direction === "inbound" ? "Received" : "Sent"}
                 >
                   {r.direction === "inbound" ? <ArrowDownLeft className="size-4" /> : <ArrowUpRight className="size-4" />}

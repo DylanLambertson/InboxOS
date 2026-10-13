@@ -93,7 +93,7 @@ export function ImportReview({ pending, onCancel, onApply }: { pending: PendingI
             </ul>
           )}
           {pending.changes.length > 12 && !showAll && (
-            <button className="text-xs font-medium text-accent hover:underline" onClick={() => setShowAll(true)}>
+            <button className="text-xs font-medium text-accent-ink hover:underline" onClick={() => setShowAll(true)}>
               Show all {pending.changes.length} changes
             </button>
           )}
