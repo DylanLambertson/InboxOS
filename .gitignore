@@ -3,3 +3,9 @@ dist
 .wrangler
 .dev.vars
 *.tsbuildinfo
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+.DS_Store
